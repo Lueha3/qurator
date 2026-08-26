@@ -1,0 +1,221 @@
+// qurator (HoneyFlow) — Phase 0 스키마
+// 정본: docs/02-architecture.md §3. Phase 0 범위로 축소했지만 필드/enum은 정본과 동일하게 유지해
+// Phase 1+ (딜 레이더·발행 어댑터·헬스체커)로 갈 때 스키마 변경이 없도록 한다.
+//
+// DB: SQLite (Phase 0 로컬 개발용 — Supabase 계정 없이 즉시 실행 가능).
+// provider만 "postgresql"로 바꾸고 DATABASE_URL을 Supabase 연결 문자열로 교체하면
+// Phase 3(RLS 멀티테넌트) 전환이 그대로 된다 (creator_id가 이미 전 테이블 FK).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ── creators ────────────────────────────────────────────────────────────
+// 1차는 현표 1행이지만 처음부터 FK로 걸어 SaaS 확장 시 스키마 변경 0.
+model Creator {
+  id              String   @id @default(uuid())
+  handle          String   @unique // 'maison_jenflox'
+  curatorShopUrl  String? // musinsa.com/curator/s/{닉네임}
+  toneProfile     String? // jsonb 대체: 말투 few-shot 예시, 금칙어 등 (JSON 문자열)
+  sizeProfile     String? // {height, weight, usual_top, usual_bottom} (JSON 문자열)
+  createdAt       DateTime @default(now())
+
+  products Product[]
+  deals    Deal[]
+
+  @@map("creators")
+}
+
+// ── products ────────────────────────────────────────────────────────────
+model Product {
+  id              String   @id @default(uuid())
+  creatorId       String
+  creator         Creator  @relation(fields: [creatorId], references: [id])
+
+  musinsaGoodsNo  String? // URL의 /products/{번호}. 수동 입력 단계에서는 선택
+  canonicalUrl    String // www.musinsa.com/products/{번호}
+  brandName       String
+  brandNameEn     String?
+  productName     String
+  styleCode       String? // 품번
+  categoryPath    String? // ['상의','맨투맨'] JSON 문자열
+  listPrice       Int // 정가(원)
+  mainImageUrl    String? // 재게시 금지 — 내부 확인용만
+  source          CaptureSource @default(PASTE)
+  capturedAt      DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  variants ProductVariant[]
+  deals    Deal[]
+
+  @@unique([creatorId, musinsaGoodsNo])
+  @@map("products")
+}
+
+enum CaptureSource {
+  EXTENSION
+  PASTE
+  RADAR
+  SHARE
+}
+
+// ── product_variants ────────────────────────────────────────────────────
+model ProductVariant {
+  id               String    @id @default(uuid())
+  productId        String
+  product          Product   @relation(fields: [productId], references: [id])
+
+  colorName        String
+  sizeName         String? // null = 색상 대표 행
+  stockState       StockState @default(UNKNOWN)
+  stockCheckedAt   DateTime?
+
+  curatorLinks CuratorLink[]
+
+  @@map("product_variants")
+}
+
+enum StockState {
+  IN_STOCK
+  LOW
+  SOLDOUT
+  UNKNOWN
+}
+
+// ── deals ───────────────────────────────────────────────────────────────
+model Deal {
+  id                String     @id @default(uuid())
+  productId         String
+  product           Product    @relation(fields: [productId], references: [id])
+  creatorId         String
+  creator           Creator    @relation(fields: [creatorId], references: [id])
+
+  status            DealStatus @default(DRAFT) // draft→ready→published→expired→archived (정본 enum)
+
+  salePrice         Int?
+  discountRate      Int? // %
+  couponCode        String?
+  couponDesc        String?
+  couponExpiresAt   DateTime?
+  finalPrice        Int? // 쿠폰 적용가. null이면 salePrice 사용
+  endsAt            DateTime?
+
+  hookLine          String? // AI 초안 → 사람 수정본
+  curatorNote       String? // 사이즈 코멘트 등 (168/62 M 정사이즈)
+  aiScore           Float?
+  priority          Int      @default(0)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  curatorLinks CuratorLink[]
+  contentCards ContentCard[]
+  posts        Post[]
+
+  @@map("deals")
+}
+
+enum DealStatus {
+  DRAFT
+  READY
+  PUBLISHED
+  EXPIRED
+  ARCHIVED
+}
+
+// ── curator_links ───────────────────────────────────────────────────────
+// 큐레이터센터에서 "사람이 수동 생성"한 링크의 저장소. API 생성 불가가 전제(무신사 약관/API 부재).
+model CuratorLink {
+  id              String   @id @default(uuid())
+  dealId          String
+  deal            Deal     @relation(fields: [dealId], references: [id])
+  variantId       String? // null = 상품 대표 링크 (기본값 — 실사용성 검증 반영: 색상별은 옵트인)
+  variant         ProductVariant? @relation(fields: [variantId], references: [id])
+
+  rawUrl          String // 붙여넣은 원본 (utm_term ULID 포함)
+  ulid            String? // rawUrl에서 파싱한 utm_term — 정산 매칭 키
+  isDefault       Boolean  @default(true) // 상품 대표 링크 여부
+
+  health          LinkHealth @default(UNCHECKED)
+  healthCheckedAt DateTime?
+
+  createdAt       DateTime @default(now())
+
+  @@map("curator_links")
+}
+
+enum LinkHealth {
+  OK
+  SOLDOUT
+  COUPON_EXPIRED
+  DEAD
+  UNCHECKED
+}
+
+// ── content_cards ───────────────────────────────────────────────────────
+// 렌더링 결과물. Deal당 채널당 활성 1개, 불변(immutable) + 버전.
+model ContentCard {
+  id                String   @id @default(uuid())
+  dealId            String
+  deal              Deal     @relation(fields: [dealId], references: [id])
+
+  channel           Channel
+  version           Int      @default(1)
+
+  bodyText          String // 최종 텍스트 (고지 포함)
+  charCount         Int
+  disclosureOk      Boolean // false면 발행/복사 API가 거부 (불변식)
+  truncated         Boolean  @default(false) // 채널 글자수 제약으로 축약 사다리가 적용됐는지
+  warnings          String? // 렌더러가 남긴 경고 메시지 배열 (JSON 문자열)
+  aiGeneratedFields String? // ['hook_line'] JSON 문자열 — 사람 검토 필요 필드 추적
+  approvedAt        DateTime?
+
+  createdAt         DateTime @default(now())
+
+  posts Post[]
+
+  @@unique([dealId, channel, version])
+  @@map("content_cards")
+}
+
+enum Channel {
+  KAKAO_OPEN
+  THREADS
+  INSTAGRAM_COMMENT
+  NOTION
+}
+
+// ── posts ───────────────────────────────────────────────────────────────
+// 발행 이력. 반자동 채널도 "복사됨"을 기록해 재입력 누락을 없앤다.
+model Post {
+  id             String      @id @default(uuid())
+  contentCardId  String
+  contentCard    ContentCard @relation(fields: [contentCardId], references: [id])
+  dealId         String
+  deal           Deal        @relation(fields: [dealId], references: [id])
+
+  channel        Channel
+  mode           PostMode
+  status         PostStatus  @default(PENDING)
+  publishedAt    DateTime?
+
+  @@map("posts")
+}
+
+enum PostMode {
+  AUTO_API
+  SEMI_COPIED
+  SEMI_SENT_TO_ME
+}
+
+enum PostStatus {
+  PENDING
+  SENT
+  CONFIRMED
+  FAILED
+}
