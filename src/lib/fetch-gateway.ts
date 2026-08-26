@@ -149,15 +149,27 @@ async function checkBudget(host: string): Promise<{ blocked: true; reason: strin
   const limits = await getLimits();
   const now = Date.now();
 
+  // 예산과 페이싱은 "실제로 네트워크로 나간 요청"을 기준으로 센다.
+  // 성공(OK)만 세면 404·타임아웃이 상한을 전혀 소모하지 않아, 실패가 반복될수록 우리가 상대 서버를
+  // 더 세게 두드리게 된다. 반대로 가드에서 막혀 나가지도 않은 BLOCKED_*는 세면 안 된다.
+  const NETWORK_TOUCHED = {
+    notIn: [
+      "BLOCKED_POLICY",
+      "BLOCKED_ROBOTS",
+      "BLOCKED_BUDGET",
+      "BLOCKED_CIRCUIT",
+    ] as FetchOutcome[],
+  };
+
   const [dayCount, hourCount, last] = await Promise.all([
     db.fetchLog.count({
-      where: { outcome: "OK", ts: { gte: new Date(now - 24 * 3_600_000) } },
+      where: { outcome: NETWORK_TOUCHED, ts: { gte: new Date(now - 24 * 3_600_000) } },
     }),
     db.fetchLog.count({
-      where: { outcome: "OK", host, ts: { gte: new Date(now - 3_600_000) } },
+      where: { outcome: NETWORK_TOUCHED, host, ts: { gte: new Date(now - 3_600_000) } },
     }),
     db.fetchLog.findFirst({
-      where: { host, outcome: "OK" },
+      where: { host, outcome: NETWORK_TOUCHED },
       orderBy: { ts: "desc" },
       select: { ts: true },
     }),
@@ -196,12 +208,32 @@ async function getRobots(host: string): Promise<RobotsFetchOutcome> {
   const cached = robotsCache.get(host);
   if (cached && Date.now() - cached.fetchedAt < ROBOTS_TTL_MS) return cached.outcome;
 
+  const started = Date.now();
   const result = await rawFetch(`https://${host}/robots.txt`, "ROBOTS", ROBOTS_MAX_BYTES, 8_000);
+  const durationMs = Date.now() - started;
+
+  // robots.txt 조회도 실제로 네트워크로 나간 요청이다 — 예산·감사 대상이므로 기록한다.
+  await log({
+    url: `https://${host}/robots.txt`,
+    trigger: "ROBOTS",
+    outcome: result.ok ? "OK" : result.outcome,
+    responseCode: result.ok ? result.status : undefined,
+    durationMs,
+    bytes: result.ok ? result.body.length : undefined,
+  });
 
   // RFC 9309 §2.3.1의 결과 분류. 이 분기를 틀리면 정확히 반대로 동작한다:
   //   2xx → 파싱 / 4xx → 규칙 없음(허용) / 5xx·네트워크 실패 → 전면 금지
+  //
+  // 단, 4xx 중 403·429는 "규칙이 없다"가 아니라 "차단당하고 있다"는 신호다. 이 둘을 absent로
+  // 분류하면 무신사가 우리를 막기 시작하는 바로 그 순간에 robots 가드가 반대로 풀린다 —
+  // "차단당하면 뚫지 않고 멈춘다"(docs/03 §9 Never List 7번)의 정반대 동작이다.
   let outcome: RobotsFetchOutcome;
   if (!result.ok) {
+    outcome = { kind: "unavailable" };
+  } else if (looksLikeBotChallenge(result.status, result.body)) {
+    // robots.txt 자리에서 챌린지가 오면 이미 차단이 시작된 것이다. 서킷을 열고 더 두드리지 않는다.
+    await recordFailure(host, `robots.txt 조회에서 봇 차단 감지 (HTTP ${result.status})`, true);
     outcome = { kind: "unavailable" };
   } else if (result.status >= 200 && result.status < 300) {
     outcome = { kind: "parsed", rules: parseRobots(result.body) };

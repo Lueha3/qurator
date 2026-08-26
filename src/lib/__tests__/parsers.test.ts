@@ -45,6 +45,99 @@ describe("상품 파서 — JSON-LD", () => {
   });
 });
 
+// 아래는 리뷰가 실행으로 재현한 실패 케이스들이다. 가격은 렌더러가 '사실'로 취급해
+// AI 관여 없이 그대로 카톡·스레드에 나가는 필드라, 여기가 틀리면 잘못된 가격이나 0원이
+// 광고 고지문과 함께 오픈채팅에 뿌려진다.
+describe("상품 파서 — 실제 커머스 JSON-LD 변형 (회귀)", () => {
+  function page(jsonLd: object) {
+    return `<html><head><script type="application/ld+json">${JSON.stringify(
+      jsonLd
+    )}</script></head><body>${"x".repeat(4000)}</body></html>`;
+  }
+
+  it("offers 배열에서 첫 번째가 아니라 재고 있는 최저가를 고른다", () => {
+    const p = parseProductPage(
+      page({
+        "@type": "Product",
+        name: "맨투맨",
+        offers: [
+          { "@type": "Offer", price: "89000", availability: "https://schema.org/OutOfStock" },
+          { "@type": "Offer", price: "53400", availability: "https://schema.org/InStock" },
+          { "@type": "Offer", price: "61000", availability: "https://schema.org/InStock" },
+        ],
+      })
+    );
+    expect(p.salePrice).toBe(53400);
+  });
+
+  it("AggregateOffer의 lowPrice/highPrice를 읽는다 (0원 방지)", () => {
+    const p = parseProductPage(
+      page({
+        "@type": "Product",
+        name: "다중옵션 상품",
+        offers: { "@type": "AggregateOffer", lowPrice: "39000", highPrice: "59000" },
+      })
+    );
+    expect(p.salePrice).toBe(39000);
+    expect(p.listPrice).toBe(59000);
+    expect(p.salePrice).not.toBe(0);
+  });
+
+  it("priceSpecification이 배열이어도 ListPrice를 찾아낸다", () => {
+    const p = parseProductPage(
+      page({
+        "@type": "Product",
+        name: "코트",
+        offers: {
+          "@type": "Offer",
+          price: "99000",
+          priceSpecification: [
+            { "@type": "UnitPriceSpecification", price: "99000" },
+            { "@type": "ListPrice", price: "159000" },
+          ],
+        },
+      })
+    );
+    expect(p.salePrice).toBe(99000);
+    expect(p.listPrice).toBe(159000);
+  });
+
+  it("WebPage.mainEntity 안의 Product도 찾는다 (@graph만 보면 놓친다)", () => {
+    const p = parseProductPage(
+      page({
+        "@type": "WebPage",
+        mainEntity: { "@type": "Product", name: "숨은 상품", offers: { price: "12000" } },
+      })
+    );
+    expect(p.productName).toBe("숨은 상품");
+    expect(p.salePrice).toBe(12000);
+  });
+
+  it("전 옵션 품절이어도 가격 표기는 살린다", () => {
+    const p = parseProductPage(
+      page({
+        "@type": "Product",
+        name: "품절 상품",
+        offers: [
+          { "@type": "Offer", price: "45000", availability: "https://schema.org/OutOfStock" },
+        ],
+      })
+    );
+    expect(p.salePrice).toBe(45000);
+  });
+
+  it("순환 참조가 있어도 멈춘다 (무한 루프 방지)", () => {
+    const a: Record<string, unknown> = { "@type": "Thing" };
+    a.self = a;
+    // JSON.stringify가 순환을 못 다루므로 파서에 직접 넣는 대신, 깊은 중첩으로 guard를 확인
+    let deep: Record<string, unknown> = { "@type": "Product", name: "깊은 상품" };
+    for (let i = 0; i < 500; i++) deep = { "@type": "Thing", child: deep };
+    const p = parseProductPage(page(deep));
+    // guard 안에서 찾든 못 찾든, 예외 없이 반환되는 것이 핵심이다
+    expect(p).toBeDefined();
+  });
+});
+
 describe("상품 파서 — OpenGraph 폴백", () => {
   it("JSON-LD가 없으면 OG 메타로 폴백한다", () => {
     const html = `<html><head>

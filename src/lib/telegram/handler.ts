@@ -14,6 +14,7 @@ import { parseCuratorLink } from "../curator-link";
 import { draftHookLine } from "../ai-hook";
 import { renderAllChannels, type DealFacts, type DealLink } from "../renderer";
 import { audit } from "../audit";
+import { signCardToken } from "../signed-link";
 import {
   answerCallback,
   editMessage,
@@ -26,12 +27,13 @@ import {
   approvedCard,
   awaitingLinkCard,
   candidateCard,
+  CB,
   kakaoDeliveryMessage,
   parseCallbackData,
   skippedCard,
   type CardDeal,
 } from "./cards";
-import type { ApprovalStage } from "@prisma/client";
+import type { ApprovalStage, Channel, PendingInput } from "@prisma/client";
 
 // ── 텔레그램 업데이트 타입 (필요한 필드만) ───────────────────────────────
 
@@ -113,7 +115,7 @@ type DealRecord = NonNullable<
   Awaited<ReturnType<typeof db.deal.findFirst<{ include: typeof DEAL_WITH_RELATIONS }>>>
 >;
 
-function toCardDeal(deal: DealRecord): CardDeal {
+function toCardDeal(deal: DealRecord, linkWarnings?: string[]): CardDeal {
   return {
     id: deal.id,
     brand: deal.product.brandName,
@@ -125,8 +127,11 @@ function toCardDeal(deal: DealRecord): CardDeal {
     discountRate: deal.discountRate,
     couponDesc: deal.couponDesc,
     hookLine: deal.hookLine,
-    parseSource: deal.product.source === "PASTE" ? "none" : null,
+    // 파싱 출처는 캡처 시점에 DB에 저장해 둔 값을 그대로 쓴다.
+    // (product.source로 유추하면 항상 같은 값이 나와 경고가 영원히 표시되지 않았다.)
+    parseSource: deal.parseSource,
     linkCount: deal.curatorLinks.length,
+    linkWarnings,
   };
 }
 
@@ -170,9 +175,63 @@ async function setStage(dealId: string, stage: ApprovalStage) {
   await db.deal.update({ where: { id: dealId }, data: { approvalStage: stage } });
 }
 
+/**
+ * "이 대화에서 봇이 지금 기다리는 입력"을 한 딜에만 세운다.
+ *
+ * 이것이 상태 머신의 핵심 불변식이다: 한 대화에 pendingInput이 걸린 딜은 최대 1건.
+ * 이전 구현은 approvalStage=AWAITING_LINK인 딜을 chatId로만 찾았는데, 딜 2건을 연달아
+ * 던지면(이 봇의 정상 사용 패턴) 붙여넣은 링크가 엉뚱한 딜에 붙어 상품 A를 설명하며
+ * 상품 B의 커미션 링크를 뿌리게 된다 — 무신사가 보기엔 링크 스왑 패턴이다.
+ */
+async function setPendingInput(
+  dealId: string,
+  chatId: string,
+  input: PendingInput | null
+): Promise<void> {
+  await db.$transaction(async (tx) => {
+    // 같은 대화의 다른 딜에 걸린 대기 상태를 먼저 모두 해제한다.
+    await tx.deal.updateMany({
+      where: { telegramChatId: chatId, pendingInput: { not: null }, NOT: { id: dealId } },
+      data: { pendingInput: null },
+    });
+    await tx.deal.update({ where: { id: dealId }, data: { pendingInput: input } });
+  });
+}
+
+/** 이 대화에서 봇이 입력을 기다리는 딜(최대 1건) */
+async function findPendingDeal(chatId: string): Promise<DealRecord | null> {
+  return db.deal.findFirst({
+    where: { telegramChatId: chatId, pendingInput: { not: null } },
+    include: DEAL_WITH_RELATIONS,
+    orderBy: { updatedAt: "desc" },
+  });
+}
+
+/**
+ * 승인·미리보기에 쓸 카드를 고른다. **항상 최신 버전**이어야 한다.
+ * include의 정렬은 channel 기준뿐이라 관계 배열에서 find로 집으면 재렌더된 v2 대신 v1이 잡힌다 —
+ * 그러면 승인 화면에 보인 것과 실제 나가는 것이 달라져 approval-first의 근거가 무너진다.
+ */
+async function latestCard(dealId: string, channel: Channel) {
+  return db.contentCard.findFirst({
+    where: { dealId, channel },
+    orderBy: { version: "desc" },
+  });
+}
+
+/**
+ * 복사 웹뷰 링크. cardId를 그대로 노출하지 않고 HMAC 서명 토큰으로 감싼다 —
+ * 카드 본문에는 커미션 ULID가 들어 있어, 링크를 아는 누구나 열 수 있으면 안 된다.
+ * APP_SECRET이 없으면 링크를 만들지 않는다(버튼 생략).
+ */
 function copyUrl(cardId: string): string | null {
   const base = process.env.PUBLIC_BASE_URL;
-  return base ? `${base.replace(/\/$/, "")}/copy/${cardId}` : null;
+  if (!base) return null;
+  try {
+    return `${base.replace(/\/$/, "")}/copy/${signCardToken(cardId)}`;
+  } catch {
+    return null;
+  }
 }
 
 // ── 진입점 ──────────────────────────────────────────────────────────────
@@ -210,14 +269,33 @@ async function handleMessage(msg: TgMessage): Promise<void> {
     return;
   }
 
-  // 링크 대기 중인 딜이 있으면, 이 메시지를 큐레이터 링크로 해석한다.
-  const awaiting = await db.deal.findFirst({
-    where: { telegramChatId: chatId, approvalStage: "AWAITING_LINK" },
-    include: DEAL_WITH_RELATIONS,
-    orderBy: { updatedAt: "desc" },
-  });
-  if (awaiting) {
-    await handleCuratorLinkPaste(awaiting, text, chatId);
+  // 봇이 이 대화에서 무언가를 기다리고 있으면, 그 딜의 그 입력으로 해석한다.
+  // pendingInput이 무엇인지에 따라 링크와 훅이 정확히 구분된다 — 이전처럼
+  // approvalStage만 보면 [훅 교체] 후 보낸 훅 문구가 큐레이터 링크 파서로 들어가 버린다.
+  const pending = await findPendingDeal(chatId);
+  if (pending) {
+    if (pending.pendingInput === "HOOK") {
+      await handleHookReplacement(pending, text, chatId);
+      return;
+    }
+
+    // 링크를 기다리는 중인데 커미션 파라미터가 없는 무신사 상품 URL이 오면,
+    // 링크를 붙여넣은 것인지 새 딜을 시작하려는 것인지 모호하다. 사람에게 되묻는다.
+    const looksLikeNewProduct =
+      /musinsa\.com\/(products|app\/goods)\//.test(text) && !/utm_|af_dp/.test(text);
+    if (looksLikeNewProduct) {
+      await sendMessage({
+        chatId,
+        text:
+          "커미션 파라미터가 없는 상품 링크입니다.\n" +
+          "이 딜의 큐레이터 링크라면 큐레이터센터에서 만든 링크를 붙여넣어 주세요.\n" +
+          "새 딜을 시작하려면 아래 버튼을 눌러주세요.",
+        keyboard: [[{ text: "🆕 새 딜로 시작", callback_data: CB.newDeal(pending.id) }]],
+      });
+      return;
+    }
+
+    await handleCuratorLinkPaste(pending, text, chatId);
     return;
   }
 
@@ -253,19 +331,30 @@ async function captureFromUrl(rawUrl: string, chatId: string, sourceMessageId: n
   const creator = await getDefaultCreator();
   const goodsNo = canonical.value.match(/\/products\/(\d+)/)?.[1] ?? null;
 
-  const product = await db.product.create({
-    data: {
-      creatorId: creator.id,
-      canonicalUrl: canonical.value,
-      musinsaGoodsNo: goodsNo,
-      brandName: parsed.brandName ?? "(브랜드 미입력)",
-      productName: parsed.productName ?? "(상품명 미입력)",
-      styleCode: parsed.styleCode,
-      listPrice: parsed.listPrice ?? parsed.salePrice ?? 0,
-      mainImageUrl: parsed.imageUrl,
-      source: "SHARE",
-    },
-  });
+  const productFields = {
+    canonicalUrl: canonical.value,
+    brandName: parsed.brandName ?? "(브랜드 미입력)",
+    productName: parsed.productName ?? "(상품명 미입력)",
+    styleCode: parsed.styleCode,
+    // 가격을 못 읽었을 때 0으로 채우면 "0원"이 고지문과 함께 오픈채팅에 나갈 수 있다.
+    // 0은 "미확인"의 의미로만 쓰고, 카드가 그것을 눈에 띄게 표시한다.
+    listPrice: parsed.listPrice ?? parsed.salePrice ?? 0,
+    mainImageUrl: parsed.imageUrl,
+    source: "SHARE" as const,
+  };
+
+  // 같은 상품을 두 번 던지는 것은 정상 사용이다(가격이 또 떨어졌거나, 아까 스킵했거나).
+  // Product에 @@unique([creatorId, musinsaGoodsNo])가 걸려 있어 create만 하면 두 번째 전송에서
+  // 예외가 나고 봇이 조용히 죽는다 — upsert로 최신 정보를 덮어쓴다.
+  const product = goodsNo
+    ? await db.product.upsert({
+        where: { creatorId_musinsaGoodsNo: { creatorId: creator.id, musinsaGoodsNo: goodsNo } },
+        update: productFields,
+        create: { creatorId: creator.id, musinsaGoodsNo: goodsNo, ...productFields },
+      })
+    : await db.product.create({
+        data: { creatorId: creator.id, musinsaGoodsNo: null, ...productFields },
+      });
 
   const deal = await db.deal.create({
     data: {
@@ -277,6 +366,8 @@ async function captureFromUrl(rawUrl: string, chatId: string, sourceMessageId: n
       telegramChatId: chatId,
       telegramMessageId: status.message_id,
       sourceUrlRaw: rawUrl,
+      parseSource: parsed.source,
+      parseFieldCount: parsed.fieldCount,
     },
     include: DEAL_WITH_RELATIONS,
   });
@@ -309,6 +400,21 @@ async function handleCuratorLinkPaste(deal: DealRecord, text: string, chatId: st
     return;
   }
 
+  // 파싱해 둔 검증 필드를 실제로 쓴다. 이전 구현은 goodsNo·hasCommissionParams를 뽑아만 두고
+  // 한 번도 읽지 않아, 다른 상품의 링크를 붙여넣어도 그대로 통과했다.
+  const linkWarnings: string[] = [];
+  const expected = deal.product.musinsaGoodsNo;
+  if (expected && parsed.link.goodsNo && parsed.link.goodsNo !== expected) {
+    linkWarnings.push(
+      `이 링크는 다른 상품(#${parsed.link.goodsNo})을 가리킵니다 — 이 딜은 #${expected}입니다.`
+    );
+  }
+  if (!parsed.link.hasCommissionParams) {
+    // 거부하지 않고 경고한다: 무신사가 파라미터 이름을 바꾸면 정상 링크를 전부 막게 되므로,
+    // 판정은 사람에게 맡기되 승인 화면에서 반드시 보이게 한다.
+    linkWarnings.push("커미션 파라미터가 없습니다 — 큐레이터센터에서 만든 링크가 맞는지 확인하세요.");
+  }
+
   await db.curatorLink.create({
     data: {
       dealId: deal.id,
@@ -317,6 +423,15 @@ async function handleCuratorLinkPaste(deal: DealRecord, text: string, chatId: st
       isDefault: true,
     },
   });
+
+  if (linkWarnings.length > 0) {
+    await audit({
+      actor: "SYSTEM",
+      action: "link.warning",
+      approvalRef: deal.id,
+      detail: linkWarnings.join(" / "),
+    });
+  }
 
   // 훅이 없으면 AI 초안을 시도한다. 실패해도(키 없음/타임아웃) 빈 훅으로 진행 — 렌더는 AI에 비의존.
   let hookLine = deal.hookLine;
@@ -332,12 +447,33 @@ async function handleCuratorLinkPaste(deal: DealRecord, text: string, chatId: st
     }
   }
 
-  const refreshed = await db.deal.findUniqueOrThrow({
-    where: { id: deal.id },
+  await renderAndShowApproval(deal.id, chatId, linkWarnings);
+}
+
+/** [훅 교체] 후 받은 새 훅 문구를 반영하고 승인 카드를 다시 그린다 */
+async function handleHookReplacement(deal: DealRecord, text: string, chatId: string) {
+  const hook = text.trim();
+  if (!hook) {
+    await sendMessage({ chatId, text: "훅 문구가 비어 있습니다. 한 줄로 보내주세요." });
+    return;
+  }
+  if (hook.length > 200) {
+    await sendMessage({ chatId, text: "훅 문구가 너무 깁니다(200자 이내). 다시 보내주세요." });
+    return;
+  }
+
+  await db.deal.update({ where: { id: deal.id }, data: { hookLine: hook } });
+  await renderAndShowApproval(deal.id, chatId, []);
+}
+
+/** 딜의 현재 사실로 4채널 카드를 새 버전으로 렌더하고 승인 카드를 띄운다 */
+async function renderAndShowApproval(dealId: string, chatId: string, linkWarnings: string[]) {
+  const deal = await db.deal.findUniqueOrThrow({
+    where: { id: dealId },
     include: DEAL_WITH_RELATIONS,
   });
 
-  const rendered = renderAllChannels(toFacts(refreshed));
+  const rendered = renderAllChannels(toFacts(deal));
   const failed = rendered.find((r) => !r.ok);
   if (failed && !failed.ok) {
     await sendMessage({ chatId, text: `⚠️ 카드를 만들지 못했습니다: ${escapeHtml(failed.error.message)}` });
@@ -369,7 +505,12 @@ async function handleCuratorLinkPaste(deal: DealRecord, text: string, chatId: st
     }
     await tx.deal.update({
       where: { id: deal.id },
-      data: { status: "READY", approvalStage: "READY_TO_PUBLISH" },
+      data: {
+        status: "READY",
+        approvalStage: "READY_TO_PUBLISH",
+        // 입력 대기 해제 — 이제 봇은 이 대화에서 아무 텍스트도 기다리지 않는다.
+        pendingInput: null,
+      },
     });
   });
 
@@ -380,17 +521,26 @@ async function handleCuratorLinkPaste(deal: DealRecord, text: string, chatId: st
   const kakao = rendered.find((r) => r.ok && r.card.channel === "KAKAO_OPEN");
   const preview = kakao && kakao.ok ? kakao.card.bodyText : "";
 
-  await updateCard(final, approvalCard(toCardDeal(final), preview));
+  await updateCard(final, approvalCard(toCardDeal(final, linkWarnings), preview));
 }
 
 // ── 콜백(버튼) 처리 ──────────────────────────────────────────────────────
 
 async function handleCallback(query: TgCallbackQuery): Promise<void> {
-  // 무거운 작업 전에 먼저 응답한다 — 콜백 ID는 10~15초 만에 만료되고,
-  // 그 사이 사용자 화면에는 스피너가 계속 돈다.
-  await answerCallback(query.id);
+  // 인가 확인이 먼저다. answerCallback을 먼저 부르면 비인가 사용자에게도 스피너가 정상 종료되어
+  // "봇이 살아 있다"를 알려준다 — 메시지 경로는 조용히 무시하는데 콜백만 응답하면 앞뒤가 안 맞는다.
+  if (!isAuthorized(query.from.id)) {
+    await audit({
+      actor: "SYSTEM",
+      action: "telegram.unauthorized",
+      detail: `허용되지 않은 사용자의 콜백 ${query.from.id}`,
+    });
+    return;
+  }
 
-  if (!isAuthorized(query.from.id)) return;
+  // 인가된 사용자에게는 즉시 응답한다 — 콜백 ID는 10~15초 만에 만료되고,
+  // 게이트웨이의 최소 간격(5초+지터) 뒤에 부르면 십중팔구 늦는다.
+  await answerCallback(query.id);
 
   const parsed = query.data ? parseCallbackData(query.data) : null;
   if (!parsed) return;
@@ -401,9 +551,12 @@ async function handleCallback(query: TgCallbackQuery): Promise<void> {
   });
   if (!deal) return;
 
+  const chatId = String(deal.telegramChatId ?? query.from.id);
+
   switch (parsed.action) {
     case "int":
       await setStage(deal.id, "AWAITING_LINK");
+      await setPendingInput(deal.id, chatId, "CURATOR_LINK");
       await updateCard(
         deal,
         awaitingLinkCard(
@@ -415,26 +568,35 @@ async function handleCallback(query: TgCallbackQuery): Promise<void> {
 
     case "skp":
       await setStage(deal.id, "SKIPPED");
+      await db.deal.update({ where: { id: deal.id }, data: { pendingInput: null } });
       await updateCard(deal, skippedCard(toCardDeal(deal)));
       await audit({ actor: "HUMAN", action: "deal.skipped", approvalRef: deal.id });
       break;
 
     case "hok":
-      await db.deal.update({ where: { id: deal.id }, data: { approvalStage: "AWAITING_LINK" } });
-      await sendMessage({
-        chatId: String(deal.telegramChatId),
-        text: "✏️ 새 훅 문구를 보내주세요. (한 줄)",
-      });
+      // 훅 대기임을 명시적으로 기록한다. 예전처럼 approvalStage만 되돌리면
+      // 이어서 보낸 훅 문구가 큐레이터 링크 파서로 들어가 "링크를 찾지 못했습니다"만 반복됐다.
+      await setPendingInput(deal.id, chatId, "HOOK");
+      await sendMessage({ chatId, text: "✏️ 새 훅 문구를 보내주세요. (한 줄)" });
       break;
 
-    case "man":
+    case "new":
+      // 링크 대기를 풀고 새 상품 URL을 다시 보내게 한다.
+      await db.deal.update({ where: { id: deal.id }, data: { pendingInput: null } });
+      await sendMessage({ chatId, text: "대기를 해제했습니다. 상품 링크를 다시 보내주세요." });
+      break;
+
+    case "man": {
+      // 딜을 지정해 대시보드로 보낸다 — 링크 없이 루트로만 보내면 텔레그램에서 시작한 딜을
+      // 웹에서 이어받을 수 없어 동선이 끊긴다.
+      const base = process.env.PUBLIC_BASE_URL ?? "http://localhost:3000";
       await sendMessage({
-        chatId: String(deal.telegramChatId),
-        text:
-          "✏️ 웹 대시보드에서 상품 정보를 입력해 주세요.\n" +
-          (process.env.PUBLIC_BASE_URL ?? "http://localhost:3000"),
+        chatId,
+        text: "✏️ 웹 대시보드에서 상품 정보를 채워주세요.",
+        keyboard: [[{ text: "🌐 대시보드에서 편집", url: `${base.replace(/\/$/, "")}/?deal=${deal.id}` }]],
       });
       break;
+    }
 
     case "apv":
       await approveDeal(deal);
@@ -443,7 +605,9 @@ async function handleCallback(query: TgCallbackQuery): Promise<void> {
 }
 
 async function approveDeal(deal: DealRecord): Promise<void> {
-  const kakaoCard = deal.contentCards.find((c) => c.channel === "KAKAO_OPEN");
+  // 관계 배열에서 find로 집으면 재렌더된 v2 대신 v1(구버전)이 잡힌다 —
+  // 승인 화면에 보인 것과 실제 나가는 것이 달라지고, 감사 로그도 엉뚱한 본문을 증적으로 남긴다.
+  const kakaoCard = await latestCard(deal.id, "KAKAO_OPEN");
   if (!kakaoCard) return;
 
   // 고지문 검증 게이트 — disclosureOk가 false인 카드는 어떤 경로로도 나가지 않는다.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { recordCopy } from "@/app/copy/[cardId]/actions";
 
 type CopyState = "idle" | "copied" | "manual";
 
@@ -30,9 +31,15 @@ function estimateRows(text: string): number {
  *   ③ 전문을 선택된 상태로 노출 + "길게 눌러 복사" 안내 — 100% 탈출 경로
  * 실패를 조용히 삼키지 않는 것이 핵심이다.
  */
-export function CopyPane({ text }: { text: string }) {
+export function CopyPane({ text, token }: { text: string; token: string }) {
   const [state, setState] = useState<CopyState>("idle");
   const areaRef = useRef<HTMLTextAreaElement>(null);
+
+  function markCopied() {
+    setState("copied");
+    // 발행 이력 기록은 체감 속도에 영향 없게 fire-and-forget.
+    void recordCopy(token).catch(() => {});
+  }
 
   function legacyCopy(): boolean {
     const area = areaRef.current;
@@ -52,19 +59,20 @@ export function CopyPane({ text }: { text: string }) {
     const inApp = /KAKAOTALK|Instagram|FBAN|FBAV|Line\//i.test(ua);
 
     if (inApp && legacyCopy()) {
-      setState("copied");
+      markCopied();
       return;
     }
 
     // await를 쓰지 않는다 — 동기 호출로 시작해야 iOS에서 user activation이 유지된다.
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(text).then(
-        () => setState("copied"),
-        () => setState(legacyCopy() ? "copied" : "manual")
+        () => markCopied(),
+        () => (legacyCopy() ? markCopied() : setState("manual"))
       );
       return;
     }
-    setState(legacyCopy() ? "copied" : "manual");
+    if (legacyCopy()) markCopied();
+    else setState("manual");
   }
 
   return (

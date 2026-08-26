@@ -1,0 +1,5 @@
+# 이 앱은 현표의 커미션 링크(utm_term ULID)가 담긴 카드 본문을 서빙한다.
+# 색인되면 제3자 트래픽이 현표 실적으로 유입되어 어뷰징으로 판정될 수 있다
+# (docs/03-account-safety.md §5.4). 전면 색인 금지.
+User-agent: *
+Disallow: /

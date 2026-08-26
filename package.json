@@ -9,6 +9,7 @@
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
     "bot": "tsx --env-file=.env scripts/bot-poll.ts",
+    "gateway": "tsx --env-file=.env scripts/gateway.ts",
     "test": "vitest run"
   },
   "prisma": {

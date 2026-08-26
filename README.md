@@ -94,11 +94,21 @@
 
 ```bash
 npm install
-cp .env.example .env         # Phase 0만 쓸 거면 그대로 둬도 됨 (SQLite, 계정 불필요)
+cp .env.example .env
 npx prisma migrate deploy    # DB 스키마 적용
 npm run db:seed              # 현표(creator) 레코드 생성
-npm run dev                  # http://localhost:3000  (웹 폼)
+
+# 웹 접근 암호와 링크 서명 키 생성 (둘 다 필수 — 비어 있으면 웹 전체가 차단된다)
+echo "APP_ACCESS_TOKEN=$(openssl rand -base64 32)" >> .env
+echo "APP_SECRET=$(openssl rand -base64 32)" >> .env
+
+npm run dev                  # http://localhost:3000/?k=<APP_ACCESS_TOKEN 값>
 ```
+
+> 대시보드와 API는 카드 본문을 서빙하고, 그 안에는 큐레이터 링크가 원본 그대로 들어 있다
+> (`utm_term` ULID 포함). 인증 없이 열어두면 검색봇·스크래퍼가 현표 실적으로 클릭을 쌓아
+> 어뷰징으로 판정될 수 있어, 미들웨어가 **토큰 미설정 시 전면 차단**한다(fail closed).
+> 복사 웹뷰만 예외이며, 그 경로는 HMAC 서명 + 24시간 만료 토큰으로 스스로를 방어한다.
 
 텔레그램 봇까지 쓰려면 `.env`에 두 값을 채운다:
 
@@ -118,8 +128,21 @@ npm run bot     # 폴링 모드로 봇 실행 (로컬 개발)
 `ANTHROPIC_API_KEY`는 선택 사항이다 — 없으면 훅 문구만 비고 나머지는 전부 동작한다.
 
 ```bash
-npm test        # 불변식 테스트 (고지·커미션URL·SSRF·robots·상태머신 E2E)
-npm run build   # 프로덕션 빌드
+npm test              # 불변식 테스트 (고지·커미션URL·SSRF·robots·서명·상태머신 E2E)
+npm run build         # 프로덕션 빌드
+npm run gateway status  # 서킷·킬스위치·사용량 확인
+```
+
+### 게이트웨이 운영
+
+무신사가 자동 요청을 차단하면 서킷이 열리고 **자동으로 재개되지 않는다** — 자동 재시도는
+"차단을 뚫으려는 시도"가 되어 법적 안전선(보호조치 우회 없음)에서 벗어나기 때문이다.
+해제는 사람이 계정 상태를 눈으로 확인한 뒤에만 한다:
+
+```bash
+npm run gateway status              # 무엇이 왜 막혔는지
+npm run gateway resume www.musinsa.com
+npm run gateway kill / unkill       # 글로벌 킬 스위치
 ```
 
 ### 아직 없는 것 (Phase 2+)

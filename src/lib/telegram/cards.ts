@@ -14,14 +14,16 @@ export const CB = {
   approve: (dealId: string) => `v1:apv:${dealId}`,
   rehook: (dealId: string) => `v1:hok:${dealId}`,
   manual: (dealId: string) => `v1:man:${dealId}`,
+  /** 링크 대기 중에 새 상품 URL이 온 경우, 대기를 풀고 새 딜로 진행 */
+  newDeal: (dealId: string) => `v1:new:${dealId}`,
 } as const;
 
-export type CallbackAction = "int" | "skp" | "apv" | "hok" | "man";
+export type CallbackAction = "int" | "skp" | "apv" | "hok" | "man" | "new";
 
 export function parseCallbackData(
   data: string
 ): { action: CallbackAction; dealId: string } | null {
-  const m = data.match(/^v1:(int|skp|apv|hok|man):([0-9a-f-]{36})$/);
+  const m = data.match(/^v1:(int|skp|apv|hok|man|new):([0-9a-f-]{36})$/);
   if (!m) return null;
   return { action: m[1] as CallbackAction, dealId: m[2] };
 }
@@ -37,17 +39,24 @@ export interface CardDeal {
   discountRate: number | null;
   couponDesc: string | null;
   hookLine: string | null;
+  /** 'json-ld' | 'opengraph' | 'none' — 얼마나 믿을 만한 정보인지 사람에게 알린다 */
   parseSource: string | null;
   linkCount: number;
+  /** 링크 검증에서 걸린 것들 (다른 상품을 가리킴, 커미션 파라미터 없음 등) */
+  linkWarnings?: string[];
 }
 
 function priceLine(d: CardDeal): string {
+  // 가격을 못 읽었을 때 0원을 찍으면 그대로 광고 고지와 함께 오픈채팅에 나갈 수 있다.
+  // 사실 필드가 비었다는 것을 사람이 반드시 보게 한다.
+  if (!d.listPrice && !d.salePrice && !d.finalPrice) return "⚠️ 가격 미확인 — 직접 입력 필요";
+
   const effective = d.finalPrice ?? d.salePrice ?? d.listPrice;
-  if (d.salePrice != null && d.salePrice < d.listPrice) {
+  if (d.salePrice != null && d.listPrice > 0 && d.salePrice < d.listPrice) {
     const pct = d.discountRate != null ? ` (${d.discountRate}%)` : "";
     return `${formatKRW(d.listPrice)} → ${formatKRW(effective)}${pct}`;
   }
-  return formatKRW(d.listPrice);
+  return formatKRW(effective || d.listPrice);
 }
 
 function header(d: CardDeal): string {
@@ -69,16 +78,23 @@ export function candidateCard(d: CardDeal): { text: string; keyboard: InlineKeyb
         ? "\n\n<i>일부 정보만 읽었습니다 — 승인 전 확인해주세요.</i>"
         : "";
 
-  return {
-    text: `${header(d)}${coupon}${note}`,
-    keyboard: [
-      [
-        { text: "✅ 이거 올릴래", callback_data: CB.interested(d.id) },
-        { text: "⏭ 스킵", callback_data: CB.skip(d.id) },
-      ],
-      [{ text: "✏️ 직접 입력", callback_data: CB.manual(d.id) }],
-    ],
-  };
+  // 아무 필드도 못 읽었으면 [이거 올릴래]를 내지 않는다 — 빈 딜을 진행시키면
+  // "(브랜드 미입력) 0원"이 고지문과 함께 오픈채팅에 나갈 수 있다.
+  const canProceed = d.parseSource !== "none";
+  const keyboard: InlineKeyboard = canProceed
+    ? [
+        [
+          { text: "✅ 이거 올릴래", callback_data: CB.interested(d.id) },
+          { text: "⏭ 스킵", callback_data: CB.skip(d.id) },
+        ],
+        [{ text: "✏️ 직접 입력", callback_data: CB.manual(d.id) }],
+      ]
+    : [
+        [{ text: "✏️ 직접 입력", callback_data: CB.manual(d.id) }],
+        [{ text: "⏭ 스킵", callback_data: CB.skip(d.id) }],
+      ];
+
+  return { text: `${header(d)}${coupon}${note}`, keyboard };
 }
 
 /** 2단계: 큐레이터센터에서 링크를 만들어 붙여넣기를 기다리는 카드 */
@@ -107,11 +123,18 @@ export function approvalCard(
     ? html`\n\n💬 <b>${d.hookLine}</b>`
     : "\n\n<i>훅 문구 없음 — [훅 교체]로 넣을 수 있습니다.</i>";
 
+  // 링크 검증 경고는 승인 버튼 바로 위에 크게 띄운다. 상품명·가격과 링크가 어긋난 채로
+  // 발행되면 무신사가 보기엔 링크 스왑 패턴이고, 소비자에게는 기만 표시다.
+  const warnings =
+    d.linkWarnings && d.linkWarnings.length > 0
+      ? "\n\n" + d.linkWarnings.map((w) => `⚠️ ${escapeHtml(w)}`).join("\n")
+      : "";
+
   return {
     // 미리보기는 <pre>로 감싼다: 발행될 내용 그대로를 보여주고(본 것 = 나가는 것),
     // URL이 자동 링크화되지 않아 텔레그램이 큐레이터 링크를 프리뷰용으로 방문하지 않는다.
     text:
-      `${header(d)}${hook}\n\n` +
+      `${header(d)}${hook}${warnings}\n\n` +
       `🔗 링크 ${d.linkCount}개\n\n` +
       `<pre>${escapeHtml(kakaoPreview)}</pre>`,
     keyboard: [

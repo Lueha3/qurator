@@ -104,6 +104,15 @@ model Deal {
   telegramMessageId Int? // editMessageText로 같은 메시지를 상태 전이시키기 위한 앵커
   sourceUrlRaw      String? // 현표가 던진 원본 URL (정규화 전) — 감사·디버깅용
 
+  // 봇이 지금 이 딜에 대해 "무엇을 기다리는지". 한 대화에 이 값이 non-null인 딜은 최대 1건이며
+  // (setPendingInput이 나머지를 비운다), 그래서 사용자가 보낸 텍스트가 어느 딜의 무엇인지가
+  // 모호해지지 않는다. approvalStage만으로 라우팅하면 링크와 훅을 구분할 수 없다.
+  pendingInput      PendingInput?
+
+  // 파싱 출처와 채워진 필드 수 — 카드에 "정보를 못 읽었다/일부만 읽었다"를 정확히 표시하기 위해 보존한다.
+  parseSource       String? // 'json-ld' | 'opengraph' | 'none'
+  parseFieldCount   Int      @default(0)
+
   salePrice         Int?
   discountRate      Int? // %
   couponCode        String?
@@ -133,6 +142,11 @@ enum DealStatus {
   PUBLISHED
   EXPIRED
   ARCHIVED
+}
+
+enum PendingInput {
+  CURATOR_LINK // 큐레이터센터에서 만든 링크를 기다리는 중
+  HOOK // 새 훅 문구를 기다리는 중
 }
 
 enum ApprovalStage {

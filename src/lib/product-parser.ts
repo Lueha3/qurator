@@ -68,28 +68,114 @@ function extractJsonLdBlocks(html: string): unknown[] {
   return blocks;
 }
 
-/** JSON-LD는 @graph 배열이나 최상위 배열로 감싸여 오는 경우가 많다 — 평탄화해서 Product를 찾는다 */
+/**
+ * JSON-LD는 @graph, 최상위 배열, WebPage.mainEntity 등 여러 형태로 Product를 감싼다.
+ * @graph만 따라가면 mainEntity 안의 Product를 놓치므로 모든 객체 값을 순회한다.
+ * guard로 순회 횟수를 묶어 순환 참조·거대 문서에서도 멈춘다.
+ */
 function findProductNode(blocks: unknown[]): Record<string, unknown> | null {
   const queue: unknown[] = [...blocks];
+  const seen = new Set<unknown>();
   let guard = 0;
-  while (queue.length > 0 && guard++ < 200) {
+
+  while (queue.length > 0 && guard++ < 2000) {
     const node = queue.shift();
     if (!node || typeof node !== "object") continue;
+    if (seen.has(node)) continue;
+    seen.add(node);
+
     if (Array.isArray(node)) {
       queue.push(...node);
       continue;
     }
     const obj = node as Record<string, unknown>;
-    const graph = obj["@graph"];
-    if (Array.isArray(graph)) queue.push(...graph);
 
     const type = obj["@type"];
     const types = Array.isArray(type) ? type : [type];
     if (types.some((t) => typeof t === "string" && t.toLowerCase() === "product")) {
       return obj;
     }
+
+    // 중첩된 어디든 Product가 있을 수 있다 (@graph, mainEntity, itemListElement…)
+    for (const value of Object.values(obj)) {
+      if (value && typeof value === "object") queue.push(value);
+    }
   }
   return null;
+}
+
+interface OfferPrices {
+  salePrice: number | null;
+  listPrice: number | null;
+}
+
+/** priceSpecification은 단일 객체나 배열로 오고, ListPrice 타입이 정가를 담는다 */
+function listPriceFromSpec(spec: unknown): number | null {
+  const specs = Array.isArray(spec) ? spec : [spec];
+  let fallback: number | null = null;
+  for (const s of specs) {
+    if (!s || typeof s !== "object") continue;
+    const obj = s as Record<string, unknown>;
+    const price = toPrice(obj.price);
+    if (price === null) continue;
+    const type = String(obj["@type"] ?? obj.priceType ?? "").toLowerCase();
+    if (type.includes("listprice")) return price;
+    fallback ??= price;
+  }
+  return fallback;
+}
+
+function isInStock(offer: Record<string, unknown>): boolean {
+  const availability = String(offer.availability ?? "").toLowerCase();
+  if (!availability) return true; // 표기가 없으면 판매 중으로 본다
+  return !availability.includes("outofstock") && !availability.includes("soldout");
+}
+
+/**
+ * offers에서 판매가·정가를 뽑는다.
+ * 무신사처럼 옵션이 많은 상품은 offers가 배열이거나 AggregateOffer로 온다:
+ *  - 배열: 첫 번째를 무조건 쓰면 품절 옵션의 정가가 잡힐 수 있다 → 재고 있는 것 중 최저가
+ *  - AggregateOffer: price가 없고 lowPrice/highPrice만 있다 → 이걸 못 읽으면 가격이 0원이 된다
+ */
+function extractOfferPrices(offersRaw: unknown): OfferPrices {
+  if (!offersRaw || typeof offersRaw !== "object") return { salePrice: null, listPrice: null };
+
+  const offers = (Array.isArray(offersRaw) ? offersRaw : [offersRaw]).filter(
+    (o): o is Record<string, unknown> => !!o && typeof o === "object"
+  );
+
+  let salePrice: number | null = null;
+  let listPrice: number | null = null;
+
+  for (const offer of offers) {
+    const type = String(offer["@type"] ?? "").toLowerCase();
+
+    if (type.includes("aggregateoffer")) {
+      const low = toPrice(offer.lowPrice);
+      const high = toPrice(offer.highPrice);
+      if (low !== null && (salePrice === null || low < salePrice)) salePrice = low;
+      if (high !== null && (listPrice === null || high > listPrice)) listPrice = high;
+      continue;
+    }
+
+    if (!isInStock(offer)) continue;
+
+    const price = toPrice(offer.price);
+    if (price !== null && (salePrice === null || price < salePrice)) salePrice = price;
+
+    const spec = listPriceFromSpec(offer.priceSpecification);
+    if (spec !== null && (listPrice === null || spec > listPrice)) listPrice = spec;
+  }
+
+  // 재고 있는 오퍼가 하나도 없으면(전 옵션 품절) 최소한 가격 표기는 살린다
+  if (salePrice === null) {
+    for (const offer of offers) {
+      const price = toPrice(offer.price);
+      if (price !== null && (salePrice === null || price < salePrice)) salePrice = price;
+    }
+  }
+
+  return { salePrice, listPrice };
 }
 
 function parseJsonLd(html: string): ParsedProduct | null {
@@ -103,18 +189,7 @@ function parseJsonLd(html: string): ParsedProduct | null {
       ? cleanText((brandRaw as Record<string, unknown>).name)
       : null);
 
-  // offers는 단일 객체 또는 배열
-  const offersRaw = product.offers;
-  const offer = (Array.isArray(offersRaw) ? offersRaw[0] : offersRaw) as
-    | Record<string, unknown>
-    | undefined;
-
-  const salePrice = offer ? toPrice(offer.price) : null;
-  // schema.org에 정가 필드가 따로 있는 경우가 있다 (priceSpecification / highPrice)
-  const listPrice =
-    offer && offer.priceSpecification && typeof offer.priceSpecification === "object"
-      ? toPrice((offer.priceSpecification as Record<string, unknown>).price)
-      : null;
+  const { salePrice, listPrice } = extractOfferPrices(product.offers);
 
   const imageRaw = product.image;
   const imageUrl = cleanText(Array.isArray(imageRaw) ? imageRaw[0] : imageRaw);

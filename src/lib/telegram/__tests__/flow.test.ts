@@ -238,6 +238,146 @@ describe("URL 가드가 봇 경로에서도 적용된다", () => {
   });
 });
 
+// ── 리뷰가 잡아낸 결함들의 회귀 테스트 ──────────────────────────────────
+// 이 블록이 깨지면 계정 안전 또는 제품 동작이 실제로 망가진 것이다.
+
+describe("회귀: 딜 2건이 동시에 링크를 기다리면 안 된다", () => {
+  it("두 번째 딜에 [이거 올릴래]를 누르면 첫 딜의 대기가 해제된다", async () => {
+    gatewayFetch.mockResolvedValue({ ok: true, status: 200, body: PRODUCT_HTML, finalUrl: "x" });
+
+    await handleUpdate(userMessage("https://www.musinsa.com/products/444"));
+    await handleUpdate(userMessage("https://www.musinsa.com/products/555"));
+    const deals = await db.deal.findMany({ orderBy: { createdAt: "asc" } });
+    expect(deals).toHaveLength(2);
+
+    await handleUpdate(buttonTap(CB.interested(deals[0].id)));
+    await handleUpdate(buttonTap(CB.interested(deals[1].id)));
+
+    // 대기 중인 딜은 항상 최대 1건 — 아니면 붙여넣은 링크가 엉뚱한 딜에 붙는다
+    const pending = await db.deal.findMany({ where: { pendingInput: { not: null } } });
+    expect(pending).toHaveLength(1);
+    expect(pending[0].id).toBe(deals[1].id);
+  });
+});
+
+describe("회귀: 링크가 다른 상품을 가리키면 승인 화면에 경고가 뜬다", () => {
+  it("goodsNo 불일치를 감지해 경고하고 감사 로그를 남긴다", async () => {
+    gatewayFetch.mockResolvedValue({ ok: true, status: 200, body: PRODUCT_HTML, finalUrl: "x" });
+    await handleUpdate(userMessage("https://www.musinsa.com/products/1234567"));
+    const deal = await db.deal.findFirstOrThrow();
+    await handleUpdate(buttonTap(CB.interested(deal.id)));
+
+    edited.length = 0;
+    // 딜은 #1234567인데 #9999999 링크를 붙여넣는다
+    await handleUpdate(
+      userMessage("https://www.musinsa.com/products/9999999?utm_source=curator&utm_term=ZZZ")
+    );
+
+    const card = edited.find((e) => e.text.includes("다른 상품"));
+    expect(card, "승인 카드에 링크 불일치 경고가 없다").toBeDefined();
+    expect(card!.text).toContain("#9999999");
+
+    const logged = await db.auditLog.findFirst({ where: { action: "link.warning" } });
+    expect(logged).toBeTruthy();
+  });
+
+  it("커미션 파라미터가 없으면 경고한다", async () => {
+    gatewayFetch.mockResolvedValue({ ok: true, status: 200, body: PRODUCT_HTML, finalUrl: "x" });
+    await handleUpdate(userMessage("https://www.musinsa.com/products/1234567"));
+    const deal = await db.deal.findFirstOrThrow();
+    await handleUpdate(buttonTap(CB.interested(deal.id)));
+
+    sent.length = 0;
+    // 커미션 파라미터 없는 상품 URL → 링크인지 새 딜인지 되묻는다
+    await handleUpdate(userMessage("https://www.musinsa.com/products/1234567"));
+    expect(sent.some((s) => s.text.includes("커미션 파라미터가 없는 상품 링크"))).toBe(true);
+  });
+});
+
+describe("회귀: [훅 교체] 후 보낸 문구가 훅으로 반영된다", () => {
+  it("훅 문구가 큐레이터 링크 파서로 새지 않는다", async () => {
+    gatewayFetch.mockResolvedValue({ ok: true, status: 200, body: PRODUCT_HTML, finalUrl: "x" });
+    await handleUpdate(userMessage("https://www.musinsa.com/products/1234567"));
+    const deal = await db.deal.findFirstOrThrow();
+    await handleUpdate(buttonTap(CB.interested(deal.id)));
+    await handleUpdate(
+      userMessage("https://www.musinsa.com/products/1234567?utm_source=curator&utm_term=AAA")
+    );
+
+    await handleUpdate(buttonTap(CB.rehook(deal.id)));
+    const waiting = await db.deal.findUniqueOrThrow({ where: { id: deal.id } });
+    expect(waiting.pendingInput).toBe("HOOK");
+
+    await handleUpdate(userMessage("이 가격에 S부터 품절각"));
+
+    const after = await db.deal.findUniqueOrThrow({ where: { id: deal.id } });
+    expect(after.hookLine).toBe("이 가격에 S부터 품절각");
+    expect(after.pendingInput).toBeNull();
+  });
+});
+
+describe("회귀: 승인은 항상 최신 버전 카드를 발행한다", () => {
+  it("카드가 재렌더되면 v1이 아니라 v2가 나간다", async () => {
+    gatewayFetch.mockResolvedValue({ ok: true, status: 200, body: PRODUCT_HTML, finalUrl: "x" });
+    await handleUpdate(userMessage("https://www.musinsa.com/products/1234567"));
+    const deal = await db.deal.findFirstOrThrow();
+    await handleUpdate(buttonTap(CB.interested(deal.id)));
+    await handleUpdate(
+      userMessage("https://www.musinsa.com/products/1234567?utm_source=curator&utm_term=AAA")
+    );
+
+    // 훅을 교체해 v2를 만든다
+    await handleUpdate(buttonTap(CB.rehook(deal.id)));
+    await handleUpdate(userMessage("새로운 훅 문구 V2"));
+
+    const versions = await db.contentCard.findMany({
+      where: { dealId: deal.id, channel: "KAKAO_OPEN" },
+      orderBy: { version: "asc" },
+    });
+    expect(versions.length).toBeGreaterThanOrEqual(2);
+
+    sent.length = 0;
+    await handleUpdate(buttonTap(CB.approve(deal.id)));
+
+    const delivery = sent.find((s) => s.text.includes("<pre>"));
+    expect(delivery).toBeDefined();
+    // 보인 것 = 나가는 것: 최신 훅이 담겨야 한다
+    expect(delivery!.text).toContain("새로운 훅 문구 V2");
+
+    const post = await db.post.findFirstOrThrow({ where: { dealId: deal.id } });
+    const latest = versions[versions.length - 1];
+    expect(post.contentCardId).toBe(latest.id);
+  });
+});
+
+describe("회귀: 같은 상품 URL을 두 번 던져도 죽지 않는다", () => {
+  it("Product 유니크 제약에 걸리지 않고 두 번째 딜이 생성된다", async () => {
+    gatewayFetch.mockResolvedValue({ ok: true, status: 200, body: PRODUCT_HTML, finalUrl: "x" });
+
+    await handleUpdate(userMessage("https://www.musinsa.com/products/1234567"));
+    // 두 번째 전송 — 이전 구현은 여기서 예외로 조용히 죽었다
+    await handleUpdate(userMessage("https://www.musinsa.com/products/1234567"));
+
+    expect(await db.deal.count()).toBe(2);
+    expect(await db.product.count()).toBe(1); // 같은 상품은 하나로 유지
+  });
+});
+
+describe("회귀: 파싱 실패 시 진행 버튼을 내주지 않는다", () => {
+  it("아무 필드도 못 읽으면 [이거 올릴래] 없이 [직접 입력]만 제공한다", async () => {
+    gatewayFetch.mockResolvedValue({ ok: false, outcome: "BOT_CHALLENGE", reason: "차단됨" });
+
+    edited.length = 0;
+    await handleUpdate(userMessage("https://www.musinsa.com/products/777"));
+
+    const deal = await db.deal.findFirstOrThrow();
+    expect(deal.parseSource).toBe("none");
+
+    const card = edited[edited.length - 1];
+    expect(card.text).toContain("읽지 못했습니다");
+  });
+});
+
 describe("스킵", () => {
   it("스킵하면 상태가 SKIPPED로 남고 감사 로그가 기록된다", async () => {
     gatewayFetch.mockResolvedValue({ ok: true, status: 200, body: PRODUCT_HTML, finalUrl: "x" });
