@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
+    "bot": "tsx --env-file=.env scripts/bot-poll.ts",
     "test": "vitest run"
   },
   "prisma": {
@@ -16,6 +17,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
     "@prisma/client": "^6.12.0",
+    "ipaddr.js": "^2.5.0",
     "next": "16.3.3",
     "prisma": "^6.12.0",
     "react": "19.2.8",

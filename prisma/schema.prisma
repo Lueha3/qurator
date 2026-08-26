@@ -1,6 +1,6 @@
-// qurator (HoneyFlow) — Phase 0 스키마
-// 정본: docs/02-architecture.md §3. Phase 0 범위로 축소했지만 필드/enum은 정본과 동일하게 유지해
-// Phase 1+ (딜 레이더·발행 어댑터·헬스체커)로 갈 때 스키마 변경이 없도록 한다.
+// qurator (HoneyFlow) — Phase 0~1 스키마
+// 정본: docs/02-architecture.md §3. 필드/enum은 정본과 동일하게 유지해
+// Phase 2+ (발행 어댑터·헬스체커·딜 레이더)로 갈 때 스키마 변경이 없도록 한다.
 //
 // DB: SQLite (Phase 0 로컬 개발용 — Supabase 계정 없이 즉시 실행 가능).
 // provider만 "postgresql"로 바꾸고 DATABASE_URL을 Supabase 연결 문자열로 교체하면
@@ -97,6 +97,13 @@ model Deal {
 
   status            DealStatus @default(DRAFT) // draft→ready→published→expired→archived (정본 enum)
 
+  // 텔레그램 승인 카드 상태 (docs/02 §6). Deal.status가 딜 자체의 생애주기라면,
+  // approvalStage는 "카드 1장이 어느 단계에 있는가"다 — 후보→링크대기→발행승인.
+  approvalStage     ApprovalStage @default(CANDIDATE)
+  telegramChatId    String? // 카드를 보낸 대화 (화이트리스트된 현표 chat_id)
+  telegramMessageId Int? // editMessageText로 같은 메시지를 상태 전이시키기 위한 앵커
+  sourceUrlRaw      String? // 현표가 던진 원본 URL (정규화 전) — 감사·디버깅용
+
   salePrice         Int?
   discountRate      Int? // %
   couponCode        String?
@@ -126,6 +133,14 @@ enum DealStatus {
   PUBLISHED
   EXPIRED
   ARCHIVED
+}
+
+enum ApprovalStage {
+  CANDIDATE // 봇이 상품을 파싱해 후보 카드를 띄운 상태
+  AWAITING_LINK // 현표가 [관심]을 눌러 큐레이터 링크 붙여넣기를 기다리는 상태
+  READY_TO_PUBLISH // 링크 수신 → 카드 렌더 완료, 승인 대기
+  APPROVED // 승인됨 (Phase 1에서는 카톡 텍스트 전달까지가 전부)
+  SKIPPED // 현표가 스킵 — 스코어링 네거티브 라벨(Phase 3)
 }
 
 // ── curator_links ───────────────────────────────────────────────────────
@@ -218,4 +233,102 @@ enum PostStatus {
   SENT
   CONFIRMED
   FAILED
+}
+
+// ── audit_log ───────────────────────────────────────────────────────────
+// docs/03-account-safety.md §11. append-only. 목적:
+//   ① 플랫폼이 계정을 제재했을 때 "전부 사람이 승인한 공식 API 사용"임을 입증
+//   ② 공정위 이슈 시 고지문 삽입 이력 입증
+// 절대 규칙: 토큰·개인정보를 기록하지 않는다. 수정·삭제 경로를 만들지 않는다.
+model AuditLog {
+  id              String   @id @default(uuid())
+  ts              DateTime @default(now())
+  actor           Actor // 사람이 한 일인가, 시스템이 한 일인가
+  action          String // 'deal.captured' | 'deal.approved' | 'card.copied' | 'fetch.blocked' 등
+  channel         String? // 해당되는 경우의 채널
+  approvalRef     String? // 승인 카드 스냅샷 → 승인 이벤트 → 페이로드 해시를 묶는 체인 키
+  payloadHash     String? // SHA-256 — 무엇을 승인했는지의 위변조 불가 증적
+  payloadSnapshot String? // 승인 시점의 본문 스냅샷 (JSON 문자열)
+  responseCode    Int? // 외부 API 응답 코드
+  responseId      String? // 플랫폼이 반환한 게시물 ID
+  detail          String? // 사람이 읽을 요약
+
+  @@index([ts])
+  @@index([approvalRef])
+  @@map("audit_log")
+}
+
+enum Actor {
+  HUMAN
+  SYSTEM
+}
+
+// ── fetch_log ───────────────────────────────────────────────────────────
+// Fetch Gateway를 통과한 모든 아웃바운드 요청의 기록. 본문은 저장하지 않는다(docs/03 §11).
+// "사용자가 명시적으로 요청한 단발 fetch"임을 입증하는 증적이기도 하다 — trigger 필드가 그것.
+model FetchLog {
+  id           String      @id @default(uuid())
+  ts           DateTime    @default(now())
+  url          String // 정규화된 요청 URL (ULID/utm 파라미터는 애초에 게이트웨이가 차단)
+  host         String
+  trigger      FetchTrigger // 무엇이 이 요청을 유발했는가
+  outcome      FetchOutcome
+  responseCode Int?
+  durationMs   Int?
+  bytes        Int?
+  detail       String? // 차단 사유 등
+
+  @@index([ts])
+  @@index([host, ts])
+  @@map("fetch_log")
+}
+
+enum FetchTrigger {
+  USER_URL // 현표가 봇/폼에 직접 던진 URL (Phase 1의 유일한 경로)
+  HEALTH_CHECK // 링크 헬스체커 (Phase 2)
+  RADAR // 자동 발굴 크롤러 (Phase 3)
+  ROBOTS // robots.txt 자체 조회
+}
+
+enum FetchOutcome {
+  OK
+  BLOCKED_POLICY // 게이트웨이 하드 가드가 막음 (ULID URL, 사설 IP, 호스트 화이트리스트 위반 등)
+  BLOCKED_ROBOTS // robots.txt Disallow
+  BLOCKED_BUDGET // 레이트리밋/일일 예산 소진
+  BLOCKED_CIRCUIT // 서킷 오픈 상태 (이전 차단 감지로 정지 중)
+  BOT_CHALLENGE // 캡차·차단 페이지 감지
+  HTTP_ERROR
+  TIMEOUT
+  NETWORK_ERROR
+}
+
+// ── circuit_state ───────────────────────────────────────────────────────
+// 소스(호스트)별 서킷브레이커. docs/03 §6.2 — 자동 정지, 수동 재개 비대칭.
+model CircuitState {
+  host          String    @id
+  state         Circuit   @default(HEALTHY)
+  pausedUntil   DateTime? // 백오프 종료 시각. BLOCKED는 pausedUntil이 없고 사람이 풀어야 한다
+  reason        String?
+  consecutiveFailures Int  @default(0)
+  updatedAt     DateTime  @updatedAt
+
+  @@map("circuit_state")
+}
+
+enum Circuit {
+  HEALTHY
+  DEGRADED // 백오프 중 — 시간이 지나면 자동 회복
+  BLOCKED // 차단 감지 — 자동 재개 없음, 사람이 해제해야 함
+}
+
+// ── policy ──────────────────────────────────────────────────────────────
+// docs/02-architecture.md §13 정책 시트의 DB 형태. "여기 없는 수치를 코드에 하드코딩하지 않는다."
+// 코드는 기본값(하드캡)을 함께 갖고, 둘 중 더 보수적인 값을 사용한다(이중화).
+model Policy {
+  key       String   @id
+  value     String // 숫자/불리언도 문자열로 저장 (SQLite/Postgres 공통)
+  note      String?
+  updatedAt DateTime @updatedAt
+
+  @@map("policy")
 }
