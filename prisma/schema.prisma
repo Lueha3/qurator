@@ -132,6 +132,7 @@ model Deal {
   curatorLinks CuratorLink[]
   contentCards ContentCard[]
   posts        Post[]
+  shortLinks   ShortLink[]
 
   @@map("deals")
 }
@@ -172,8 +173,14 @@ model CuratorLink {
 
   health          LinkHealth @default(UNCHECKED)
   healthCheckedAt DateTime?
+  /** 연속 품절 관측 횟수. 일시적 품절(플랩)로 살아있는 링크를 죽이지 않기 위한 카운터 */
+  soldoutStreak   Int      @default(0)
+  /** 첫 헬스체크 시각. 발행 시각과 동기화되지 않도록 랜덤 오프셋(1~6h)을 더해 정한다 */
+  healthCheckAfter DateTime?
 
   createdAt       DateTime @default(now())
+
+  shortLinks ShortLink[]
 
   @@map("curator_links")
 }
@@ -247,6 +254,61 @@ enum PostStatus {
   SENT
   CONFIRMED
   FAILED
+}
+
+// ── short_links ─────────────────────────────────────────────────────────
+// docs/02-architecture.md §10.1. 채널별 클릭 계측의 소유권을 확보하고, 품절 시
+// 과거 게시물의 링크까지 한 번에 구제하기 위한 앞단 리다이렉트.
+//
+// 불변식 (docs/03 §5.2·§5.3):
+//   - targetUrl은 큐레이터 링크 **원형 무변조**다. 파라미터를 건드리면 링크 변조 금지 조항 위반.
+//   - state=DEAD인 링크는 절대 '다른 상품의 커미션 링크'로 자동 착지시키지 않는다.
+//     반드시 비커미션 안내 페이지로 보내고, 대안 딜은 사용자가 명시적으로 클릭해야 한다.
+model ShortLink {
+  id            String      @id @default(uuid())
+  code          String      @unique // base62 7자
+  dealId        String
+  deal          Deal        @relation(fields: [dealId], references: [id])
+  curatorLinkId String
+  curatorLink   CuratorLink @relation(fields: [curatorLinkId], references: [id])
+
+  /**
+   * 어느 지면에 실린 링크인지 — 딜×지면당 1개를 발급해 채널 기여를 최초 클릭 시점에 확정한다.
+   * 'hub' | 'notion' | 'kakao_open' | 'threads' … (Channel enum + 링크허브)
+   *
+   * nullable로 두지 않는 이유: SQL에서 NULL은 서로 다른 값으로 취급되어 복합 유니크가
+   * 실제로 강제되지 않는다 — 같은 딜에 hub 링크가 여러 개 생겨도 DB가 막지 못한다.
+   */
+  surface   String         @default("hub")
+  targetUrl String // 큐레이터 링크 원본. 절대 수정하지 않는다.
+  state     ShortLinkState @default(ACTIVE)
+  createdAt DateTime       @default(now())
+
+  clicks ClickEvent[]
+
+  @@unique([dealId, curatorLinkId, surface])
+  @@map("short_links")
+}
+
+enum ShortLinkState {
+  ACTIVE
+  DEAD // 품절·쿠폰 만료 — 안내 페이지로 보낸다
+}
+
+// ── click_events ────────────────────────────────────────────────────────
+// IP는 저장하지 않는다(개인정보 최소화). 봇 판정에만 쓰고 즉시 버린다.
+model ClickEvent {
+  id          String    @id @default(uuid())
+  shortLinkId String
+  shortLink   ShortLink @relation(fields: [shortLinkId], references: [id])
+  ts          DateTime  @default(now())
+  referer     String?
+  /** 'human' | 'bot' — UA 기반 1차 분류. 봇 클릭은 성과 집계에서 제외한다. */
+  uaClass     String    @default("human")
+  country     String?
+
+  @@index([shortLinkId, ts])
+  @@map("click_events")
 }
 
 // ── audit_log ───────────────────────────────────────────────────────────

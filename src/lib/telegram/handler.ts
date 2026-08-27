@@ -15,6 +15,8 @@ import { draftHookLine } from "../ai-hook";
 import { renderAllChannels, type DealFacts, type DealLink } from "../renderer";
 import { audit } from "../audit";
 import { signCardToken } from "../signed-link";
+import { ensureShortLink } from "../shortlink";
+import { firstCheckAt } from "../health-check";
 import {
   answerCallback,
   editMessage,
@@ -415,14 +417,31 @@ async function handleCuratorLinkPaste(deal: DealRecord, text: string, chatId: st
     linkWarnings.push("커미션 파라미터가 없습니다 — 큐레이터센터에서 만든 링크가 맞는지 확인하세요.");
   }
 
-  await db.curatorLink.create({
+  const curatorLink = await db.curatorLink.create({
     data: {
       dealId: deal.id,
       rawUrl: parsed.link.rawUrl,
       ulid: parsed.link.ulid,
       isDefault: true,
+      // 첫 헬스체크는 지금이 아니라 1~6시간 뒤부터. 발행 시각과 점검 시각이 동기화되면
+      // 무신사 쪽에서 "이 큐레이터의 크롤러"라는 지문이 남는다(docs/03 §4.3).
+      healthCheckAfter: firstCheckAt(),
     },
   });
+
+  // 링크허브용 숏링크를 발급한다(자기 소유 지면이라 safe 모드에서도 숏링크를 쓴다).
+  // 이 코드가 있어야 품절 시 착지점만 바꿔 과거 게시물까지 한 번에 구제된다.
+  try {
+    await ensureShortLink({
+      dealId: deal.id,
+      curatorLinkId: curatorLink.id,
+      targetUrl: parsed.link.rawUrl,
+      surface: "hub",
+    });
+  } catch (err) {
+    // 숏링크 발급 실패가 카드 생성을 막지는 않는다 — 카톡·스레드는 어차피 원본 링크를 쓴다.
+    console.error("[shortlink] 발급 실패", deal.id, err);
+  }
 
   if (linkWarnings.length > 0) {
     await audit({

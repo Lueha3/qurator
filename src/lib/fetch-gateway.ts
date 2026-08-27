@@ -213,10 +213,20 @@ async function getRobots(host: string): Promise<RobotsFetchOutcome> {
   const durationMs = Date.now() - started;
 
   // robots.txt 조회도 실제로 네트워크로 나간 요청이다 — 예산·감사 대상이므로 기록한다.
+  // 응답이 왔다는 사실(result.ok)과 그 응답이 정상이라는 것(2xx)은 다르다 —
+  // 403을 "OK"로 남기면 운영자가 상태를 잘못 읽는다.
+  const robotsOutcome: FetchOutcome = !result.ok
+    ? result.outcome
+    : looksLikeBotChallenge(result.status, result.body)
+      ? "BOT_CHALLENGE"
+      : result.status >= 400
+        ? "HTTP_ERROR"
+        : "OK";
+
   await log({
     url: `https://${host}/robots.txt`,
     trigger: "ROBOTS",
-    outcome: result.ok ? "OK" : result.outcome,
+    outcome: robotsOutcome,
     responseCode: result.ok ? result.status : undefined,
     durationMs,
     bytes: result.ok ? result.body.length : undefined,

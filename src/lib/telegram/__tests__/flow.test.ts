@@ -72,6 +72,9 @@ function buttonTap(data: string) {
 }
 
 async function resetDb() {
+  // FK 의존 순서대로 — 자식부터 지운다
+  await db.clickEvent.deleteMany();
+  await db.shortLink.deleteMany();
   await db.post.deleteMany();
   await db.contentCard.deleteMany();
   await db.curatorLink.deleteMany();

@@ -10,7 +10,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "bot": "tsx --env-file=.env scripts/bot-poll.ts",
     "gateway": "tsx --env-file=.env scripts/gateway.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "health": "tsx --env-file=.env scripts/health-check.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

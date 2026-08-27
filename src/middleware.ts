@@ -10,7 +10,15 @@ import { NextRequest, NextResponse } from "next/server";
 // 그 경로는 URL에 실린 HMAC 서명 토큰으로 스스로를 방어한다(src/lib/signed-link.ts).
 
 const COOKIE_NAME = "qurator_session";
-const PUBLIC_PREFIXES = ["/copy/", "/api/telegram/"];
+
+// 공개 경로. 각자 스스로를 방어할 수단이 있는 것만 여기 들어간다:
+//   /copy/    — HMAC 서명 + 만료 토큰 (텔레그램 인앱 브라우저엔 세션이 없다)
+//   /l/       — 숏링크 리다이렉트. 팔로워가 클릭하는 지면이라 공개여야 한다
+//   /expired/ — 죽은 링크 안내(비커미션)
+//   /hub      — 링크허브. 프로필 링크로 공개되는 것이 존재 이유다
+//   /api/telegram/ — webhook 시크릿 헤더로 검증
+// 이 경로들은 전부 noindex를 달아 검색봇이 커미션 링크를 따라가지 못하게 한다.
+const PUBLIC_PREFIXES = ["/copy/", "/l/", "/expired/", "/hub", "/api/telegram/"];
 
 export function middleware(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
