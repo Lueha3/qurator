@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { db } from "@/lib/db";
 import { DISCLOSURE } from "@/lib/disclosure";
 
@@ -54,24 +53,25 @@ export default async function ExpiredPage({ params }: { params: Promise<{ code: 
           <ul className="flex flex-col gap-2">
             {alternatives.map((deal) => (
               <li key={deal.id}>
-                <Link
+                {/* 프리페치로 커미션 링크가 미리 호출되지 않도록 순수 <a>를 쓴다 */}
+                <a
                   href={`/l/${deal.shortLinks[0].code}`}
-                  rel="nofollow"
+                  rel="nofollow noopener"
                   className="block rounded-lg border border-line bg-panel px-4 py-3 hover:border-honey"
                 >
                   <span className="text-sm font-medium">
                     {deal.product.brandName} · {deal.product.productName}
                   </span>
-                </Link>
+                </a>
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      <Link href="/hub" className="text-center text-sm text-honey hover:underline">
+      <a href="/hub" className="text-center text-sm text-honey hover:underline">
         전체 목록 보기 →
-      </Link>
+      </a>
     </main>
   );
 }

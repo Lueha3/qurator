@@ -61,8 +61,12 @@ export async function ensureShortLink(params: {
         },
       });
       return created.code;
-    } catch {
-      // 충돌 또는 동시 생성 — 이미 만들어졌으면 그것을 쓴다
+    } catch (err) {
+      // 재시도할 가치가 있는 것은 유니크 위반(P2002)뿐이다.
+      // FK 위반·연결 끊김까지 '충돌'로 삼키면 5회 헛돌다 원인 없는 에러만 남는다.
+      if (!isUniqueViolation(err)) throw err;
+
+      // 동시 생성이었다면 이미 만들어진 것을 쓴다
       const raced = await db.shortLink.findUnique({
         where: {
           dealId_curatorLinkId_surface: {
@@ -73,9 +77,19 @@ export async function ensureShortLink(params: {
         },
       });
       if (raced) return raced.code;
+      // 아니면 code 충돌 — 새 코드로 재시도
     }
   }
-  throw new Error("숏링크 코드 발급에 실패했습니다.");
+  throw new Error("숏링크 코드 발급에 실패했습니다 (코드 충돌 5회).");
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "P2002"
+  );
 }
 
 export function shortLinkUrl(code: string): string | null {

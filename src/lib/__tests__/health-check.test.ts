@@ -2,32 +2,96 @@ import { describe, expect, it } from "vitest";
 import { firstCheckAt, judgeAvailability, nextCheckInterval } from "../health-check";
 import { classifyUserAgent, usesShortLink } from "../shortlink";
 
-function productPage(availability: string | null, extra = "") {
-  const offer = availability
-    ? `,"offers":{"@type":"Offer","price":"53400","availability":"${availability}"}`
-    : `,"offers":{"@type":"Offer","price":"53400"}`;
+function pageWithOffers(offers: unknown, extra = "") {
   return `<html><head><script type="application/ld+json">
-  {"@type":"Product","name":"맨투맨","brand":{"name":"쿠어"}${offer}}
+  ${JSON.stringify({ "@type": "Product", name: "맨투맨", brand: { name: "쿠어" }, offers })}
   </script></head><body>${extra}${"본문 ".repeat(2000)}</body></html>`;
+}
+
+function productPage(availability: string | null, extra = "") {
+  return pageWithOffers(
+    availability
+      ? { "@type": "Offer", price: "53400", availability }
+      : { "@type": "Offer", price: "53400" },
+    extra
+  );
 }
 
 describe("헬스 판정 — 의심스러우면 유지한다", () => {
   it("InStock을 살아있음으로 판정한다", () => {
-    expect(judgeAvailability(productPage("https://schema.org/InStock")).kind).toBe("ok");
+    expect(judgeAvailability(200, productPage("https://schema.org/InStock")).kind).toBe("ok");
   });
 
-  it("OutOfStock을 품절로 판정한다", () => {
-    expect(judgeAvailability(productPage("https://schema.org/OutOfStock")).kind).toBe("soldout");
+  it("전 옵션 OutOfStock을 품절로 판정한다", () => {
+    expect(judgeAvailability(200, productPage("https://schema.org/OutOfStock")).kind).toBe(
+      "soldout"
+    );
   });
 
   it("파싱이 안 되면 상태를 바꾸지 않고 동결한다 (파서가 깨져도 살아있는 링크를 죽이지 않는다)", () => {
-    const verdict = judgeAvailability("<html><body>알 수 없는 페이지</body></html>");
-    expect(verdict.kind).toBe("frozen");
+    expect(judgeAvailability(200, "<html><body>알 수 없는 페이지</body></html>").kind).toBe(
+      "frozen"
+    );
   });
 
   it("가격은 읽혔지만 재고 표기가 없으면 판단하지 않는다", () => {
-    const verdict = judgeAvailability(productPage(null));
-    expect(verdict.kind).toBe("frozen");
+    expect(judgeAvailability(200, productPage(null)).kind).toBe("frozen");
+  });
+});
+
+// 리뷰가 잡아낸 결함의 회귀 테스트.
+// 예전 구현은 HTML 전문에서 "outofstock" 부분문자열을 찾아, 사이즈 하나 품절인
+// 잘 팔리는 상품이 18시간 만에 DEAD로 확정되고 허브에서 사라졌다.
+describe("회귀: 옵션 일부 품절은 품절이 아니다", () => {
+  it("사이즈 하나만 품절이면 살아있음으로 판정한다", () => {
+    const html = pageWithOffers([
+      { "@type": "Offer", price: "53400", availability: "https://schema.org/OutOfStock" },
+      { "@type": "Offer", price: "53400", availability: "https://schema.org/InStock" },
+      { "@type": "Offer", price: "53400", availability: "https://schema.org/InStock" },
+    ]);
+    const verdict = judgeAvailability(200, html);
+    expect(verdict.kind).toBe("ok");
+    if (verdict.kind === "ok") expect(verdict.detail).toContain("3개 옵션 중 2개");
+  });
+
+  it("전 옵션이 품절일 때만 품절로 확정한다", () => {
+    const html = pageWithOffers([
+      { "@type": "Offer", price: "53400", availability: "https://schema.org/OutOfStock" },
+      { "@type": "Offer", price: "53400", availability: "https://schema.org/OutOfStock" },
+    ]);
+    const verdict = judgeAvailability(200, html);
+    expect(verdict.kind).toBe("soldout");
+    if (verdict.kind === "soldout") expect(verdict.detail).toContain("2개 옵션 전부");
+  });
+
+  it("본문 다른 곳(추천상품 등)의 품절 표기에 영향받지 않는다", () => {
+    const html = pageWithOffers(
+      { "@type": "Offer", price: "53400", availability: "https://schema.org/InStock" },
+      // 연관상품 블록이 함께 실린 상황 — 문자열 스캔이었다면 여기서 품절로 판정됐다
+      `<div data-related='{"availability":"https://schema.org/OutOfStock"}'>추천상품</div>`
+    );
+    expect(judgeAvailability(200, html).kind).toBe("ok");
+  });
+
+  it("AggregateOffer만 있으면 재고를 알 수 없으므로 동결한다", () => {
+    const html = pageWithOffers({
+      "@type": "AggregateOffer",
+      lowPrice: "39000",
+      highPrice: "59000",
+    });
+    expect(judgeAvailability(200, html).kind).toBe("frozen");
+  });
+});
+
+describe("HTTP 상태 기반 판정", () => {
+  it("404·410은 상품이 사라진 것으로 본다", () => {
+    expect(judgeAvailability(404, "").kind).toBe("gone");
+    expect(judgeAvailability(410, "").kind).toBe("gone");
+  });
+
+  it("그 외 오류 상태는 판정하지 않는다 (일시 장애로 링크를 죽이지 않는다)", () => {
+    expect(judgeAvailability(500, "").kind).toBe("frozen");
+    expect(judgeAvailability(503, "").kind).toBe("frozen");
   });
 });
 

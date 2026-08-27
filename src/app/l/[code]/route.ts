@@ -12,8 +12,37 @@ import { classifyUserAgent } from "@/lib/shortlink";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * 프리페치·프리렌더 요청인가.
+ *
+ * 이 가드가 없으면 링크가 실린 페이지를 **여는 것만으로** 뷰포트 안의 모든 숏링크가 실행된다:
+ * 브라우저·프레임워크가 미리 당겨오면서 클릭이 기록되고 커미션 URL로 302가 나간다.
+ * 그러면 숏링크의 존재 이유인 클릭 계측이 통째로 오염되고, 현표가 자기 허브를 확인만 해도
+ * 자기 링크에 클릭이 쌓인다 — 게이트웨이에서 그토록 막은 자기 클릭이 프론트로 우회해 들어오는 셈이다.
+ *
+ * 1차 방어는 페이지 쪽에서 <a>를 쓰는 것이고(next/link의 자동 프리페치를 피한다),
+ * 이 헤더 가드는 프레임워크가 바뀌어도 남는 2차 방어다.
+ */
+function isPrefetch(req: NextRequest): boolean {
+  const h = req.headers;
+  // Next.js App Router의 프리페치 마커
+  if (h.get("next-router-prefetch") === "1") return true;
+  if (h.get("rsc") === "1") return true;
+  // 표준 (Chrome/Safari의 speculation rules, <link rel=prefetch/prerender>)
+  const purpose = `${h.get("sec-purpose") ?? ""} ${h.get("purpose") ?? ""} ${h.get("x-purpose") ?? ""}`.toLowerCase();
+  return purpose.includes("prefetch") || purpose.includes("prerender");
+}
+
 export async function GET(req: NextRequest, ctx: { params: Promise<{ code: string }> }) {
   const { code } = await ctx.params;
+
+  // 사람이 실제로 누른 것이 아니면 아무 일도 하지 않는다 — 클릭도 기록하지 않고 302도 내보내지 않는다.
+  if (isPrefetch(req)) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: { "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store" },
+    });
+  }
 
   const link = await db.shortLink.findUnique({ where: { code } });
   if (!link) {

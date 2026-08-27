@@ -22,6 +22,13 @@ async function once() {
     `[health] 점검 ${result.checked}건 · 품절 확정 ${result.died.length}건 · 판정보류 ${result.frozen}건 (${seconds}초)`
   );
 
+  // 조기 종료를 조용히 넘기지 않는다 — 헬스체커가 몇 주째 아무것도 안 하고 있는데
+  // 로그가 "점검 0건"만 찍고 있으면 아무도 눈치채지 못한다.
+  if (result.stoppedEarly) {
+    console.warn(`[health] ⚠️ 사이클이 조기 종료됐습니다: ${result.stoppedEarly}`);
+    console.warn("[health]    상태 확인: npm run gateway status");
+  }
+
   if (result.died.length > 0) {
     await notifyDeadLinks(result.died);
     console.log(`[health] 품절 알림 ${result.died.length}건 전송`);

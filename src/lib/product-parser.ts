@@ -22,7 +22,15 @@ export interface ParsedProduct {
   source: "json-ld" | "opengraph" | "none";
   /** 파싱된 필드 수. 0이면 완전 실패(수동 입력으로 폴백해야 함) */
   fieldCount: number;
+  /**
+   * 재고 판정용 — **최상위 Product의 offers만** 집계한다.
+   * 헬스체커가 HTML 전문을 문자열로 훑으면 추천상품·연관상품의 품절 표기까지 걸려
+   * 잘 팔리는 상품이 품절로 확정되는 사고가 난다. 그래서 구조화된 offer만 센다.
+   */
+  offers: { total: number; inStock: number; hasAvailabilityInfo: boolean };
 }
+
+const NO_OFFERS = { total: 0, inStock: 0, hasAvailabilityInfo: false };
 
 const EMPTY: ParsedProduct = {
   brandName: null,
@@ -33,6 +41,7 @@ const EMPTY: ParsedProduct = {
   imageUrl: null,
   source: "none",
   fieldCount: 0,
+  offers: NO_OFFERS,
 };
 
 function toPrice(value: unknown): number | null {
@@ -107,6 +116,8 @@ function findProductNode(blocks: unknown[]): Record<string, unknown> | null {
 interface OfferPrices {
   salePrice: number | null;
   listPrice: number | null;
+  /** 재고 판정용 집계 — 최상위 Product의 offers만 반영된다 */
+  stats: { total: number; inStock: number; hasAvailabilityInfo: boolean };
 }
 
 /** priceSpecification은 단일 객체나 배열로 오고, ListPrice 타입이 정가를 담는다 */
@@ -125,6 +136,10 @@ function listPriceFromSpec(spec: unknown): number | null {
   return fallback;
 }
 
+function hasAvailability(offer: Record<string, unknown>): boolean {
+  return String(offer.availability ?? "").trim().length > 0;
+}
+
 function isInStock(offer: Record<string, unknown>): boolean {
   const availability = String(offer.availability ?? "").toLowerCase();
   if (!availability) return true; // 표기가 없으면 판매 중으로 본다
@@ -138,7 +153,9 @@ function isInStock(offer: Record<string, unknown>): boolean {
  *  - AggregateOffer: price가 없고 lowPrice/highPrice만 있다 → 이걸 못 읽으면 가격이 0원이 된다
  */
 function extractOfferPrices(offersRaw: unknown): OfferPrices {
-  if (!offersRaw || typeof offersRaw !== "object") return { salePrice: null, listPrice: null };
+  if (!offersRaw || typeof offersRaw !== "object") {
+    return { salePrice: null, listPrice: null, stats: { ...NO_OFFERS } };
+  }
 
   const offers = (Array.isArray(offersRaw) ? offersRaw : [offersRaw]).filter(
     (o): o is Record<string, unknown> => !!o && typeof o === "object"
@@ -146,11 +163,13 @@ function extractOfferPrices(offersRaw: unknown): OfferPrices {
 
   let salePrice: number | null = null;
   let listPrice: number | null = null;
+  const stats = { total: 0, inStock: 0, hasAvailabilityInfo: false };
 
   for (const offer of offers) {
     const type = String(offer["@type"] ?? "").toLowerCase();
 
     if (type.includes("aggregateoffer")) {
+      // AggregateOffer는 옵션별 재고를 알려주지 않는다 — 재고 판정 불가로 남긴다.
       const low = toPrice(offer.lowPrice);
       const high = toPrice(offer.highPrice);
       if (low !== null && (salePrice === null || low < salePrice)) salePrice = low;
@@ -158,7 +177,10 @@ function extractOfferPrices(offersRaw: unknown): OfferPrices {
       continue;
     }
 
+    stats.total++;
+    if (hasAvailability(offer)) stats.hasAvailabilityInfo = true;
     if (!isInStock(offer)) continue;
+    stats.inStock++;
 
     const price = toPrice(offer.price);
     if (price !== null && (salePrice === null || price < salePrice)) salePrice = price;
@@ -175,7 +197,7 @@ function extractOfferPrices(offersRaw: unknown): OfferPrices {
     }
   }
 
-  return { salePrice, listPrice };
+  return { salePrice, listPrice, stats };
 }
 
 function parseJsonLd(html: string): ParsedProduct | null {
@@ -189,7 +211,7 @@ function parseJsonLd(html: string): ParsedProduct | null {
       ? cleanText((brandRaw as Record<string, unknown>).name)
       : null);
 
-  const { salePrice, listPrice } = extractOfferPrices(product.offers);
+  const { salePrice, listPrice, stats } = extractOfferPrices(product.offers);
 
   const imageRaw = product.image;
   const imageUrl = cleanText(Array.isArray(imageRaw) ? imageRaw[0] : imageRaw);
@@ -203,6 +225,7 @@ function parseJsonLd(html: string): ParsedProduct | null {
     imageUrl,
     source: "json-ld",
     fieldCount: 0,
+    offers: stats,
   };
   parsed.fieldCount = countFields(parsed);
   return parsed.fieldCount > 0 ? parsed : null;
@@ -242,6 +265,8 @@ function parseOpenGraph(html: string): ParsedProduct | null {
     imageUrl: cleanText(metaContent(html, "og:image")),
     source: "opengraph",
     fieldCount: 0,
+    // OG 메타에는 옵션별 재고 정보가 없다
+    offers: { ...NO_OFFERS },
   };
   parsed.fieldCount = countFields(parsed);
   return parsed.fieldCount > 0 ? parsed : null;
@@ -275,6 +300,7 @@ export function parseProductPage(html: string): ParsedProduct {
       imageUrl: fromJsonLd.imageUrl ?? fromOg.imageUrl,
       source: "json-ld",
       fieldCount: 0,
+      offers: fromJsonLd.offers,
     };
     merged.fieldCount = countFields(merged);
     return merged;
