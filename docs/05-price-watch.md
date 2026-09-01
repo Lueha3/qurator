@@ -270,7 +270,7 @@ Persistent=true                  # 재부팅으로 놓친 실행을 따라잡는
 
 | # | 질문 | 해소 시점 |
 |---|---|---|
-| 1 | 무신사 robots.txt의 /products 허용 여부 (실측 필요 — 개발 샌드박스에서는 이그레스 차단으로 미확인) | W2 1일차 게이트 |
+| 1 | ~~무신사 robots.txt의 /products 허용 여부~~ → **해소(2026-09-01, §9.1)**: `User-agent: *` = `Disallow: /`. `HoneyFlowBot`은 /products 포함 전면 차단 → 크롤리스 확정 | ✅ 해소 |
 | 2 | couponPrice가 JSON-LD에 포함되는지, `__NEXT_DATA__` 확장이 필요한지 | W3 실페이로드 캡처 |
 | 3 | 2026 무진장 BF 정확 일정·형식(여름 에디션 존재 — 이벤트 창 복수 지원 여부) | 무신사 공지 후 |
 | 4 | 무신사 협의 트랙(봇 정식 통지) 결과 — 성사 시 워치 러너 폐기 여부 | 협의 트랙 진행에 따름 |
@@ -281,6 +281,31 @@ Persistent=true                  # 재부팅으로 놓친 실행을 따라잡는
 
 > 기입 전까지 워치 러너는 가동하지 않는다.
 
-- [ ] robots.txt 원문 확보 및 /products 판정: (미실측)
-- [ ] VPS IP 단건 fetch 응답: (미실측)
-- [ ] 판정: 가동 / 크롤리스 모드: (미정)
+- [x] **robots.txt 원문 확보 및 /products 판정: 실측 완료 → /products 전면 Disallow**
+      (2026-09-01, 개발환경 IP. Phase 1 텔레그램 봇으로 실제 onelink.me 공유 링크를 던져 게이트웨이가 도달한 실측).
+- [ ] VPS IP 단건 fetch 응답: **미실측 (VPS 미확보)** — 단, robots 정책이 UA 기반이라(아래) 이 테스트 이전에 크롤리스 확정.
+- [x] **판정: 크롤리스 모드 (§3.4).** 워치 러너 자동 수집(WATCH 트리거)은 현 UA로 성립하지 않는다.
+
+### 9.1 실측 근거 (2026-09-01)
+
+`www.musinsa.com/robots.txt` = **HTTP 200** (1479 bytes, `Last Updated: 2026.05.13`). 정책은 **User-Agent 기반**이다:
+
+- **Group 1 (전체 허용, `Allow: /`)**: Applebot, facebookexternalhit, Twitterbot, OAI-SearchBot, ChatGPT-User, **Claude-User, Claude-SearchBot**, Perplexity-User
+- **Group 2 (부분 허용, `Allow: /` + 일부 Disallow)**: Googlebot, NaverBot(Yeti), Bingbot, Daum, **ClaudeBot, GPTBot, PerplexityBot, Amazonbot** 등 — `/auth/ /fashiontalk/ /festival/ /like/ /mypage/ /showcase/ /app/coupon/coupon_result/`만 차단, **/products 허용**
+- **Group 3 (명시 차단)**: Baiduspider → `Disallow: /`
+- **Group 4 (와일드카드 폴백)**: **`User-agent: * → Disallow: /`**
+
+게이트웨이의 정직한 UA `HoneyFlowBot/1.0`은 Group 1~3 어디에도 없으므로 **Group 4에 걸려 전 경로(/products 포함) Disallow**다. robots는 IP가 아니라 UA로 매칭하므로 **VPS IP로 옮겨도 동일**하다 — §3.3의 VPS 단건 fetch 테스트를 하기도 전에 판정이 선다.
+
+실측 경로(Phase 1 봇, FetchLog 증적):
+```
+musinsa.onelink.me/PvkC/… → 301 → www.musinsa.com/products/3811288?is_retargeting=…&shortlink=…
+robots.txt(www.musinsa.com) → 200 OK
+→ 착지 URL 대조 → BLOCKED_ROBOTS  (Group 4 Disallow: / 적용)
+→ 파싱 실패(parse=none), 딜은 생성되어 수동 입력으로 폴백
+```
+
+함의:
+- §6 리스크 "robots.txt가 /products 차단(확률 중~높음)"이 **현실로 확정**. §3.4 크롤리스 폴백(리마인더 봇)이 기본 운영 모드다.
+- 이 프로젝트 원칙상 **UA를 Group 1/2 봇으로 바꾸는 우회는 금지**(§7-5, Never List #7). robots가 허용하는 정공법은 **무신사 협의 트랙(§8-4)으로 `HoneyFlowBot`을 화이트리스트에 등재**하는 것뿐이다 — 성사되면 워치 러너 자동 수집이 곧바로 성립한다.
+- [03] README의 기존 실측(과거 이 환경에서 robots.txt가 403)은 **폐기**: 지금은 정상 200 + 명시적 UA 정책이다. VPS 확보 후 §3.3 단건 fetch(데이터센터 IP 챌린지 여부)는 협의 트랙이 성사돼 UA가 허용될 때 의미가 생기므로 그때 재실측한다.
