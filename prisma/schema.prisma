@@ -439,6 +439,17 @@ model WatchItem {
   expiresAt DateTime // 등록 시 +90일 기본
   active    Boolean  @default(true)
 
+  /**
+   * 첫 조회 가능 시각. 등록 시각 + 랜덤 1~6h.
+   * 등록과 동시에 조회하면 "현표가 관심을 표한 순간"과 요청 시각이 붙어 지문이 된다 (docs/03 §4.3).
+   */
+  checkAfter    DateTime
+  /**
+   * 마지막 조회 시각. **스냅샷으로 대체할 수 없다** — 파싱에 실패하면 스냅샷이 남지 않으므로
+   * 스냅샷을 기준으로 삼으면 그 상품이 영원히 "미조회"로 남아 매 사이클 재조회된다(무한 두드림).
+   */
+  lastCheckedAt DateTime?
+
   @@map("watch_items")
 }
 

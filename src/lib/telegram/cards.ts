@@ -16,14 +16,16 @@ export const CB = {
   manual: (dealId: string) => `v1:man:${dealId}`,
   /** 링크 대기 중에 새 상품 URL이 온 경우, 대기를 풀고 새 딜로 진행 */
   newDeal: (dealId: string) => `v1:new:${dealId}`,
+  /** BF 가격 워치에 이 상품을 등록 (docs/05 §4.6) */
+  watch: (dealId: string) => `v1:wch:${dealId}`,
 } as const;
 
-export type CallbackAction = "int" | "skp" | "apv" | "hok" | "man" | "new";
+export type CallbackAction = "int" | "skp" | "apv" | "hok" | "man" | "new" | "wch";
 
 export function parseCallbackData(
   data: string
 ): { action: CallbackAction; dealId: string } | null {
-  const m = data.match(/^v1:(int|skp|apv|hok|man|new):([0-9a-f-]{36})$/);
+  const m = data.match(/^v1:(int|skp|apv|hok|man|new|wch):([0-9a-f-]{36})$/);
   if (!m) return null;
   return { action: m[1] as CallbackAction, dealId: m[2] };
 }
@@ -87,7 +89,11 @@ export function candidateCard(d: CardDeal): { text: string; keyboard: InlineKeyb
           { text: "✅ 이거 올릴래", callback_data: CB.interested(d.id) },
           { text: "⏭ 스킵", callback_data: CB.skip(d.id) },
         ],
-        [{ text: "✏️ 직접 입력", callback_data: CB.manual(d.id) }],
+        [
+          { text: "✏️ 직접 입력", callback_data: CB.manual(d.id) },
+          // 딜로 올리지 않더라도 가격 추적만 걸어둘 수 있다 — BF 후보를 미리 담아두는 동선.
+          { text: "📈 BF 추적", callback_data: CB.watch(d.id) },
+        ],
       ]
     : [
         [{ text: "✏️ 직접 입력", callback_data: CB.manual(d.id) }],

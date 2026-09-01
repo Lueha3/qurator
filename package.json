@@ -11,7 +11,8 @@
     "bot": "tsx --env-file=.env scripts/bot-poll.ts",
     "gateway": "tsx --env-file=.env scripts/gateway.ts",
     "test": "vitest run",
-    "health": "tsx --env-file=.env scripts/health-check.ts"
+    "health": "tsx --env-file=.env scripts/health-check.ts",
+    "watch": "tsx --env-file=.env scripts/watch.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

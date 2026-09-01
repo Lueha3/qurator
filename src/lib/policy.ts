@@ -22,6 +22,16 @@ export const HARD_CAP = {
   fetchTimeoutMs: 12_000,
   /** 리다이렉트 최대 추적 횟수 (각 홉마다 가드 전체 재실행) */
   fetchMaxRedirects: 3,
+
+  // ── BF 가격 워치 (docs/05-price-watch.md §3.2) ──
+  /** 동시 추적 상품 상한. [02 §13]의 추적 상한 200개의 15% — "현표가 직접 고른 소수"를 수치로 강제 */
+  watchItemsMax: 30,
+  /** 한 사이클 최대 조회 수 */
+  watchPerRunMax: 30,
+  /** 같은 상품 재조회 최소 간격(ms). 하루 1회 — 일 1회 크론이 지터로 밀려도 놓치지 않게 20h */
+  watchMinIntervalMs: 20 * 3_600_000,
+  /** 행사 창(BF) 기간의 재조회 최소 간격(ms). 하루 2회 */
+  watchEventIntervalMs: 10 * 3_600_000,
 } as const;
 
 export type PolicyKey = keyof typeof HARD_CAP | "killSwitch" | "shortlinkMode";
@@ -55,6 +65,17 @@ export async function getLimits() {
       readNumeric("fetchMaxRedirects"),
     ]);
   return { dailyMax, hourlyMax, minIntervalMs, jitterMaxMs, maxBytes, timeoutMs, maxRedirects };
+}
+
+/** BF 워치 규율 (docs/05 §3.2). 하드캡 이중화는 위와 동일 — DB로 느슨하게 만들 수 없다. */
+export async function getWatchLimits() {
+  const [itemsMax, perRunMax, minIntervalMs, eventIntervalMs] = await Promise.all([
+    readNumeric("watchItemsMax"),
+    readNumeric("watchPerRunMax"),
+    readNumeric("watchMinIntervalMs"),
+    readNumeric("watchEventIntervalMs"),
+  ]);
+  return { itemsMax, perRunMax, minIntervalMs, eventIntervalMs };
 }
 
 /**

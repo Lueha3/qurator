@@ -13,7 +13,8 @@ import { looksLikeNonProductPage, parseProductPage } from "../product-parser";
 import { parseCuratorLink } from "../curator-link";
 import { recordParsedSnapshot, recordSnapshot } from "../price-snapshot";
 import { BF2025_OBSERVED_AT } from "../price-analysis";
-import { formatKRW } from "../format";
+import { addWatch, countActiveWatches, listActiveWatches, removeWatch } from "../watch";
+import { formatKRW, formatShortDateTime } from "../format";
 import { draftHookLine } from "../ai-hook";
 import { renderAllChannels, type DealFacts, type DealLink } from "../renderer";
 import { audit } from "../audit";
@@ -270,15 +271,31 @@ async function handleMessage(msg: TgMessage): Promise<void> {
         "1️⃣ 상품 URL 전송 (무신사 앱 공유 → 이 대화)\n" +
         "2️⃣ [이거 올릴래] → 큐레이터 링크 붙여넣기\n" +
         "3️⃣ [승인] → 카톡 문구 받기\n\n" +
+        "<b>BF 가격 추적</b>\n" +
+        "📈 /watch 상품링크 — 블프까지 가격 추적 등록\n" +
+        "📋 /watchlist — 추적 중인 상품 목록\n" +
+        "🚫 /unwatch 상품링크 — 추적 해제\n" +
         "💾 /bf2025 상품링크 판매가 [정가] — 작년 블프 가격 수동 기록",
     });
     return;
   }
 
-  // 작년 BF 가격 수동 입력(docs/05 §4.6) — pending 상태보다 먼저 처리해야 한다.
-  // 링크 대기 중에 이 명령을 보내면 큐레이터 링크 파서로 들어가 오류만 반복되기 때문이다.
+  // 워치·수동입력 명령은 pending 상태보다 먼저 처리한다.
+  // 링크 대기 중에 이 명령들을 보내면 큐레이터 링크 파서로 들어가 오류만 반복되기 때문이다.
   if (text.startsWith("/bf2025")) {
     await handleManualBfEntry(text, chatId);
+    return;
+  }
+  if (text.startsWith("/watchlist")) {
+    await handleWatchList(chatId);
+    return;
+  }
+  if (text.startsWith("/watch")) {
+    await handleWatchCommand(text, chatId, true);
+    return;
+  }
+  if (text.startsWith("/unwatch")) {
+    await handleWatchCommand(text, chatId, false);
     return;
   }
 
@@ -436,12 +453,24 @@ function parsePriceToken(token: string | undefined): number | null {
  * 상품은 이미 캡처된 것만 받는다: 여기서 미등록 상품을 만들면 이름 없는 껍데기 Product가
  * 생기고, 그걸 채우려면 결국 링크를 던져야 한다 — 순서만 바꾼 셈이니 처음부터 그렇게 안내한다.
  */
+/**
+ * "https://www.musinsa.com/products/123" 또는 "123" → 이미 등록된 Product.
+ * 여기서 미등록 상품을 새로 만들지 않는 이유: 이름·가격이 빈 껍데기 Product가 생기고,
+ * 그것을 채우려면 결국 링크를 던져야 한다 — 순서만 바꾼 셈이라 처음부터 그렇게 안내한다.
+ */
+async function resolveProductByToken(token: string) {
+  const goodsNo = /^\d+$/.test(token) ? token : (token.match(/\/products\/(\d+)/)?.[1] ?? null);
+  if (!goodsNo) return { goodsNo: null, product: null };
+  const creator = await getDefaultCreator();
+  const product = await db.product.findUnique({
+    where: { creatorId_musinsaGoodsNo: { creatorId: creator.id, musinsaGoodsNo: goodsNo } },
+  });
+  return { goodsNo, product };
+}
+
 async function handleManualBfEntry(text: string, chatId: string) {
   const tokens = text.split(/\s+/).slice(1);
-  const target = tokens[0] ?? "";
-  const goodsNo = /^\d+$/.test(target)
-    ? target
-    : (target.match(/\/products\/(\d+)/)?.[1] ?? null);
+  const { goodsNo, product } = await resolveProductByToken(tokens[0] ?? "");
   const salePrice = parsePriceToken(tokens[1]);
   const listPriceInput = parsePriceToken(tokens[2]);
 
@@ -455,10 +484,6 @@ async function handleManualBfEntry(text: string, chatId: string) {
     return;
   }
 
-  const creator = await getDefaultCreator();
-  const product = await db.product.findUnique({
-    where: { creatorId_musinsaGoodsNo: { creatorId: creator.id, musinsaGoodsNo: goodsNo } },
-  });
   if (!product) {
     await sendMessage({
       chatId,
@@ -504,6 +529,87 @@ async function handleManualBfEntry(text: string, chatId: string) {
       (listPrice ? ` · 정가 ${formatKRW(listPrice)}` : "") +
       (rate !== null ? ` · 할인율 ${rate}%` : "") +
       "\n<i>수동 입력 값입니다 — 올해 BF 비교에 '작년(수동)'으로 표시됩니다.</i>",
+  });
+}
+
+// ── BF 워치 등록/해제 ────────────────────────────────────────────────────
+
+/** 등록·해제 결과를 사람이 읽을 문장으로. 상한과 만료를 항상 함께 알려준다. */
+async function watchAddedMessage(
+  productLabel: string,
+  result: Awaited<ReturnType<typeof addWatch>>
+): Promise<string> {
+  if (!result.ok) return `⚠️ ${result.reason}`;
+  const until = result.expiresAt.toISOString().slice(0, 10);
+  const head = result.alreadyActive
+    ? `📈 이미 추적 중입니다 — 기간을 ${until}까지 연장했습니다.`
+    : `📈 <b>BF 추적 시작</b> — ${productLabel}`;
+  return (
+    `${head}\n` +
+    `하루 1회 가격을 기록합니다 (행사 기간에는 2회) · 만료 ${until}\n` +
+    `<i>추적 ${result.activeCount}개</i>`
+  );
+}
+
+/** `/watch <링크|번호>` · `/unwatch <링크|번호>` */
+async function handleWatchCommand(text: string, chatId: string, add: boolean) {
+  const token = text.split(/\s+/)[1] ?? "";
+  const { goodsNo, product } = await resolveProductByToken(token);
+
+  if (!goodsNo) {
+    await sendMessage({
+      chatId,
+      text:
+        `사용법: ${add ? "/watch" : "/unwatch"} 상품링크(또는 상품번호)\n` +
+        `예: <code>${add ? "/watch" : "/unwatch"} https://www.musinsa.com/products/3134008</code>`,
+    });
+    return;
+  }
+  if (!product) {
+    await sendMessage({
+      chatId,
+      text: `#${goodsNo} 상품이 아직 등록되지 않았습니다.\n상품 링크를 먼저 보내주세요.`,
+    });
+    return;
+  }
+
+  const label = `${escapeHtml(product.brandName)} ${escapeHtml(product.productName)}`;
+  if (!add) {
+    const removed = await removeWatch(product.id);
+    await sendMessage({
+      chatId,
+      text: removed ? `🚫 추적을 해제했습니다 — ${label}` : `추적 중이 아닌 상품입니다 — ${label}`,
+    });
+    return;
+  }
+
+  await sendMessage({ chatId, text: await watchAddedMessage(label, await addWatch(product.id)) });
+}
+
+/** `/watchlist` — 지금 무엇을 추적 중인지. 상한 대비 사용량을 항상 함께 보여준다. */
+async function handleWatchList(chatId: string) {
+  const [items, activeCount] = await Promise.all([listActiveWatches(), countActiveWatches()]);
+  if (items.length === 0) {
+    await sendMessage({
+      chatId,
+      text: "추적 중인 상품이 없습니다.\n상품 카드의 [📈 BF 추적] 버튼이나 /watch 로 등록하세요.",
+    });
+    return;
+  }
+
+  const lines = items.map((item, i) => {
+    const last = item.lastCheckedAt
+      ? formatShortDateTime(item.lastCheckedAt)
+      : "아직 조회 전";
+    return (
+      `${i + 1}. ${escapeHtml(item.product.brandName)} ${escapeHtml(item.product.productName)}\n` +
+      `   마지막 조회 ${last} · 만료 ${item.expiresAt.toISOString().slice(0, 10)}`
+    );
+  });
+
+  await sendMessage({
+    chatId,
+    text: `📋 <b>BF 추적 목록</b> (${activeCount}개)\n\n${lines.join("\n")}`,
   });
 }
 
@@ -726,6 +832,17 @@ async function handleCallback(query: TgCallbackQuery): Promise<void> {
         chatId,
         text: "✏️ 웹 대시보드에서 상품 정보를 채워주세요.",
         keyboard: [[{ text: "🌐 대시보드에서 편집", url: `${base.replace(/\/$/, "")}/?deal=${deal.id}` }]],
+      });
+      break;
+    }
+
+    case "wch": {
+      // 버튼 한 번으로 워치 등록 — 카드는 그대로 두고 별도 메시지로 결과만 알린다.
+      // (카드를 갈아끼우면 진행 중이던 승인 흐름의 버튼이 사라진다.)
+      const label = `${escapeHtml(deal.product.brandName)} ${escapeHtml(deal.product.productName)}`;
+      await sendMessage({
+        chatId,
+        text: await watchAddedMessage(label, await addWatch(deal.productId)),
       });
       break;
     }
