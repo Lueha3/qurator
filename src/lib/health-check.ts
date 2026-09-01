@@ -14,7 +14,8 @@
 
 import { db } from "./db";
 import { gatewayFetch } from "./fetch-gateway";
-import { parseProductPage } from "./product-parser";
+import { parseProductPage, type ParsedProduct } from "./product-parser";
+import { recordParsedSnapshot } from "./price-snapshot";
 import { audit } from "./audit";
 import type { CuratorLink, LinkHealth } from "@prisma/client";
 
@@ -67,6 +68,11 @@ export type HealthVerdict =
  * 죽여버리는 것이 이 시스템 최악의 시나리오다.
  */
 export function judgeAvailability(status: number, html: string): HealthVerdict {
+  return judgeStatus(status) ?? judgeParsedProduct(parseProductPage(html));
+}
+
+/** HTML을 볼 필요도 없는 판정 — 4xx는 파싱 없이 끝난다 */
+function judgeStatus(status: number): HealthVerdict | null {
   // 상품 자체가 사라진 것은 가장 확실한 죽음 신호다.
   if (status === 404 || status === 410) {
     return { kind: "gone", detail: `상품 페이지가 사라졌습니다 (HTTP ${status})` };
@@ -74,8 +80,14 @@ export function judgeAvailability(status: number, html: string): HealthVerdict {
   if (status >= 400) {
     return { kind: "frozen", reason: `HTTP ${status} — 판정하지 않습니다` };
   }
+  return null;
+}
 
-  const parsed = parseProductPage(html);
+/**
+ * 파싱 결과로 판정한다. runHealthCheck가 파싱을 직접 들고 있는 이유:
+ * 같은 파싱 결과를 가격 스냅샷(docs/05 §4.3 피기백)에도 써야 해서다 — 두 번 파싱하지 않는다.
+ */
+function judgeParsedProduct(parsed: ParsedProduct): HealthVerdict {
   if (parsed.fieldCount === 0) {
     return { kind: "frozen", reason: "상품 구조를 읽지 못했습니다 (파서 점검 필요)" };
   }
@@ -261,6 +273,8 @@ async function applyVerdict(
 export async function runHealthCheck(now: Date = new Date()): Promise<CheckResult> {
   const targets = await selectTargets(now);
   const result: CheckResult = { checked: 0, died: [], frozen: 0, stoppedEarly: null };
+  // 같은 상품에 링크가 여러 개면 한 사이클에 여러 번 파싱된다 — 스냅샷은 상품당 1건이면 충분하다.
+  const snapshotted = new Set<string>();
 
   for (const link of targets) {
     // 커미션 파라미터가 없는 정규 상품 URL만 조회한다 — 큐레이터 링크는 절대 방문하지 않는다.
@@ -291,7 +305,18 @@ export async function runHealthCheck(now: Date = new Date()): Promise<CheckResul
 
     result.checked++;
 
-    const verdict = judgeAvailability(fetched.status, fetched.body);
+    let verdict = judgeStatus(fetched.status);
+    if (verdict === null) {
+      const parsed = parseProductPage(fetched.body);
+      verdict = judgeParsedProduct(parsed);
+      // 피기백 스냅샷(docs/05 §4.3) — 이미 내려받은 페이지의 파싱 결과 저장. 추가 요청 0건.
+      // recordParsedSnapshot은 절대 throw하지 않고, 가격이 없으면 조용히 건너뛴다.
+      const productId = link.deal.product.id;
+      if (!snapshotted.has(productId)) {
+        snapshotted.add(productId);
+        await recordParsedSnapshot(productId, parsed, "HEALTH_CHECK");
+      }
+    }
     if (verdict.kind === "frozen") result.frozen++;
 
     const { died } = await applyVerdict(link, verdict, now);

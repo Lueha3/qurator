@@ -59,6 +59,8 @@ async function resetDb() {
   await db.contentCard.deleteMany();
   await db.curatorLink.deleteMany();
   await db.deal.deleteMany();
+  await db.priceSnapshot.deleteMany();
+  await db.watchItem.deleteMany();
   await db.product.deleteMany();
 }
 

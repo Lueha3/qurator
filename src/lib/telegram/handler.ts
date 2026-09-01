@@ -11,6 +11,8 @@ import { gatewayFetch } from "../fetch-gateway";
 import { canonicalizeMusinsaUrl } from "../url-guard";
 import { looksLikeNonProductPage, parseProductPage } from "../product-parser";
 import { parseCuratorLink } from "../curator-link";
+import { recordParsedSnapshot, recordSnapshot } from "../price-snapshot";
+import { formatKRW } from "../format";
 import { draftHookLine } from "../ai-hook";
 import { renderAllChannels, type DealFacts, type DealLink } from "../renderer";
 import { audit } from "../audit";
@@ -266,8 +268,16 @@ async function handleMessage(msg: TgMessage): Promise<void> {
         "무신사 상품 링크를 보내면 카톡·스레드·인스타·노션용 완성 카드를 만들어 드립니다.\n\n" +
         "1️⃣ 상품 URL 전송 (무신사 앱 공유 → 이 대화)\n" +
         "2️⃣ [이거 올릴래] → 큐레이터 링크 붙여넣기\n" +
-        "3️⃣ [승인] → 카톡 문구 받기",
+        "3️⃣ [승인] → 카톡 문구 받기\n\n" +
+        "💾 /bf2025 상품링크 판매가 [정가] — 작년 블프 가격 수동 기록",
     });
+    return;
+  }
+
+  // 작년 BF 가격 수동 입력(docs/05 §4.6) — pending 상태보다 먼저 처리해야 한다.
+  // 링크 대기 중에 이 명령을 보내면 큐레이터 링크 파서로 들어가 오류만 반복되기 때문이다.
+  if (text.startsWith("/bf2025")) {
+    await handleManualBfEntry(text, chatId);
     return;
   }
 
@@ -381,6 +391,11 @@ async function captureFromUrl(rawUrl: string, chatId: string, sourceMessageId: n
     include: DEAL_WITH_RELATIONS,
   });
 
+  // 피기백 스냅샷(docs/05 §4.3) — 방금 그 1회 조회의 파싱 결과를 이력으로 남긴다.
+  // Product upsert는 최신값으로 덮어쓰므로, 여기 기록이 없으면 가격 변화가 소실된다.
+  // 절대 throw하지 않고, 가격을 못 읽었으면 조용히 건너뛴다.
+  await recordParsedSnapshot(product.id, parsed, "USER_URL");
+
   await audit({
     actor: "HUMAN",
     action: "deal.captured",
@@ -398,6 +413,93 @@ async function captureFromUrl(rawUrl: string, chatId: string, sourceMessageId: n
     messageId: status.message_id,
     text: card.text + failureNote,
     keyboard: card.keyboard,
+  });
+}
+
+// ── 작년 BF 가격 수동 입력 ───────────────────────────────────────────────
+
+/** 자동으로는 복원 불가능한 과거(2025 BF) 가격의 유일한 입력 경로 — docs/05 §2(a) */
+const BF_MANUAL_TAG = "BF2025";
+
+/** "39,000" / "39000원" 같은 사람 입력을 원 단위 정수로 */
+function parsePriceToken(token: string | undefined): number | null {
+  if (!token) return null;
+  const digits = token.replace(/[^\d]/g, "");
+  if (!digits) return null;
+  const n = Number(digits);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * `/bf2025 <상품링크|상품번호> <판매가> [정가]` — 네트워크 요청이 전혀 없는 순수 DB 기록.
+ * 상품은 이미 캡처된 것만 받는다: 여기서 미등록 상품을 만들면 이름 없는 껍데기 Product가
+ * 생기고, 그걸 채우려면 결국 링크를 던져야 한다 — 순서만 바꾼 셈이니 처음부터 그렇게 안내한다.
+ */
+async function handleManualBfEntry(text: string, chatId: string) {
+  const tokens = text.split(/\s+/).slice(1);
+  const target = tokens[0] ?? "";
+  const goodsNo = /^\d+$/.test(target)
+    ? target
+    : (target.match(/\/products\/(\d+)/)?.[1] ?? null);
+  const salePrice = parsePriceToken(tokens[1]);
+  const listPriceInput = parsePriceToken(tokens[2]);
+
+  if (!goodsNo || salePrice === null) {
+    await sendMessage({
+      chatId,
+      text:
+        "사용법: /bf2025 상품링크(또는 상품번호) 작년BF판매가 [정가]\n" +
+        "예: <code>/bf2025 https://www.musinsa.com/products/3134008 39900 89000</code>",
+    });
+    return;
+  }
+
+  const creator = await getDefaultCreator();
+  const product = await db.product.findUnique({
+    where: { creatorId_musinsaGoodsNo: { creatorId: creator.id, musinsaGoodsNo: goodsNo } },
+  });
+  if (!product) {
+    await sendMessage({
+      chatId,
+      text: `#${goodsNo} 상품이 아직 등록되지 않았습니다.\n상품 링크를 먼저 보내 등록한 뒤 다시 입력해주세요.`,
+    });
+    return;
+  }
+
+  // 정가 미입력 시 상품의 정가를 쓴다. 0은 "미확인" 표시값이므로 정가로 취급하지 않는다.
+  const listPrice = listPriceInput ?? (product.listPrice > 0 ? product.listPrice : null);
+  const saved = await recordSnapshot({
+    productId: product.id,
+    salePrice,
+    listPrice,
+    source: "MANUAL",
+    eventTag: BF_MANUAL_TAG,
+    note: "텔레그램 수동 입력",
+  });
+  if (!saved.recorded) {
+    await sendMessage({ chatId, text: "⚠️ 기록하지 못했습니다. 다시 시도해주세요." });
+    return;
+  }
+
+  await audit({
+    actor: "HUMAN",
+    action: "snapshot.manual",
+    approvalRef: product.id,
+    detail:
+      `${BF_MANUAL_TAG} ${product.brandName} ${product.productName} — ` +
+      `판매가 ${salePrice}${listPrice ? ` / 정가 ${listPrice}` : ""}`,
+  });
+
+  const rate =
+    listPrice && listPrice > salePrice ? Math.round((1 - salePrice / listPrice) * 100) : null;
+  await sendMessage({
+    chatId,
+    text:
+      `📌 <b>${BF_MANUAL_TAG}</b> 기록 완료 — ${escapeHtml(product.brandName)} ${escapeHtml(product.productName)}\n` +
+      `판매가 ${formatKRW(salePrice)}` +
+      (listPrice ? ` · 정가 ${formatKRW(listPrice)}` : "") +
+      (rate !== null ? ` · 할인율 ${rate}%` : "") +
+      "\n<i>수동 입력 값입니다 — 올해 BF 비교에 '작년(수동)'으로 표시됩니다.</i>",
   });
 }
 

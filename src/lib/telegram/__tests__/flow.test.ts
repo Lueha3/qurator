@@ -80,6 +80,8 @@ async function resetDb() {
   await db.curatorLink.deleteMany();
   await db.deal.deleteMany();
   await db.productVariant.deleteMany();
+  await db.priceSnapshot.deleteMany();
+  await db.watchItem.deleteMany();
   await db.product.deleteMany();
   await db.auditLog.deleteMany();
 }

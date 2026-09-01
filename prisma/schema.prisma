@@ -50,8 +50,10 @@ model Product {
   capturedAt      DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  variants ProductVariant[]
-  deals    Deal[]
+  variants       ProductVariant[]
+  deals          Deal[]
+  priceSnapshots PriceSnapshot[]
+  watchItem      WatchItem?
 
   @@unique([creatorId, musinsaGoodsNo])
   @@map("products")
@@ -364,6 +366,7 @@ enum FetchTrigger {
   HEALTH_CHECK // 링크 헬스체커 (Phase 2)
   RADAR // 자동 발굴 크롤러 (Phase 3)
   ROBOTS // robots.txt 자체 조회
+  WATCH // BF 워치 러너 — VPS 전용, docs/05 §3.2 규율 (W2에서 가동)
 }
 
 enum FetchOutcome {
@@ -395,6 +398,48 @@ enum Circuit {
   HEALTHY
   DEGRADED // 백오프 중 — 시간이 지나면 자동 회복
   BLOCKED // 차단 감지 — 자동 재개 없음, 사람이 해제해야 함
+}
+
+// ── price_snapshots ─────────────────────────────────────────────────────
+// docs/05-price-watch.md §4.3 — 상품 가격의 시계열 기록. BF 연도별 비교의 데이터 기반.
+// USER_URL·HEALTH_CHECK 스냅샷은 이미 내려받은 페이지의 파싱 결과를 저장할 뿐이라
+// 추가 아웃바운드 요청이 0건이다. WATCH만 신규 요청을 만들며 docs/05 §3.2 규율을 따른다.
+// 저장 범위는 가격 필드만 — 설명문·이미지를 축적하지 않는다 (docs/03 §4.2 저작권 안전선).
+model PriceSnapshot {
+  id          String         @id @default(uuid())
+  productId   String
+  product     Product        @relation(fields: [productId], references: [id])
+  capturedAt  DateTime       @default(now())
+  listPrice   Int? // 정가
+  salePrice   Int? // 행사가(판매가)
+  couponPrice Int? // 공개 상품쿠폰가 — 파서 확장(W3) 전에는 항상 null
+  source      SnapshotSource
+  eventTag    String? // "BF2025" 등. 이벤트 창(policy watch.event.*) 안이면 자동 스탬핑, MANUAL은 직접 지정
+  note        String? // MANUAL 입력 근거 (예: "작년 스크린샷 기준")
+
+  @@index([productId, capturedAt])
+  @@map("price_snapshots")
+}
+
+enum SnapshotSource {
+  USER_URL // 봇에 링크를 던진 시점의 파싱 결과 (피기백)
+  HEALTH_CHECK // 헬스체커가 내려받은 페이지의 파싱 결과 (피기백)
+  WATCH // VPS 워치 러너의 정기 스냅샷 (W2)
+  MANUAL // 사람이 직접 입력 (작년 BF가 등)
+}
+
+// ── watch_items ─────────────────────────────────────────────────────────
+// BF 추적 대상 — 현표가 명시적으로 등록한 상품만. 발굴·카탈로그 수집은 하지 않는다.
+// 상한(기본 30)과 만료는 docs/05 §3.2 — 목적이 끝난 상품에 트래픽이 잔존하지 않게 한다.
+model WatchItem {
+  id        String   @id @default(uuid())
+  productId String   @unique
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+  expiresAt DateTime // 등록 시 +90일 기본
+  active    Boolean  @default(true)
+
+  @@map("watch_items")
 }
 
 // ── policy ──────────────────────────────────────────────────────────────
