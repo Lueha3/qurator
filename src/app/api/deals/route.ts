@@ -4,6 +4,7 @@ import { getDefaultCreator } from "@/lib/creator";
 import { draftHookLine } from "@/lib/ai-hook";
 import { renderAllChannels, type DealFacts, type DealLink } from "@/lib/renderer";
 import { DEAL_INCLUDE, toDealDTO } from "@/lib/deal-dto";
+import { buildPriceAnalyses } from "@/lib/price-analysis";
 import type { ApiErrorResponse, CreateDealInput } from "@/lib/api-types";
 
 export async function GET() {
@@ -12,7 +13,11 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     take: 30,
   });
-  return NextResponse.json({ deals: deals.map(toDealDTO) });
+  const analyses = await buildPriceAnalyses([...new Set(deals.map((d) => d.productId))]);
+  // 점 없는 `deals.map(toDealDTO)`를 쓰면 배열 인덱스가 두 번째 인자로 들어간다 — 명시적 화살표로 고정한다.
+  return NextResponse.json({
+    deals: deals.map((deal) => toDealDTO(deal, analyses.get(deal.productId))),
+  });
 }
 
 function badRequest(error: string, code?: string) {

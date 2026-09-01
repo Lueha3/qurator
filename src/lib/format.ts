@@ -30,6 +30,26 @@ export function formatShortDateTime(date: Date): string {
   return KST_SHORT.format(date);
 }
 
+/**
+ * "3시간 전" 같은 상대 시각. now를 인자로 받는 순수 함수인 이유:
+ * 클라이언트가 Date.now()로 다시 계산하면 서버 렌더 결과와 달라져 하이드레이션이 깨진다.
+ * 서버에서 한 번 계산해 문자열로 넘기고, 클라이언트는 그 문자열을 그대로 그린다.
+ */
+export function formatRelativeFromNow(date: Date, now: Date = new Date()): string {
+  const diffMs = now.getTime() - date.getTime();
+  if (diffMs < 0) return "방금";
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return "방금";
+  if (minutes < 60) return `${minutes}분 전`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}시간 전`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}일 전`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}개월 전`;
+  return `${Math.floor(days / 365)}년 전`;
+}
+
 export function formatEndsAt(endsAt: Date): string {
   // 예: "8/28(금) 23:59"
   const parts = KST_ENDS_AT.formatToParts(endsAt);

@@ -12,6 +12,7 @@ import { canonicalizeMusinsaUrl } from "../url-guard";
 import { looksLikeNonProductPage, parseProductPage } from "../product-parser";
 import { parseCuratorLink } from "../curator-link";
 import { recordParsedSnapshot, recordSnapshot } from "../price-snapshot";
+import { BF2025_OBSERVED_AT } from "../price-analysis";
 import { formatKRW } from "../format";
 import { draftHookLine } from "../ai-hook";
 import { renderAllChannels, type DealFacts, type DealLink } from "../renderer";
@@ -474,7 +475,10 @@ async function handleManualBfEntry(text: string, chatId: string) {
     listPrice,
     source: "MANUAL",
     eventTag: BF_MANUAL_TAG,
-    note: "텔레그램 수동 입력",
+    // capturedAt은 "그 가격이 참이었던 시점"이다. 입력 시각(지금)으로 찍으면 작년 가격이
+    // 최신 스냅샷이 되어 카드의 '현재가'와 시계열 순서가 통째로 뒤집힌다.
+    capturedAt: BF2025_OBSERVED_AT,
+    note: `텔레그램 수동 입력 (${new Date().toISOString().slice(0, 10)} 기록)`,
   });
   if (!saved.recorded) {
     await sendMessage({ chatId, text: "⚠️ 기록하지 못했습니다. 다시 시도해주세요." });

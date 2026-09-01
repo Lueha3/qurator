@@ -1,4 +1,5 @@
 import { DealCard } from "./DealCard";
+import { PriceStrip } from "./PriceStrip";
 import { formatKRW, formatShortDateTime } from "@/lib/format";
 import type { DealDTO } from "@/lib/api-types";
 
@@ -27,6 +28,7 @@ export function DealEntry({ deal }: { deal: DealDTO }) {
           {formatShortDateTime(new Date(deal.createdAt))}
         </span>
       </div>
+      {deal.priceHistory && <PriceStrip history={deal.priceHistory} />}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {deal.cards.map((card) => (
           <DealCard key={card.id} card={card} />

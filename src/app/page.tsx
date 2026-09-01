@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { DEAL_INCLUDE, toDealDTO } from "@/lib/deal-dto";
+import { buildPriceAnalyses } from "@/lib/price-analysis";
 import { DealWorkspace } from "@/components/DealWorkspace";
 
 // DB를 직접 읽는 페이지라 Next.js의 정적 프리렌더링 대상이 될 수 있다(빌드 시점 딜 목록이
@@ -12,6 +13,10 @@ export default async function Home() {
     orderBy: { createdAt: "desc" },
     take: 30,
   });
+
+  // 가격 이력은 상품 단위다 — 딜마다 쿼리하지 않고 한 번에 읽어 묶는다 (docs/05 §4.6).
+  // 이 페이지는 DB만 읽는다. 새로고침이 무신사 요청을 만들지 않는 것이 불변식이다.
+  const analyses = await buildPriceAnalyses([...new Set(deals.map((d) => d.productId))]);
 
   return (
     <>
@@ -29,7 +34,9 @@ export default async function Home() {
         </div>
       </header>
       <main className="flex-1">
-        <DealWorkspace initialDeals={deals.map(toDealDTO)} />
+        <DealWorkspace
+          initialDeals={deals.map((deal) => toDealDTO(deal, analyses.get(deal.productId)))}
+        />
       </main>
     </>
   );
