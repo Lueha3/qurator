@@ -13,7 +13,7 @@
 import { lookup } from "node:dns/promises";
 import { db } from "./db";
 import { getLimits, isKillSwitchOn } from "./policy";
-import { assertFetchable, isBlockedAddress } from "./url-guard";
+import { assertFetchable, isBlockedAddress, stripTrackingParams } from "./url-guard";
 import { decideByOutcome, parseRobots, type RobotsFetchOutcome } from "./robots";
 import type { FetchOutcome, FetchTrigger } from "@prisma/client";
 
@@ -380,6 +380,14 @@ export async function gatewayFetch(req: GatewayRequest): Promise<GatewayResult> 
 
   for (let hop = 0; hop <= limits.maxRedirects; hop++) {
     // ① 하드 가드 — 홉마다 다시 실행한다. 리다이렉트로 가드를 우회할 수 없다.
+    // 검증 전에 먼저 트래킹 파라미터를 벗긴다: 리다이렉트 Location(예: 공유 링크가 넘겨주는
+    // 실제 상품 URL)에는 AppsFlyer 등 제3자가 붙인 af_/pid류가 흔한데, 이걸 안 씻고 검증하면
+    // 큐레이터 커미션 링크와 구분이 안 돼 정상 리다이렉트가 COMMISSION_URL로 하드 abort된다.
+    try {
+      currentUrl = stripTrackingParams(new URL(currentUrl)).toString();
+    } catch {
+      return reject(currentUrl, trigger, "BLOCKED_POLICY", "URL 형식이 아닙니다.");
+    }
     const guard = assertFetchable(currentUrl);
     if (!guard.ok) {
       return reject(currentUrl, trigger, "BLOCKED_POLICY", guard.error.reason);

@@ -13,6 +13,10 @@ const ALLOWED_HOSTS = new Set([
   "www.musinsa.com",
   "musinsa.com",
   "store.musinsa.com", // 구 상품 URL — canonicalize가 www로 바꾼다
+  // 무신사 앱 "공유하기" 버튼이 실제로 만드는 링크(AppsFlyer OneLink, 실측 확인).
+  // 상품 데이터는 없고 www.musinsa.com/products/{번호}로 302 리다이렉트만 한다 —
+  // 게이트웨이가 그 리다이렉트를 따라가려면 첫 홉으로 이 호스트가 허용돼 있어야 한다.
+  "musinsa.onelink.me",
 ]);
 
 /**
@@ -24,6 +28,23 @@ const COMMISSION_PARAM_PREFIXES = ["utm_", "af_", "af-", "pid", "c_id", "click_i
 export function isCommissionParam(name: string): boolean {
   const lower = name.toLowerCase();
   return COMMISSION_PARAM_PREFIXES.some((p) => lower === p || lower.startsWith(p));
+}
+
+/**
+ * 커미션/추적 파라미터만 제거한다 (호스트·경로는 건드리지 않는다).
+ * canonicalizeMusinsaUrl은 사용자가 처음 던진 URL 1회에만 적용되는데, 리다이렉트 홉(예: 공유
+ * 링크가 302로 넘겨주는 실제 상품 URL)에도 AppsFlyer 자체 첨부 파라미터(af_dp, pid 등)가
+ * 흔히 붙는다. 이걸 벗기지 않고 assertFetchable에 그대로 넣으면 큐레이터 커미션 링크와
+ * 구분이 안 돼 하드 abort된다 — 게이트웨이가 매 홉마다 이 함수로 먼저 씻어낸 뒤 재검증한다.
+ */
+export function stripTrackingParams(url: URL): URL {
+  const cleaned = new URL(url.toString());
+  const kept = new URLSearchParams();
+  for (const [k, v] of url.searchParams) {
+    if (!isCommissionParam(k)) kept.append(k, v);
+  }
+  cleaned.search = kept.toString();
+  return cleaned;
 }
 
 export type UrlRejection =
@@ -77,7 +98,11 @@ export function canonicalizeMusinsaUrl(raw: string): UrlCheck<string> {
   const legacy = parsed.pathname.match(/^\/app\/goods\/(\d+)/);
   const goodsNo = legacy ? legacy[1] : parsed.pathname.match(/^\/products\/(\d+)/)?.[1];
 
-  const canonical = new URL("https://www.musinsa.com");
+  // musinsa.com 계열(www/구.store)만 www.musinsa.com으로 합친다. onelink.me는 무신사 도메인이
+  // 아니라 AppsFlyer가 운영하는 별도 리다이렉터이므로 호스트를 바꾸면 존재하지 않는 주소가 된다 —
+  // 원래 호스트를 그대로 둬야 게이트웨이가 실제로 그 주소를 열어 리다이렉트를 받아낼 수 있다.
+  const canonicalHost = host === "musinsa.onelink.me" ? host : "www.musinsa.com";
+  const canonical = new URL(`https://${canonicalHost}`);
   if (goodsNo) {
     canonical.pathname = `/products/${goodsNo}`;
   } else {

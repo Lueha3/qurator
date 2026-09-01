@@ -4,6 +4,7 @@ import {
   canonicalizeMusinsaUrl,
   isBlockedAddress,
   isCommissionParam,
+  stripTrackingParams,
 } from "../url-guard";
 
 // 이 파일의 테스트는 docs/03-account-safety.md의 불변식을 코드로 고정한다.
@@ -112,6 +113,49 @@ describe("정규화: 구 URL 형식과 모바일 공유 링크", () => {
     expect(result.value).toContain("/campaign/sale");
     expect(result.value).toContain("tab=outer");
     expect(result.value).not.toContain("utm_source");
+  });
+
+  // 실측 회귀: 무신사 앱 "공유하기" 버튼이 실제로 만드는 링크는 www.musinsa.com이 아니라
+  // musinsa.onelink.me(AppsFlyer OneLink)였다 — 이걸 허용하지 않으면 "모바일 공유시트"라는
+  // 1급 입력 경로 자체가 실사용에서 100% 거부된다.
+  it("무신사 앱 공유 링크(musinsa.onelink.me)를 허용하고 호스트를 그대로 보존한다", () => {
+    const result = canonicalizeMusinsaUrl("https://musinsa.onelink.me/PvkC/mq1u9fu0");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // musinsa.com 계열과 달리 onelink.me는 www.musinsa.com으로 합쳐지면 안 된다 —
+    // 실존하지 않는 www.musinsa.com/PvkC/... 가 되어 리다이렉트를 아예 받을 수 없게 된다.
+    expect(new URL(result.value).hostname).toBe("musinsa.onelink.me");
+    expect(result.value).toBe("https://musinsa.onelink.me/PvkC/mq1u9fu0");
+  });
+
+  it("onelink.me를 사칭하는 호스트는 여전히 거부한다", () => {
+    for (const bad of [
+      "https://musinsa.onelink.me.evil.example/PvkC/x",
+      "https://evil-onelink.me/PvkC/x",
+    ]) {
+      const result = canonicalizeMusinsaUrl(bad);
+      expect(result.ok, `${bad} 가 차단되지 않았습니다`).toBe(false);
+    }
+  });
+});
+
+describe("stripTrackingParams — 리다이렉트 홉마다 재사용하는 세척기", () => {
+  it("커미션·추적 파라미터를 제거하고 일반 파라미터는 남긴다", () => {
+    const result = stripTrackingParams(
+      new URL("https://www.musinsa.com/products/1?af_dp=musinsa%3A%2F%2F&pid=onelink&size=M")
+    );
+    expect(result.toString()).toBe("https://www.musinsa.com/products/1?size=M");
+  });
+
+  it("파라미터가 전부 커미션 마커면 물음표까지 깨끗이 사라진다", () => {
+    const result = stripTrackingParams(new URL("https://www.musinsa.com/products/1?af_dp=x&pid=y"));
+    expect(result.toString()).toBe("https://www.musinsa.com/products/1");
+  });
+
+  it("호스트·경로는 건드리지 않는다", () => {
+    const result = stripTrackingParams(new URL("https://musinsa.onelink.me/PvkC/mq1u9fu0?utm_source=app"));
+    expect(result.hostname).toBe("musinsa.onelink.me");
+    expect(result.pathname).toBe("/PvkC/mq1u9fu0");
   });
 });
 

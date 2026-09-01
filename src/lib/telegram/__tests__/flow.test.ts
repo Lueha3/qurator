@@ -182,6 +182,52 @@ describe("전체 흐름: URL → 후보 → 링크 대기 → 승인", () => {
   });
 });
 
+// 회귀: 무신사 앱 "공유하기"가 실제로 만드는 링크는 musinsa.onelink.me(AppsFlyer OneLink)이고
+// www.musinsa.com/products/{번호}로 302 리다이렉트된다. 게이트웨이가 그 리다이렉트를 따라가
+// 최종 도달한 URL을 finalUrl로 돌려주는데, 예전 코드는 리다이렉트 전(onelink.me) URL에서
+// goodsNo를 뽑았다 — 항상 null이 되어 같은 상품 재전송 시 dedup(upsert)이 깨지고,
+// canonicalUrl에 상품과 무관한 공유 링크 자체가 저장됐다.
+describe("회귀: 공유 링크 리다이렉트는 finalUrl 기준으로 정본화된다", () => {
+  it("onelink.me로 들어와도 실제 도달한 상품 URL에서 goodsNo·canonicalUrl을 뽑는다", async () => {
+    gatewayFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: PRODUCT_HTML,
+      finalUrl: "https://www.musinsa.com/products/9988776",
+    });
+
+    await handleUpdate(userMessage("https://musinsa.onelink.me/PvkC/mq1u9fu0"));
+
+    // 게이트웨이에는 리다이렉트 전 원본 URL이 그대로 전달된다 — 리다이렉트를 따라가는 건
+    // 게이트웨이 자신의 책임이다(호출부가 미리 풀어줄 필요가 없다).
+    expect(gatewayFetch).toHaveBeenCalledWith({
+      url: "https://musinsa.onelink.me/PvkC/mq1u9fu0",
+      trigger: "USER_URL",
+    });
+
+    const deal = await db.deal.findFirstOrThrow({ include: { product: true } });
+    expect(deal.product.musinsaGoodsNo).toBe("9988776");
+    expect(deal.product.canonicalUrl).toBe("https://www.musinsa.com/products/9988776");
+    // 원본 공유 링크 자체는 감사·재현을 위해 sourceUrlRaw에 그대로 남는다.
+    expect(deal.sourceUrlRaw).toBe("https://musinsa.onelink.me/PvkC/mq1u9fu0");
+  });
+
+  it("같은 공유 링크를 다시 던져도(재고 갱신 등) 같은 상품으로 upsert된다", async () => {
+    gatewayFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: PRODUCT_HTML,
+      finalUrl: "https://www.musinsa.com/products/9988776",
+    });
+
+    await handleUpdate(userMessage("https://musinsa.onelink.me/PvkC/aaa111"));
+    await handleUpdate(userMessage("https://musinsa.onelink.me/PvkC/bbb222"));
+
+    const products = await db.product.findMany({ where: { musinsaGoodsNo: "9988776" } });
+    expect(products).toHaveLength(1);
+  });
+});
+
 describe("게이트웨이가 막혀도 파이프라인이 죽지 않는다 (절대 원칙 2)", () => {
   it("차단 감지 시 딜은 생성되고 수동 입력을 안내한다", async () => {
     gatewayFetch.mockResolvedValue({

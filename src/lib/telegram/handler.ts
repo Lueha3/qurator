@@ -325,16 +325,23 @@ async function captureFromUrl(rawUrl: string, chatId: string, sourceMessageId: n
 
   const result = await gatewayFetch({ url: canonical.value, trigger: "USER_URL" });
 
+  // 공유 링크(예: 무신사 앱 "공유하기"가 만드는 onelink.me)는 게이트웨이가 리다이렉트를
+  // 따라가야 실제 상품 URL에 도달한다. goodsNo·canonicalUrl은 리다이렉트 전 URL이 아니라
+  // 실제 도달한 finalUrl 기준이어야 한다 — 안 그러면 공유 링크 자체가 canonicalUrl로 저장되고
+  // goodsNo가 항상 null이 돼 같은 상품 재전송 시 dedup(upsert)이 깨진다.
+  const resolved = result.ok ? canonicalizeMusinsaUrl(result.finalUrl) : canonical;
+  const finalCanonical = resolved.ok ? resolved.value : canonical.value;
+
   let parsed = parseProductPage(result.ok ? result.body : "");
   if (result.ok && looksLikeNonProductPage(result.body, parsed)) {
     parsed = { ...parsed, fieldCount: 0, source: "none" };
   }
 
   const creator = await getDefaultCreator();
-  const goodsNo = canonical.value.match(/\/products\/(\d+)/)?.[1] ?? null;
+  const goodsNo = finalCanonical.match(/\/products\/(\d+)/)?.[1] ?? null;
 
   const productFields = {
-    canonicalUrl: canonical.value,
+    canonicalUrl: finalCanonical,
     brandName: parsed.brandName ?? "(브랜드 미입력)",
     productName: parsed.productName ?? "(상품명 미입력)",
     styleCode: parsed.styleCode,
@@ -378,7 +385,7 @@ async function captureFromUrl(rawUrl: string, chatId: string, sourceMessageId: n
     actor: "HUMAN",
     action: "deal.captured",
     approvalRef: deal.id,
-    detail: `사용자가 던진 URL 1건 (텔레그램 메시지 ${sourceMessageId}) → ${canonical.value} / 파싱 ${parsed.source}`,
+    detail: `사용자가 던진 URL 1건 (텔레그램 메시지 ${sourceMessageId}) → ${finalCanonical} / 파싱 ${parsed.source}`,
   });
 
   const card = candidateCard(toCardDeal(deal));
