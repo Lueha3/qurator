@@ -12,7 +12,8 @@
     "gateway": "tsx --env-file=.env scripts/gateway.ts",
     "test": "vitest run",
     "health": "tsx --env-file=.env scripts/health-check.ts",
-    "watch": "tsx --env-file=.env scripts/watch.ts"
+    "watch": "tsx --env-file=.env scripts/watch.ts",
+    "remind": "tsx --env-file=.env scripts/remind.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

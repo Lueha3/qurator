@@ -12,17 +12,30 @@
 //   VPS IP에서 robots.txt와 저빈도 단건 fetch를 실측하고 그 결과를 docs/05 §9에 기록하기 전에는
 //   가동하지 않는다. 막히면 뚫지 않고 크롤리스 모드로 확정한다.
 //
+//   2026-09-01 실측 결과(docs/05 §9.1) robots가 우리 UA를 전 경로 차단하므로 **크롤리스가 기본값**이다.
+//   그 상태에서 이 러너는 요청을 한 건도 보내지 않고 즉시 끝난다. 사람에게 보내는 리마인더는
+//   봇 호스트의 `npm run remind`가 담당한다(여기 VPS에는 텔레그램 토큰이 없다 — docs/03 §4.1).
+//
 // 스케줄 규율: 헬스체크(npm run health)와 **다른 시간대**에 배치한다.
 //   호스트당 시간당 60건 캡을 공유하므로 겹치면 한쪽이 BLOCKED_BUDGET으로 조기 종료된다.
 
 import { db } from "../src/lib/db";
 import { listActiveWatches, runWatchCycle } from "../src/lib/watch";
-import { getWatchLimits } from "../src/lib/policy";
+import { getWatchLimits, isCrawlessMode } from "../src/lib/policy";
 
 async function dryRun() {
-  const [items, limits] = await Promise.all([listActiveWatches(), getWatchLimits()]);
+  const [items, limits, crawless] = await Promise.all([
+    listActiveWatches(),
+    getWatchLimits(),
+    isCrawlessMode(),
+  ]);
   console.log(
     `[watch] --dry: 활성 워치 ${items.length}/${limits.itemsMax}건 (요청을 보내지 않습니다)`
+  );
+  console.log(
+    crawless
+      ? "[watch] 모드: 크롤리스 (docs/05 §3.4) — 실행해도 요청을 보내지 않습니다"
+      : "[watch] 모드: 자동 수집 — 게이트 통과 기록이 있어야 정상입니다 (docs/05 §9)"
   );
   for (const item of items) {
     const last = item.lastCheckedAt ? item.lastCheckedAt.toISOString() : "미조회";
@@ -38,6 +51,17 @@ async function once() {
   const started = Date.now();
   const result = await runWatchCycle();
   const seconds = Math.round((Date.now() - started) / 1000);
+
+  // 크롤리스는 고장이 아니라 확정된 운영 모드다. 그래도 조용히 끝내지는 않는다 —
+  // "매일 잘 돌고 있는데 아무것도 안 쌓인다"가 이 프로젝트에서 가장 비싼 침묵이다.
+  if (result.crawless) {
+    console.log(
+      `[watch] 크롤리스 모드 (docs/05 §3.4) — 요청 0건. 만료해제 ${result.expired}건 (${seconds}초)`
+    );
+    console.log("[watch] 가격 기록은 봇 호스트의 리마인더가 담당합니다: npm run remind");
+    console.log("[watch] 해제하려면 §3.3 게이트를 실측해 §9에 기록한 뒤 crawlessMode=off");
+    return;
+  }
 
   const eventNote = result.eventTag ? ` · 행사 창 ${result.eventTag}(하루 2회)` : "";
   console.log(

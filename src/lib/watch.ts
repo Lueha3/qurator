@@ -14,7 +14,7 @@ import { db } from "./db";
 import { gatewayFetch } from "./fetch-gateway";
 import { parseProductPage } from "./product-parser";
 import { recordParsedSnapshot, activeEventTag } from "./price-snapshot";
-import { getWatchLimits } from "./policy";
+import { getWatchLimits, isCrawlessMode } from "./policy";
 import { audit } from "./audit";
 
 /** 워치 등록 기본 유효기간(일). 목적이 끝난 상품에 트래픽이 잔존하지 않게 한다. */
@@ -137,6 +137,19 @@ export interface WatchCycleResult {
   eventTag: string | null;
   /** 조기 종료 사유. 조용히 멈추지 않기 위해 반드시 위로 올린다 */
   stoppedEarly: string | null;
+  /** 크롤리스 모드(docs/05 §3.4)라 요청을 아예 보내지 않았다 — 리마인더가 대신한다 */
+  crawless: boolean;
+}
+
+/**
+ * 이번 사이클에 적용할 재조회 간격. 리마인더(watch-remind.ts)도 같은 값을 써야 한다 —
+ * 자동 수집이든 사람 알림이든 "한 상품을 얼마나 자주 건드리는가"는 하나의 규율이어야 하기 때문이다.
+ */
+export async function watchCadence(now: Date = new Date()) {
+  const [limits, eventTag] = await Promise.all([getWatchLimits(), activeEventTag(now)]);
+  // 행사 기간에만 하루 2회. 평시에 빈도를 올리지 않는 것이 이 설계의 핵심 절제다.
+  const intervalMs = eventTag ? limits.eventIntervalMs : limits.minIntervalMs;
+  return { limits, eventTag, intervalMs };
 }
 
 /** Fisher-Yates. 매 사이클 순회 순서를 섞어 고정 순서 지문을 없앤다. */
@@ -164,16 +177,24 @@ export async function runWatchCycle(now: Date = new Date()): Promise<WatchCycleR
     expired: 0,
     eventTag: null,
     stoppedEarly: null,
+    crawless: false,
   };
 
   result.expired = await expireWatches(now);
 
-  const limits = await getWatchLimits();
-  const eventTag = await activeEventTag(now);
+  const { limits, eventTag, intervalMs } = await watchCadence(now);
   result.eventTag = eventTag;
-  // 행사 기간에만 하루 2회. 평시에 빈도를 올리지 않는 것이 이 설계의 핵심 절제다.
-  const interval = eventTag ? limits.eventIntervalMs : limits.minIntervalMs;
-  const dueBefore = new Date(now.getTime() - interval);
+
+  // 크롤리스 게이트 (docs/05 §3.4). robots가 우리 UA를 전 경로 차단한다는 것이 §9.1에서
+  // 실측 확정됐으므로 **기본값이 켜짐**이다. 여기서 끊지 않고 내려가면 첫 상품에서
+  // BLOCKED_ROBOTS를 받고 멈출 뿐인데, 그건 "차단인 줄 알면서 두드린" 요청 1건이 로그에 남는 일이다.
+  // 뚫지 않는다는 원칙은 시도조차 하지 않는 것까지 포함한다.
+  if (await isCrawlessMode()) {
+    result.crawless = true;
+    return result;
+  }
+
+  const dueBefore = new Date(now.getTime() - intervalMs);
 
   const due = await db.watchItem.findMany({
     where: {

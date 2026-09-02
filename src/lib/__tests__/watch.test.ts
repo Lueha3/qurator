@@ -12,6 +12,7 @@ const { db } = await import("../db");
 const { addWatch, removeWatch, runWatchCycle, expireWatches, countActiveWatches } = await import(
   "../watch"
 );
+const { setCrawlessMode } = await import("../policy");
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -67,6 +68,54 @@ async function makeDue(productId: string, lastCheckedAt: Date | null = null) {
 beforeEach(async () => {
   gatewayFetch.mockReset();
   await resetDb();
+  // 자동 수집 규율을 검증하려면 크롤리스를 명시적으로 꺼야 한다. 기본값이 켜짐이기 때문이다
+  // (docs/05 §3.4·§9.1) — 그 기본값 자체는 아래 "크롤리스 게이트" 스위트가 검증한다.
+  await setCrawlessMode(false, "테스트: 게이트 통과 가정");
+});
+
+describe("크롤리스 게이트 — 기본값은 '요청하지 않는다'", () => {
+  it("정책 행이 없으면(=기본값) 게이트웨이를 단 한 번도 부르지 않는다", async () => {
+    const [product] = await seedProducts(1);
+    await addWatch(product.id);
+    await makeDue(product.id);
+    await db.policy.deleteMany({ where: { key: "crawlessMode" } });
+
+    const result = await runWatchCycle();
+
+    expect(result.crawless).toBe(true);
+    expect(result.checked).toBe(0);
+    // 차단인 줄 알면서 두드린 요청 1건조차 남기지 않는다 (Never List #7)
+    expect(gatewayFetch).not.toHaveBeenCalled();
+  });
+
+  it("크롤리스여도 만료 해제는 계속 돈다 — 목적이 끝난 상품을 방치하지 않는다", async () => {
+    const [product] = await seedProducts(1);
+    await addWatch(product.id);
+    await db.watchItem.update({
+      where: { productId: product.id },
+      data: { expiresAt: new Date(Date.now() - DAY) },
+    });
+    await setCrawlessMode(true);
+
+    const result = await runWatchCycle();
+
+    expect(result.crawless).toBe(true);
+    expect(result.expired).toBe(1);
+    expect(await countActiveWatches()).toBe(0);
+  });
+
+  it("사람이 명시적으로 끄면 그때부터 수집한다", async () => {
+    const [product] = await seedProducts(1);
+    await addWatch(product.id);
+    await makeDue(product.id);
+    gatewayFetch.mockResolvedValue({ ok: true, outcome: "OK", body: PAGE });
+
+    await setCrawlessMode(false, "게이트 실측 완료");
+    const result = await runWatchCycle();
+
+    expect(result.crawless).toBe(false);
+    expect(result.checked).toBe(1);
+  });
 });
 
 describe("워치 등록 — 상한이 실제로 막는다", () => {

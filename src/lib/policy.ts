@@ -34,7 +34,7 @@ export const HARD_CAP = {
   watchEventIntervalMs: 10 * 3_600_000,
 } as const;
 
-export type PolicyKey = keyof typeof HARD_CAP | "killSwitch" | "shortlinkMode";
+export type PolicyKey = keyof typeof HARD_CAP | "killSwitch" | "shortlinkMode" | "crawlessMode";
 
 /** DB 오버라이드를 읽되, 하드캡보다 느슨해지지 않도록 조인다. */
 async function readNumeric(key: keyof typeof HARD_CAP): Promise<number> {
@@ -97,5 +97,35 @@ export async function setKillSwitch(on: boolean, note?: string) {
     where: { key: "killSwitch" },
     update: { value: on ? "on" : "off", note },
     create: { key: "killSwitch", value: on ? "on" : "off", note },
+  });
+}
+
+/**
+ * 크롤리스 모드 (docs/05 §3.4). 켜져 있으면 워치 러너는 무신사에 요청을 **한 건도** 보내지 않고,
+ * 사람에게 보내는 리마인더(src/lib/watch-remind.ts)가 그 자리를 대신한다.
+ *
+ * 기본값이 `on`인 것이 이 스위치의 핵심이다. docs/05 §9.1에서 무신사 robots.txt가
+ * 와일드카드 그룹(`User-agent: *` → `Disallow: /`)으로 우리 UA(HoneyFlowBot)를 전 경로 차단함이
+ * 실측 확정됐다. 게이트(§3.3)를 통과했다는 기록 없이 러너가 도는 일을 코드가 막는다 —
+ * 끄는 것은 사람의 명시적 행위여야 한다.
+ *
+ * killSwitch와 기본값 방향이 반대인 이유: 저쪽은 "평시 정상"이 기본이고, 이쪽은
+ * **실측으로 차단이 확정된 상태**가 기본이다. DB를 못 읽으면 켜진 것으로 본다(요청을 보내지 않는다).
+ */
+export async function isCrawlessMode(): Promise<boolean> {
+  try {
+    const row = await db.policy.findUnique({ where: { key: "crawlessMode" } });
+    return row?.value !== "off";
+  } catch {
+    return true;
+  }
+}
+
+/** 크롤리스 해제는 §3.3 게이트 실측을 §9에 기록한 뒤에만 한다. note에 그 근거를 남긴다. */
+export async function setCrawlessMode(on: boolean, note?: string) {
+  await db.policy.upsert({
+    where: { key: "crawlessMode" },
+    update: { value: on ? "on" : "off", note },
+    create: { key: "crawlessMode", value: on ? "on" : "off", note },
   });
 }
