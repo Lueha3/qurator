@@ -64,6 +64,7 @@ enum CaptureSource {
   PASTE
   RADAR
   SHARE
+  SCREENSHOT // docs/06 — 스크린샷 Vision 캡처로 생성된 상품
 }
 
 // ── product_variants ────────────────────────────────────────────────────
@@ -426,6 +427,7 @@ enum SnapshotSource {
   HEALTH_CHECK // 헬스체커가 내려받은 페이지의 파싱 결과 (피기백)
   WATCH // VPS 워치 러너의 정기 스냅샷 (W2)
   MANUAL // 사람이 직접 입력 (작년 BF가 등)
+  SCREENSHOT // docs/06 — 스크린샷 Vision 추출 결과 (실질적인 1차 입력 경로)
 }
 
 // ── watch_items ─────────────────────────────────────────────────────────
