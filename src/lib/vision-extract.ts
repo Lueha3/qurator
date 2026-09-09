@@ -3,33 +3,30 @@
 // ai-hook.ts와 동일한 그레이스풀 디그레이드 규율을 따른다:
 //   1. 실패해도(키 없음/타임아웃/네트워크 오류/비-JSON 응답/필수 필드 누락) 절대 throw하지 않고
 //      null을 반환한다 — 호출부(캡처 핸들러)는 null을 "빈 카드 + 직접 입력"으로 처리한다.
-//   2. 응답은 `responseMimeType: "application/json"`으로 JSON만 뱉게 강제하되, 정식 스키마
-//      바인딩(responseSchema)까지는 쓰지 않고 텍스트 → JSON.parse만 쓴다 — 모델이 스키마 안에서도
-//      환각을 낼 수 있으므로 아래 3번 방어 재검증이 항상 최종 방어선이다.
+//   2. 여기서는 구조화 출력(beta) 대신 텍스트 프롬프트로 JSON만 뱉게 지시하고 직접 JSON.parse한다 —
+//      이 SDK 버전에서 output_config.format의 정확한 와이어 스펙을 검증하지 않은 채 추측하면
+//      조용히 실패할 수 있어, 첫 구현에서는 검증된 경로(텍스트 → JSON.parse)만 쓴다.
 //   3. 모델이 화면에 없는 값을 지어낼 수 있으므로("약 5만원" 같은 문자열이 가격 필드에 들어오는 등)
 //      모든 필드를 방어적으로 재검증한다 — 타입이 안 맞으면 그 필드만 null로 떨어뜨리고,
 //      절대 caller를 향해 예외를 던지지 않는다.
 //
-// 이미지는 이 함수 안에서만 잠깐 base64로 들고 있다가 Gemini에 보내고 버린다 — 디스크·DB·로그에
+// 이미지는 이 함수 안에서만 잠깐 base64로 들고 있다가 Claude에 보내고 버린다 — 디스크·DB·로그에
 // 쓰지 않는다(docs/06 §4.3). 호출부도 같은 원칙을 지켜야 한다: 응답을 받은 뒤 원본 base64를 저장하지 말 것.
-//
-// ai-hook.ts(카피라이팅, claude-haiku-4-5)와는 별개 기능이다 — 여기는 Vision 추출만 Gemini로
-// 옮긴 것이고, ai-hook.ts는 그대로 Anthropic을 쓴다. ANTHROPIC_API_KEY는 그 용도로 계속 필요하다.
 
-import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 
-// 2026-09 기준 안정 버전. Google이 2026-10-16 이후 gemini-2.5-flash를 단계적으로
-// 종료할 예정이라 공지했다 — 그 전에 후속 모델(가용 목록은 Google AI Studio 콘솔에서 확인)로
-// 교체해야 한다.
-const MODEL = "gemini-2.5-flash";
+const MODEL = "claude-opus-5";
+const MAX_TOKENS = 1024;
 // 텍스트 훅 생성(ai-hook.ts, 10초)보다 넉넉히 잡는다 — 이미지 토큰 처리가 텍스트만 보낼 때보다 오래 걸린다.
 const TIMEOUT_MS = 20_000;
 
-// 텔레그램이 알려주는 MIME 문자열을 그대로 신뢰하지 않고 알려진 이미지 타입으로만 좁힌다.
-const KNOWN_IMAGE_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+// SDK가 받는 media_type은 이 네 값만의 리터럴 유니온이다. 호출부(텔레그램 핸들러)는 텔레그램이
+// 알려주는 MIME 문자열을 그대로 넘기므로, 여기서 하나로 좁혀 SDK 타입과 맞춘다.
+type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
-function toImageMediaType(mediaType: string): string {
-  return KNOWN_IMAGE_MEDIA_TYPES.includes(mediaType) ? mediaType : "image/jpeg";
+function toImageMediaType(mediaType: string): ImageMediaType {
+  const known: ImageMediaType[] = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+  return (known as string[]).includes(mediaType) ? (mediaType as ImageMediaType) : "image/jpeg";
 }
 
 export type VisionConfidence = "high" | "medium" | "low";
@@ -55,12 +52,12 @@ export interface VisionExtractResult {
   notes: string | null;
 }
 
-let client: GoogleGenAI | null | undefined;
+let client: Anthropic | null | undefined;
 
-function getClient(): GoogleGenAI | null {
+function getClient(): Anthropic | null {
   if (client !== undefined) return client;
-  const apiKey = process.env.GEMINI_API_KEY;
-  client = apiKey ? new GoogleGenAI({ apiKey }) : null;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  client = apiKey ? new Anthropic({ apiKey }) : null;
   return client;
 }
 
@@ -162,9 +159,9 @@ export async function extractFromScreenshot(
   imageBase64: string,
   mediaType: string
 ): Promise<VisionExtractResult | null> {
-  const gemini = getClient();
-  if (!gemini) {
-    console.warn("[vision-extract] GEMINI_API_KEY가 설정되지 않아 추출을 시도하지 않습니다.");
+  const anthropic = getClient();
+  if (!anthropic) {
+    console.warn("[vision-extract] ANTHROPIC_API_KEY가 설정되지 않아 추출을 시도하지 않습니다.");
     return null;
   }
 
@@ -172,41 +169,46 @@ export async function extractFromScreenshot(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-    const response = await gemini.models.generateContent({
-      model: MODEL,
-      contents: [
-        {
-          role: "user",
-          parts: [
-            // 이미지 파트가 텍스트 지시보다 먼저 온다 (기존 구현의 컨벤션을 유지).
-            {
-              inlineData: { data: imageBase64, mimeType: toImageMediaType(mediaType) },
-            },
-            { text: buildUserPrompt() },
-          ],
-        },
-      ],
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        responseMimeType: "application/json",
-        abortSignal: controller.signal,
+    const response = await anthropic.messages.create(
+      {
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        // 추출은 깊은 사고가 필요 없다 (docs/06 §4.1) — effort를 낮춰 응답 속도를 우선한다.
+        output_config: { effort: "low" },
+        system: SYSTEM_PROMPT,
+        messages: [
+          {
+            role: "user",
+            content: [
+              // 이미지 블록은 텍스트 지시보다 먼저 온다 (Anthropic vision 컨벤션).
+              {
+                type: "image",
+                source: { type: "base64", media_type: toImageMediaType(mediaType), data: imageBase64 },
+              },
+              { type: "text", text: buildUserPrompt() },
+            ],
+          },
+        ],
       },
-    });
+      { signal: controller.signal }
+    );
     clearTimeout(timer);
 
-    const text = response.text;
-    if (!text) {
-      console.warn("[vision-extract] 응답에 텍스트가 없습니다.");
+    const block = response.content.find((c) => c.type === "text");
+    if (!block || block.type !== "text") {
+      console.warn("[vision-extract] 응답에 텍스트 블록이 없습니다.", {
+        stopReason: response.stop_reason,
+      });
       return null;
     }
 
     let parsed: unknown;
     try {
-      parsed = JSON.parse(stripCodeFence(text));
+      parsed = JSON.parse(stripCodeFence(block.text));
     } catch {
       // 마크다운 설명이 섞이는 등 비-JSON 응답 — 카드는 빈 값으로 폴백한다.
-      // text는 모델이 뱉은 텍스트일 뿐 이미지가 아니다 — 원인 진단용으로 로그에 남긴다.
-      console.warn("[vision-extract] JSON 파싱 실패 — 응답 원문(앞 300자):", text.slice(0, 300));
+      // block.text는 모델이 뱉은 텍스트일 뿐 이미지가 아니다 — 원인 진단용으로 로그에 남긴다.
+      console.warn("[vision-extract] JSON 파싱 실패 — 응답 원문(앞 300자):", block.text.slice(0, 300));
       return null;
     }
 
@@ -218,7 +220,7 @@ export async function extractFromScreenshot(
   } catch (err) {
     // 네트워크 오류·타임아웃·레이트리밋·인증 실패 등 — 전부 동일하게 "추출 실패"로 처리하되,
     // 원인 없이 조용히 삼키면 API 키 누락 같은 흔한 설정 오류를 진단할 방법이 없다.
-    console.error("[vision-extract] Gemini 호출 실패 (네트워크·타임아웃·API 오류):", err);
+    console.error("[vision-extract] Claude 호출 실패 (네트워크·타임아웃·API 오류):", err);
     return null;
   }
 }
