@@ -160,7 +160,10 @@ export async function extractFromScreenshot(
   mediaType: string
 ): Promise<VisionExtractResult | null> {
   const anthropic = getClient();
-  if (!anthropic) return null;
+  if (!anthropic) {
+    console.warn("[vision-extract] ANTHROPIC_API_KEY가 설정되지 않아 추출을 시도하지 않습니다.");
+    return null;
+  }
 
   try {
     const controller = new AbortController();
@@ -192,19 +195,32 @@ export async function extractFromScreenshot(
     clearTimeout(timer);
 
     const block = response.content.find((c) => c.type === "text");
-    if (!block || block.type !== "text") return null;
+    if (!block || block.type !== "text") {
+      console.warn("[vision-extract] 응답에 텍스트 블록이 없습니다.", {
+        stopReason: response.stop_reason,
+      });
+      return null;
+    }
 
     let parsed: unknown;
     try {
       parsed = JSON.parse(stripCodeFence(block.text));
     } catch {
       // 마크다운 설명이 섞이는 등 비-JSON 응답 — 카드는 빈 값으로 폴백한다.
+      // block.text는 모델이 뱉은 텍스트일 뿐 이미지가 아니다 — 원인 진단용으로 로그에 남긴다.
+      console.warn("[vision-extract] JSON 파싱 실패 — 응답 원문(앞 300자):", block.text.slice(0, 300));
       return null;
     }
 
-    return toResult(parsed);
-  } catch {
-    // 네트워크 오류·타임아웃·레이트리밋 등 — 전부 동일하게 "추출 실패"로 처리한다.
+    const result = toResult(parsed);
+    if (!result) {
+      console.warn("[vision-extract] isProductPage 필드가 없거나 형식이 잘못됨:", parsed);
+    }
+    return result;
+  } catch (err) {
+    // 네트워크 오류·타임아웃·레이트리밋·인증 실패 등 — 전부 동일하게 "추출 실패"로 처리하되,
+    // 원인 없이 조용히 삼키면 API 키 누락 같은 흔한 설정 오류를 진단할 방법이 없다.
+    console.error("[vision-extract] Claude 호출 실패 (네트워크·타임아웃·API 오류):", err);
     return null;
   }
 }
