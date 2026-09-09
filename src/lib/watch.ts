@@ -14,6 +14,7 @@ import { db } from "./db";
 import { gatewayFetch } from "./fetch-gateway";
 import { parseProductPage } from "./product-parser";
 import { recordParsedSnapshot, activeEventTag } from "./price-snapshot";
+import { canonicalizeMusinsaUrl } from "./url-guard";
 import { getWatchLimits, isCrawlessMode } from "./policy";
 import { audit } from "./audit";
 
@@ -210,6 +211,20 @@ export async function runWatchCycle(now: Date = new Date()): Promise<WatchCycleR
   });
 
   for (const item of shuffle(due)) {
+    // 스크린샷 상품(docs/06)이 큐레이터 링크 백필 전이면 canonicalUrl이 합성 sentinel일 수
+    // 있다. health-check.ts와 같은 이유로, 게이트웨이를 부르지 않고 이 항목만 건너뛴다 —
+    // 안 그러면 BLOCKED_POLICY가 STOP_CYCLE_OUTCOMES에 걸려 사이클 전체가 멈춘다.
+    if (!canonicalizeMusinsaUrl(item.product.canonicalUrl).ok) {
+      await db.watchItem.update({ where: { id: item.id }, data: { lastCheckedAt: now } });
+      await audit({
+        actor: "SYSTEM",
+        action: "watch.frozen",
+        approvalRef: item.productId,
+        detail: `상품의 canonicalUrl이 유효한 무신사 URL이 아닙니다: ${item.product.canonicalUrl}`,
+      });
+      continue;
+    }
+
     // 커미션 파라미터가 없는 정규 상품 URL만 — 큐레이터 링크는 절대 방문하지 않는다.
     const fetched = await gatewayFetch({ url: item.product.canonicalUrl, trigger: "WATCH" });
 

@@ -208,4 +208,65 @@ describe("헬스체크 피기백 — 추가 요청 0건으로 이력이 쌓인�
     await runHealthCheck();
     expect(await db.priceSnapshot.count()).toBe(0);
   });
+
+  // 회귀: 스크린샷(docs/06)으로 만든 상품이 큐레이터 링크 백필 전에 승인되면 canonicalUrl이
+  // 합성 sentinel("screenshot-pending:...")일 수 있다. 이걸 그대로 게이트웨이에 넘기면
+  // BLOCKED_POLICY를 받는데, 그건 STOP_CYCLE_OUTCOMES라서 사이클 전체가 멈춘다 —
+  // 상품 1건의 데이터 문제가 헬스체크 전체를 영구 정지시키는 사고. 게이트웨이를 부르지도
+  // 않고 이 링크만 frozen 처리해야 한다(다른 정상 상품은 같은 사이클에서 계속 점검돼야 한다).
+  it("canonicalUrl이 유효한 무신사 URL이 아니면 게이트웨이를 부르지 않고 그 링크만 건너뛴다 (사이클은 안 멈춘다)", async () => {
+    const { deal: brokenDeal, product: brokenProduct } = await seedPublishedDeal();
+    await db.product.update({
+      where: { id: brokenDeal.productId },
+      data: { canonicalUrl: "screenshot-pending:deadbeef-0000-0000-0000-000000000000" },
+    });
+
+    // seedPublishedDeal은 매번 새 creator를 만들어(handle 유니크 제약), 두 번째 상품은
+    // 같은 creator에 수동으로 붙인다 — 한 사이클에 정상/비정상 상품이 함께 있는 상황을 재현한다.
+    const goodProduct = await db.product.create({
+      data: {
+        creatorId: brokenProduct.creatorId,
+        musinsaGoodsNo: "999000",
+        canonicalUrl: "https://www.musinsa.com/products/999000",
+        brandName: "쿠어",
+        productName: "정상 상품",
+        listPrice: 89000,
+      },
+    });
+    const goodDeal = await db.deal.create({
+      data: {
+        productId: goodProduct.id,
+        creatorId: brokenProduct.creatorId,
+        status: "PUBLISHED",
+        approvalStage: "APPROVED",
+      },
+    });
+    await db.curatorLink.create({
+      data: {
+        dealId: goodDeal.id,
+        rawUrl: "https://www.musinsa.com/products/999000?utm_term=ULIDX",
+        isDefault: true,
+        healthCheckAfter: new Date(Date.now() - 3_600_000),
+      },
+    });
+
+    gatewayFetch.mockResolvedValue({ ok: true, status: 200, body: PAGE });
+
+    const result = await runHealthCheck();
+
+    expect(result.stoppedEarly).toBeNull();
+    expect(result.frozen).toBe(1);
+    expect(result.checked).toBe(1); // 정상 상품은 같은 사이클에서 그대로 점검된다
+    // 게이트웨이는 정상 상품 1건에만 호출된다 — 깨진 URL로는 호출조차 되지 않는다.
+    expect(gatewayFetch).toHaveBeenCalledTimes(1);
+    expect(gatewayFetch).toHaveBeenCalledWith({
+      url: goodProduct.canonicalUrl,
+      trigger: "HEALTH_CHECK",
+    });
+
+    // 깨진 링크도 healthCheckedAt이 갱신돼야 한다 — 안 그러면 다음 사이클에도 맨 앞에 뽑혀
+    // 뒤의 정상 링크들이 영영 점검되지 않는다(head-of-line blocking).
+    const brokenLink = await db.curatorLink.findFirstOrThrow({ where: { dealId: brokenDeal.id } });
+    expect(brokenLink.healthCheckedAt).not.toBeNull();
+  });
 });

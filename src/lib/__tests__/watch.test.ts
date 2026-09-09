@@ -323,4 +323,35 @@ describe("워치 사이클 — 차단 신호를 만나면 뚫지 않고 멈춘�
     expect(result.parseFailed).toBe(1);
     expect(await db.priceSnapshot.count()).toBe(0);
   });
+
+  // 회귀: 스크린샷(docs/06)으로 만든 상품이 큐레이터 링크 백필 전에 워치 등록되면
+  // canonicalUrl이 합성 sentinel("screenshot-pending:...")일 수 있다. 게이트웨이에 그대로
+  // 넘기면 BLOCKED_POLICY를 받는데, 그건 STOP_CYCLE_OUTCOMES라서 사이클 전체가 멈춘다 —
+  // health-check.ts와 같은 이유로, 게이트웨이를 부르기 전에 걸러야 한다.
+  it("canonicalUrl이 유효한 무신사 URL이 아니면 게이트웨이를 부르지 않고 그 항목만 건너뛴다 (사이클은 안 멈춘다)", async () => {
+    const [brokenProduct, goodProduct] = await seedProducts(2);
+    await db.product.update({
+      where: { id: brokenProduct.id },
+      data: { canonicalUrl: "screenshot-pending:deadbeef-0000-0000-0000-000000000000" },
+    });
+    await addWatch(brokenProduct.id);
+    await addWatch(goodProduct.id);
+    await makeDue(brokenProduct.id);
+    await makeDue(goodProduct.id);
+    gatewayFetch.mockResolvedValue({ ok: true, status: 200, body: PAGE });
+
+    const result = await runWatchCycle();
+
+    expect(result.stoppedEarly).toBeNull();
+    expect(result.checked).toBe(1); // 정상 상품은 같은 사이클에서 그대로 조회된다
+    expect(gatewayFetch).toHaveBeenCalledTimes(1);
+    expect(gatewayFetch).toHaveBeenCalledWith({ url: goodProduct.canonicalUrl, trigger: "WATCH" });
+
+    // 깨진 항목도 lastCheckedAt이 갱신돼야 한다 — 안 그러면 매 사이클 맨 앞에 다시 뽑혀
+    // 나머지 워치 대상이 굶는다(head-of-line blocking).
+    const brokenItem = await db.watchItem.findUniqueOrThrow({
+      where: { productId: brokenProduct.id },
+    });
+    expect(brokenItem.lastCheckedAt).not.toBeNull();
+  });
 });

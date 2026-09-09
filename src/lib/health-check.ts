@@ -16,6 +16,7 @@ import { db } from "./db";
 import { gatewayFetch } from "./fetch-gateway";
 import { parseProductPage, type ParsedProduct } from "./product-parser";
 import { recordParsedSnapshot } from "./price-snapshot";
+import { canonicalizeMusinsaUrl } from "./url-guard";
 import { audit } from "./audit";
 import type { CuratorLink, LinkHealth } from "@prisma/client";
 
@@ -279,6 +280,24 @@ export async function runHealthCheck(now: Date = new Date()): Promise<CheckResul
   for (const link of targets) {
     // 커미션 파라미터가 없는 정규 상품 URL만 조회한다 — 큐레이터 링크는 절대 방문하지 않는다.
     const url = link.deal.product.canonicalUrl;
+
+    // 스크린샷으로 생성된 상품(docs/06)은 큐레이터 링크가 붙기 전까지, 또는 goodsNo 충돌로
+    // 백필이 거부된 경우 canonicalUrl이 실제 URL이 아닌 합성 sentinel("screenshot-pending:...")
+    // 일 수 있다. 이걸 그대로 게이트웨이에 넘기면 BLOCKED_POLICY로 거부되는데, 그건
+    // STOP_CYCLE_OUTCOMES에 들어 있어 사이클 전체를 멈춘다 — 상품 1건의 데이터 문제가
+    // 헬스체크 전체를 영구 정지시키는 사고다(§119의 주석이 경계하는 바로 그 사고를,
+    // 원인만 다르게 재현한다). 게이트웨이를 아예 부르지 않고 이 링크만 frozen 처리한다.
+    if (!canonicalizeMusinsaUrl(url).ok) {
+      result.frozen++;
+      await db.curatorLink.update({ where: { id: link.id }, data: { healthCheckedAt: now } });
+      await audit({
+        actor: "SYSTEM",
+        action: "health.frozen",
+        approvalRef: link.dealId,
+        detail: `상품의 canonicalUrl이 유효한 무신사 URL이 아닙니다 (스크린샷 백필 누락 가능): ${url}`,
+      });
+      continue;
+    }
 
     const fetched = await gatewayFetch({ url, trigger: "HEALTH_CHECK" });
 

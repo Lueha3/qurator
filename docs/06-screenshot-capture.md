@@ -121,6 +121,14 @@ notes              string|null  애매한 점 ("가격이 두 개 보임" 등)
 
 ### 4.2 상품 매칭 — 어느 Product에 붙일 것인가
 
+> **구현 후 발견(2026-09-09, 적대적 검증)**: 아래 4단계 매칭과 별개로, S0 최초 구현에는
+> "나중에 큐레이터 링크가 오면 그 Product에 goodsNo를 채운다"가 실제로 구현돼 있지 않았다.
+> `handleCuratorLinkPaste`가 백필하도록 수정하고(§4.2 마지막 단락), goodsNo 충돌 시엔
+> 경고만 남기고 sentinel을 유지한다. 추가로 `health-check.ts`·`watch.ts`에 방어선을 넣었다 —
+> canonicalUrl이 유효한 무신사 URL이 아니면 게이트웨이를 부르지 않고 그 항목만 건너뛴다
+> (백필이 어떤 이유로든 안 됐을 때, `BLOCKED_POLICY`가 STOP_CYCLE_OUTCOMES라서 사이클
+> 전체가 멈추는 사고를 막는 이중 방어).
+
 순서대로, 처음 맞는 것:
 
 1. **같은 대화, 10분 이내에 goodsNo가 있는 딜**이 있으면 그 상품 (링크 먼저 던진 경우)
@@ -186,7 +194,7 @@ Fetch Gateway·robots·서킷·킬스위치는 그대로 두되, 스크린샷 �
 
 | 단계 | 내용 | 완료 기준 | 규모 |
 |---|---|---|---|
-| **S0** | 사진 수신 → Vision 추출 → 후보 카드 + 스냅샷 기록. `SCREENSHOT` 출처 추가(CaptureSource·SnapshotSource) | 스크린샷 1장 → 3초 뒤 브랜드·상품명·가격이 채워진 카드 | 2일 |
+| **S0** | 사진 수신 → Vision 추출 → 후보 카드 + 스냅샷 기록. `SCREENSHOT` 출처 추가(CaptureSource·SnapshotSource) | ✅ **완료 (2026-09-09)** — `vision-extract.ts`·`product-match.ts`·핸들러 연결 + 4관점 적대적 검증(3 pass·1 fail→수정 완료) | 2일 |
 | **S1** | **판정 카드**: §3.1 규칙(policy 키) + 가격 흐름 렌더. `price-analysis.ts` 재사용 | 같은 상품 3번째 스크린샷부터 실할인 판정이 첫 줄에 뜬다 | 1일 |
 | **S2** | 상품 매칭(§4.2) · onelink `landedUrl` → goodsNo(§5.1) · 공유 텍스트(§5.2) | 링크→스크린샷, 스크린샷→링크 어느 순서로 와도 한 상품으로 합쳐진다 | 1일 |
 | **S3** | 리마인더에 앱 열기 링크 + 문구(§6) · 워크스페이스 스트립에 SCREENSHOT 출처 표기 | BF 리마인더 → 찍기 → 스냅샷이 행사 태그를 달고 쌓인다 | 반나절 |

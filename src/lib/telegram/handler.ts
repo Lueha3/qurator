@@ -5,6 +5,11 @@
 //
 // 이 파일은 webhook과 폴링 양쪽에서 같은 함수로 쓰인다(진입 경로만 다르고 처리는 동일).
 
+// 텔레그램 파일 다운로드(getFile이 알려준 file_path → api.telegram.org/file/...)는 무신사
+// Fetch Gateway와 무관한 텔레그램 자체 CDN이다 (docs/06-screenshot-capture.md §4.4).
+// client.ts와 동일한 이유로, 이 경로에서만 전역 fetch를 직접 쓴다.
+/* eslint-disable no-restricted-globals -- 텔레그램 자체 CDN 다운로드, 무신사 게이트웨이와 무관한 별도 경로다 */
+
 import { db } from "../db";
 import { getDefaultCreator } from "../creator";
 import { gatewayFetch } from "../fetch-gateway";
@@ -16,6 +21,8 @@ import { BF2025_OBSERVED_AT } from "../price-analysis";
 import { addWatch, countActiveWatches, listActiveWatches, removeWatch } from "../watch";
 import { formatKRW, formatShortDateTime } from "../format";
 import { draftHookLine } from "../ai-hook";
+import { extractFromScreenshot } from "../vision-extract";
+import { matchOrCreateProduct } from "../product-match";
 import { renderAllChannels, type DealFacts, type DealLink } from "../renderer";
 import { audit } from "../audit";
 import { signCardToken } from "../signed-link";
@@ -23,6 +30,7 @@ import { ensureShortLink } from "../shortlink";
 import { firstCheckAt } from "../health-check";
 import {
   answerCallback,
+  callMethod,
   editMessage,
   escapeHtml,
   sendMessage,
@@ -52,12 +60,20 @@ interface TgMessageEntity {
   length: number;
   url?: string;
 }
+/** 텔레그램은 사진 1장을 여러 해상도로 보낸다 — 배열의 마지막 원소가 가장 큰 사이즈다(텔레그램 자체 컨벤션) */
+interface TgPhotoSize {
+  file_id: string;
+  file_size?: number;
+  width: number;
+  height: number;
+}
 interface TgMessage {
   message_id: number;
   from?: TgUser;
   chat: { id: number };
   text?: string;
   entities?: TgMessageEntity[];
+  photo?: TgPhotoSize[];
 }
 interface TgCallbackQuery {
   id: string;
@@ -259,8 +275,17 @@ async function handleMessage(msg: TgMessage): Promise<void> {
     return; // 조용히 무시 — 봇의 존재를 확인시켜 줄 이유가 없다
   }
 
-  const text = msg.text?.trim() ?? "";
   const chatId = String(msg.chat.id);
+
+  // 스크린샷은 pendingInput·/command보다 먼저 처리한다: 사진은 링크 붙여넣기와 절대 혼동될
+  // 수 없으므로(텍스트 URL과 달리) "무엇을 기다리는 중인지"를 되물을 모호함이 없다 —
+  // 사진이 오면 항상 새 캡처를 시작한다 (docs/06-screenshot-capture.md §3).
+  if (msg.photo && msg.photo.length > 0) {
+    await captureFromScreenshot(msg, chatId);
+    return;
+  }
+
+  const text = msg.text?.trim() ?? "";
 
   if (text === "/start" || text === "/help") {
     await sendMessage({
@@ -430,6 +455,125 @@ async function captureFromUrl(rawUrl: string, chatId: string, sourceMessageId: n
     chatId,
     messageId: status.message_id,
     text: card.text + failureNote,
+    keyboard: card.keyboard,
+  });
+}
+
+/**
+ * 스크린샷 1장을 캡처한다 — docs/06-screenshot-capture.md §3-§4의 1차 입력 경로.
+ * captureFromUrl과 대칭이지만 무신사에 요청을 전혀 보내지 않는다: Vision이 화면에서
+ * 직접 읽으므로 gatewayFetch를 아예 거치지 않는다(§7 — 요청 0건).
+ *
+ * 이미지 바이트는 이 함수의 지역 변수(base64)에만 존재하다가 extractFromScreenshot 호출이
+ * 끝나면 스코프를 벗어나 버려진다 — 디스크·DB·로그·감사 기록 어디에도 쓰지 않는다 (§4.3).
+ */
+async function captureFromScreenshot(msg: TgMessage, chatId: string): Promise<void> {
+  const status = await sendMessage({ chatId, text: "🔎 스크린샷 확인하는 중…" });
+
+  // 여러 해상도 중 배열의 마지막(가장 큰 사이즈)을 쓴다 — 작은 글씨(품번 등) 오독을 줄인다.
+  const photo = msg.photo![msg.photo!.length - 1];
+
+  let base64: string;
+  try {
+    const file = await callMethod<{ file_path: string }>("getFile", { file_id: photo.file_id });
+    // 텔레그램 자체 CDN이다(무신사와 무관) — gatewayFetch가 아니라 전역 fetch를 직접 쓴다.
+    const response = await fetch(
+      `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`
+    );
+    base64 = Buffer.from(await response.arrayBuffer()).toString("base64");
+  } catch (err) {
+    console.error("[screenshot] 텔레그램 파일 다운로드 실패", err);
+    await editMessage({
+      chatId,
+      messageId: status.message_id,
+      text: "⚠️ 스크린샷을 받지 못했습니다. 다시 보내주세요.",
+    });
+    return;
+  }
+
+  // 텔레그램은 사진(photo)을 서버에서 항상 JPEG로 재인코딩한다 — 원래 사용자가 무엇을 보냈든
+  // photo 배열에는 mime 정보가 없으므로 고정값을 쓴다 (docs/06 §4.4).
+  const result = await extractFromScreenshot(base64, "image/jpeg");
+  // 이 아래로는 base64를 다시 참조하지 않는다 — 여기서 사실상 버려진다.
+
+  if (!result) {
+    // Vision 실패(API 장애·타임아웃 등)는 ai-hook.ts와 같은 null 폴백이다 — 빈 딜을 만들면
+    // 장애 상황에 워크스페이스가 껍데기 카드로 스팸된다. 아무것도 만들지 않고 안내만 한다.
+    await editMessage({
+      chatId,
+      messageId: status.message_id,
+      text: "⚠️ 스크린샷을 읽지 못했습니다. 다시 시도해주시거나 /help의 직접 입력 방법을 이용해주세요.",
+    });
+    return;
+  }
+
+  if (!result.isProductPage) {
+    // 카메라가 잘못된 화면을 향한 경우다 — 기록할 것이 없으므로 딜·스냅샷을 만들지 않는다
+    // (docs/06 §3.3: "이건 실패가 아니라 엉뚱한 화면을 찍은 것" — 소음으로 남기지 않는다).
+    await editMessage({
+      chatId,
+      messageId: status.message_id,
+      text: "상품 페이지 상단(브랜드·상품명·가격이 보이는 화면)을 찍어주세요.",
+    });
+    return;
+  }
+
+  const creator = await getDefaultCreator();
+  const { product, matchedBy } = await matchOrCreateProduct({
+    creatorId: creator.id,
+    chatId,
+    brand: result.brand,
+    productName: result.productName,
+    styleCode: result.styleCode,
+  });
+
+  // 피기백 스냅샷 — 가격을 하나도 못 읽었으면 recordSnapshot이 조용히 건너뛴다.
+  await recordSnapshot({
+    productId: product.id,
+    listPrice: result.listPrice,
+    salePrice: result.salePrice,
+    couponPrice: result.couponPrice,
+    source: "SCREENSHOT",
+  });
+
+  // product-parser.ts의 countFields()와 같은 정신: null이 아닌 필드 수 = "얼마나 채워졌나".
+  const parseFieldCount = [
+    result.brand,
+    result.productName,
+    result.listPrice,
+    result.salePrice,
+  ].filter((v) => v !== null).length;
+
+  const deal = await db.deal.create({
+    data: {
+      productId: product.id,
+      creatorId: creator.id,
+      status: "DRAFT",
+      approvalStage: "CANDIDATE",
+      salePrice: result.salePrice,
+      telegramChatId: chatId,
+      telegramMessageId: status.message_id,
+      // JSON-LD/OpenGraph가 아니라 Vision 추출이라는 것을 카드·감사 로그가 구분할 수 있게 한다.
+      parseSource: "vision",
+      parseFieldCount,
+    },
+    include: DEAL_WITH_RELATIONS,
+  });
+
+  await audit({
+    actor: "HUMAN",
+    action: "deal.captured",
+    approvalRef: deal.id,
+    // 이미지 자체는 절대 남기지 않는다 — 매칭 결과와 메시지 ID만 증적으로 남는다 (docs/06 §4.3/§7).
+    detail: `스크린샷 캡처 (텔레그램 메시지 ${msg.message_id}) → 상품 매칭 ${matchedBy}`,
+  });
+
+  // 링크 경로와 동일한 후보 카드 — 사용자에게는 두 입력 경로가 이 지점부터 구분되지 않는다.
+  const card = candidateCard(toCardDeal(deal));
+  await editMessage({
+    chatId,
+    messageId: status.message_id,
+    text: card.text,
     keyboard: card.keyboard,
   });
 }
@@ -629,6 +773,30 @@ async function handleCuratorLinkPaste(deal: DealRecord, text: string, chatId: st
     linkWarnings.push(
       `이 링크는 다른 상품(#${parsed.link.goodsNo})을 가리킵니다 — 이 딜은 #${expected}입니다.`
     );
+  } else if (!expected && parsed.link.goodsNo) {
+    // 스크린샷으로 생성된 상품(docs/06 §4.2)은 musinsaGoodsNo가 없다. 처음 받는 정규 링크로
+    // 지금 채워야 한다 — 안 그러면 canonicalUrl이 합성 sentinel("screenshot-pending:...")로
+    // 영원히 남고, 승인 뒤 헬스체커·워치가 그걸 실제 URL로 오인해 요청을 시도하게 된다.
+    const collision = await db.product.findUnique({
+      where: {
+        creatorId_musinsaGoodsNo: { creatorId: deal.creatorId, musinsaGoodsNo: parsed.link.goodsNo },
+      },
+    });
+    if (collision && collision.id !== deal.productId) {
+      // 같은 상품이 이미 다른 경로(링크 던지기 등)로 등록돼 있다 — 두 Product를 자동으로
+      // 합치지 않는다(자동 병합은 v2 과제, docs/06 §4.2). 사람이 보도록 경고만 남긴다.
+      linkWarnings.push(
+        `이 링크의 상품(#${parsed.link.goodsNo})은 이미 다른 항목으로 등록돼 있습니다 — 중복 상품일 수 있습니다.`
+      );
+    } else {
+      const canonical = canonicalizeMusinsaUrl(parsed.link.rawUrl);
+      if (canonical.ok) {
+        await db.product.update({
+          where: { id: deal.productId },
+          data: { musinsaGoodsNo: parsed.link.goodsNo, canonicalUrl: canonical.value },
+        });
+      }
+    }
   }
   if (!parsed.link.hasCommissionParams) {
     // 거부하지 않고 경고한다: 무신사가 파라미터 이름을 바꾸면 정상 링크를 전부 막게 되므로,
