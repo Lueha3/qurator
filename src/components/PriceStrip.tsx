@@ -30,12 +30,22 @@ function Cell({
 function EventCell({ event }: { event: PriceEventDTO }) {
   const label = event.manualOnly ? `${event.eventTag} (수동)` : event.eventTag;
 
+  // 쿠폰가 라인은 두 분기(실할인 있음/없음) 모두에서 조건이 같아 한 번만 만든다 —
+  // "작년 vs 올해"를 나란히 볼 때 쿠폰가 유무로 줄 수가 흔들리면 비교가 깨진다.
+  const couponLine = event.couponPrice !== null && (
+    <div className="text-xs font-normal text-muted">
+      쿠폰가 {formatKRW(event.couponPrice)}
+      {event.couponDiscountRate !== null && ` · 실할인 ${event.couponDiscountRate}%`}
+    </div>
+  );
+
   // 실할인율이 헤드라인이다. 표본이 부족하면 %를 띄우지 않는다 — 위장 인상을 못 거른 숫자이므로.
   if (event.realDiscountRate !== null) {
     return (
       <Cell label={label}>
         {event.realDiscountRate}%<span className="ml-1.5 text-xs text-muted">실할인</span>
         <div className="text-xs font-normal text-muted">{formatKRW(event.salePrice)}</div>
+        {couponLine}
       </Cell>
     );
   }
@@ -55,6 +65,7 @@ function EventCell({ event }: { event: PriceEventDTO }) {
           ? "기록 이전 행사 — 실할인율 없음"
           : `기준가 수집 ${event.baselineSampleSize}/3`}
       </div>
+      {couponLine}
     </Cell>
   );
 }

@@ -45,6 +45,8 @@ export interface PriceEventDTO {
   realDiscountRate: number | null;
   /** 정가 대비 할인율 (참고값) */
   listDiscountRate: number | null;
+  /** 기준가 대비, 쿠폰가까지 반영한 실할인율. couponPrice가 없으면 null */
+  couponDiscountRate: number | null;
   /** 전부 수동 입력이면 true → "수동" 배지 */
   manualOnly: boolean;
   /** 기준가 표본 수 — "기준가 수집 중 (2/3)" 표시에 쓴다 */

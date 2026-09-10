@@ -149,6 +149,27 @@ describe("/bf2025 — 작년 BF 가격 수동 입력 (네트워크 요청 0건)"
     expect(manual.listPrice).toBe(89000); // 캡처 때 저장된 Product.listPrice
   });
 
+  it("쿠폰가(4번째 토큰)도 함께 기록하고, 회신에 쿠폰 할인율을 알려준다", async () => {
+    await captureProduct();
+    await handleUpdate(userMessage(`/bf2025 ${PRODUCT_URL} 39900 89000 37900`));
+
+    const manual = await db.priceSnapshot.findFirstOrThrow({ where: { source: "MANUAL" } });
+    expect(manual.couponPrice).toBe(37900);
+    expect(manual.eventTag).toBe("BF2025");
+
+    const reply = sent.at(-1)?.text ?? "";
+    expect(reply).toContain("쿠폰가");
+    expect(reply).toContain("57%"); // (1 - 37900/89000) ≈ 57%
+  });
+
+  it("쿠폰가를 생략하면 스냅샷의 couponPrice가 null로 남는다", async () => {
+    await captureProduct();
+    await handleUpdate(userMessage(`/bf2025 ${PRODUCT_URL} 39,900원 89000`));
+
+    const manual = await db.priceSnapshot.findFirstOrThrow({ where: { source: "MANUAL" } });
+    expect(manual.couponPrice).toBeNull();
+  });
+
   it("미등록 상품이면 기록하지 않고 등록 방법을 안내한다", async () => {
     await handleUpdate(userMessage("/bf2025 999999 39900"));
     expect(await db.priceSnapshot.count()).toBe(0);

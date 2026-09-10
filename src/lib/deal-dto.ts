@@ -54,6 +54,7 @@ export function toPriceHistoryDTO(
       couponPrice: e.couponPrice,
       realDiscountRate: e.realDiscountRate,
       listDiscountRate: e.listDiscountRate,
+      couponDiscountRate: e.couponDiscountRate,
       manualOnly: e.manualOnly,
       baselineSampleSize: e.baseline.sampleSize,
       baselineSufficient: e.baseline.sufficient,

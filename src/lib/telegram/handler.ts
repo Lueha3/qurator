@@ -300,7 +300,7 @@ async function handleMessage(msg: TgMessage): Promise<void> {
         "📈 /watch 상품링크 — 블프까지 가격 추적 등록\n" +
         "📋 /watchlist — 추적 중인 상품 목록\n" +
         "🚫 /unwatch 상품링크 — 추적 해제\n" +
-        "💾 /bf2025 상품링크 판매가 [정가] — 작년 블프 가격 수동 기록",
+        "💾 /bf2025 상품링크 판매가 [정가] [쿠폰가] — 작년 블프 가격 수동 기록",
     });
     return;
   }
@@ -593,9 +593,12 @@ function parsePriceToken(token: string | undefined): number | null {
 }
 
 /**
- * `/bf2025 <상품링크|상품번호> <판매가> [정가]` — 네트워크 요청이 전혀 없는 순수 DB 기록.
+ * `/bf2025 <상품링크|상품번호> <판매가> [정가] [쿠폰가]` — 네트워크 요청이 전혀 없는 순수 DB 기록.
  * 상품은 이미 캡처된 것만 받는다: 여기서 미등록 상품을 만들면 이름 없는 껍데기 Product가
  * 생기고, 그걸 채우려면 결국 링크를 던져야 한다 — 순서만 바꾼 셈이니 처음부터 그렇게 안내한다.
+ *
+ * 쿠폰가는 선택이다 — 작년엔 쿠폰이 없었거나 기억나지 않을 수 있다. 입력하면 그 해 행사의
+ * 쿠폰 반영 실할인율(price-analysis.ts의 couponDiscountRate)까지 "작년 vs 올해" 비교에 들어간다.
  */
 /**
  * "https://www.musinsa.com/products/123" 또는 "123" → 이미 등록된 Product.
@@ -617,13 +620,14 @@ async function handleManualBfEntry(text: string, chatId: string) {
   const { goodsNo, product } = await resolveProductByToken(tokens[0] ?? "");
   const salePrice = parsePriceToken(tokens[1]);
   const listPriceInput = parsePriceToken(tokens[2]);
+  const couponPrice = parsePriceToken(tokens[3]);
 
   if (!goodsNo || salePrice === null) {
     await sendMessage({
       chatId,
       text:
-        "사용법: /bf2025 상품링크(또는 상품번호) 작년BF판매가 [정가]\n" +
-        "예: <code>/bf2025 https://www.musinsa.com/products/3134008 39900 89000</code>",
+        "사용법: /bf2025 상품링크(또는 상품번호) 작년BF판매가 [정가] [쿠폰가]\n" +
+        "예: <code>/bf2025 https://www.musinsa.com/products/3134008 39900 89000 37900</code>",
     });
     return;
   }
@@ -642,6 +646,7 @@ async function handleManualBfEntry(text: string, chatId: string) {
     productId: product.id,
     salePrice,
     listPrice,
+    couponPrice,
     source: "MANUAL",
     eventTag: BF_MANUAL_TAG,
     // capturedAt은 "그 가격이 참이었던 시점"이다. 입력 시각(지금)으로 찍으면 작년 가격이
@@ -660,11 +665,15 @@ async function handleManualBfEntry(text: string, chatId: string) {
     approvalRef: product.id,
     detail:
       `${BF_MANUAL_TAG} ${product.brandName} ${product.productName} — ` +
-      `판매가 ${salePrice}${listPrice ? ` / 정가 ${listPrice}` : ""}`,
+      `판매가 ${salePrice}${listPrice ? ` / 정가 ${listPrice}` : ""}${couponPrice ? ` / 쿠폰가 ${couponPrice}` : ""}`,
   });
 
   const rate =
     listPrice && listPrice > salePrice ? Math.round((1 - salePrice / listPrice) * 100) : null;
+  const couponRate =
+    listPrice && couponPrice && listPrice > couponPrice
+      ? Math.round((1 - couponPrice / listPrice) * 100)
+      : null;
   await sendMessage({
     chatId,
     text:
@@ -672,6 +681,9 @@ async function handleManualBfEntry(text: string, chatId: string) {
       `판매가 ${formatKRW(salePrice)}` +
       (listPrice ? ` · 정가 ${formatKRW(listPrice)}` : "") +
       (rate !== null ? ` · 할인율 ${rate}%` : "") +
+      (couponPrice
+        ? `\n쿠폰가 ${formatKRW(couponPrice)}` + (couponRate !== null ? ` · 할인율 ${couponRate}%` : "")
+        : "") +
       "\n<i>수동 입력 값입니다 — 올해 BF 비교에 '작년(수동)'으로 표시됩니다.</i>",
   });
 }

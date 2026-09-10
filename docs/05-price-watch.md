@@ -207,7 +207,10 @@ enum FetchTrigger { USER_URL HEALTH_CHECK RADAR ROBOTS WATCH }  // WATCH 추가
 - [새로고침] 버튼: 최신 스냅샷이 6h 이내면 캐시 응답(요청 0건), 아니면 USER_URL 1회. 게이트웨이 거부
   (BLOCKED_*)는 사유 그대로 표기.
 - 텔레그램: 상품 카드에 [BF까지 추적] 버튼(= /watch), `/watchlist`, `/unwatch`. 등록 시 상한(30)·만료 안내.
-- 작년 BF 수동 입력: `/bf2025 <가격>` 또는 워크스페이스 폼 → MANUAL 스냅샷(eventTag=BF2025, "수동" 배지).
+- 작년 BF 수동 입력: `/bf2025 <상품링크|번호> <판매가> [정가] [쿠폰가]` 또는 워크스페이스 폼 →
+  MANUAL 스냅샷(eventTag=BF2025, "수동" 배지). 쿠폰가는 선택 — 입력하면 작년 행사의 쿠폰 반영
+  실할인율(`couponDiscountRate`)까지 3칸 스트립의 해당 이벤트 칸에 함께 뜬다
+  (2026-09-10 추가 — 이전엔 판매가·정가만 받아 "작년에도 쿠폰이 있었다"는 비교가 빠져 있었다).
 
 ---
 
