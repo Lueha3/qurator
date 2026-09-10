@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   analyzeSnapshots,
+  buildPriceChangeNote,
   computeBaseline,
   discountRate,
   median,
@@ -239,5 +240,77 @@ describe("analyzeSnapshots — 첫 기록 (이벤트 태그 없는 일반 기간
     );
     // 자동 스냅샷이 1건뿐이므로(MANUAL 제외) first는 null
     expect(analysis.first).toBeNull();
+  });
+});
+
+describe("analyzeSnapshots — previous (바로 직전 기록, 재촬영 비교용)", () => {
+  const now = new Date("2026-09-10T12:00:00+09:00");
+
+  it("자동 스냅샷이 2건이면 두 번째로 최신인 것이 previous다", () => {
+    const analysis = analyzeSnapshots(
+      [
+        snap(new Date("2026-09-10T10:00:00+09:00"), 48000),
+        snap(new Date("2026-09-10T11:00:00+09:00"), 42900),
+      ],
+      now
+    );
+    expect(analysis.current?.salePrice).toBe(42900);
+    expect(analysis.previous?.salePrice).toBe(48000);
+  });
+
+  it("자동 스냅샷이 1건뿐이면 previous는 null이다", () => {
+    const analysis = analyzeSnapshots([snap(new Date("2026-09-10T11:00:00+09:00"), 42900)], now);
+    expect(analysis.previous).toBeNull();
+  });
+});
+
+describe("buildPriceChangeNote — 재촬영 시 '지난번 vs 지금' 한 줄", () => {
+  const now = new Date("2026-09-10T12:00:00+09:00");
+
+  it("가격이 내렸으면 하락률과 함께 알린다", () => {
+    const analysis = analyzeSnapshots(
+      [
+        snap(new Date("2026-09-10T10:00:00+09:00"), 48000),
+        snap(new Date("2026-09-10T11:00:00+09:00"), 42900),
+      ],
+      now
+    );
+    const note = buildPriceChangeNote(analysis);
+    expect(note).toContain("48,000원");
+    expect(note).toContain("42,900원");
+    expect(note).toContain("하락");
+    expect(note).toContain("11%"); // (1 - 42900/48000) ≈ 10.6% → 반올림 11%
+  });
+
+  it("가격이 올랐으면 상승률과 함께 알린다", () => {
+    const analysis = analyzeSnapshots(
+      [
+        snap(new Date("2026-09-10T10:00:00+09:00"), 42900),
+        snap(new Date("2026-09-10T11:00:00+09:00"), 48000),
+      ],
+      now
+    );
+    const note = buildPriceChangeNote(analysis);
+    expect(note).toContain("상승");
+  });
+
+  it("가격이 같으면 '지난번과 같은 가격'이라고 말한다", () => {
+    const analysis = analyzeSnapshots(
+      [
+        snap(new Date("2026-09-10T10:00:00+09:00"), 42900),
+        snap(new Date("2026-09-10T11:00:00+09:00"), 42900),
+      ],
+      now
+    );
+    expect(buildPriceChangeNote(analysis)).toContain("같은 가격");
+  });
+
+  it("비교할 이전 기록이 없으면(첫 기록) null — 침묵이 아니라 '비교 대상 없음'의 정직한 표현", () => {
+    const analysis = analyzeSnapshots([snap(new Date("2026-09-10T11:00:00+09:00"), 42900)], now);
+    expect(buildPriceChangeNote(analysis)).toBeNull();
+  });
+
+  it("analysis 자체가 없으면(방어적) null", () => {
+    expect(buildPriceChangeNote(undefined)).toBeNull();
   });
 });

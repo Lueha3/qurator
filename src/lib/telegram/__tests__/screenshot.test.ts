@@ -218,6 +218,43 @@ describe("스크린샷 해피패스 (docs/06 §3-4)", () => {
     // 이미지 바이트·base64는 어디에도(로그 포함) 남지 않는다 (docs/06 §4.3)
     expect(log?.detail ?? "").not.toMatch(/가짜 jpeg|base64/i);
     expect(log?.payloadSnapshot).toBeFalsy();
+
+    // 첫 캡처는 비교할 이전 기록이 없다 — 가격 변화 문구가 뜨면 안 된다.
+    expect(card?.text ?? "").not.toMatch(/지난번|하락|상승/);
+  });
+});
+
+// 사용자가 겪은 실제 문제: 같은 상품을 가격이 바뀐 뒤 다시 찍어 보냈는데 카드에 아무 비교도
+// 안 떴다("이러면 이 앱은 쓸모가 없다") — BUTTON_GUIDE·/help가 이미 약속한 기능인데 실제로는
+// 구현이 없었다. 같은 상품을 재촬영하면 카드에 "지난번 vs 지금"이 뜨는지 검증한다.
+describe("재촬영 시 가격 변화 안내 (docs/06 §3.1)", () => {
+  it("같은 상품을 가격이 바뀐 뒤 다시 찍으면 후보 카드에 '지난번 → 지금'이 뜬다", async () => {
+    extractFromScreenshot.mockResolvedValueOnce(VISION_RESULT_FULL); // 53,400원
+    await handleUpdate(photoMessage());
+
+    const cheaper = { ...VISION_RESULT_FULL, salePrice: 42900 };
+    extractFromScreenshot.mockResolvedValueOnce(cheaper);
+    await handleUpdate(photoMessage());
+
+    // 같은 브랜드·상품명·품번이므로 product-match.ts가 같은 Product로 묶는다.
+    expect(await db.product.count()).toBe(1);
+    expect(await db.deal.count()).toBe(2);
+    expect(await db.priceSnapshot.count()).toBe(2);
+
+    const card = edited.at(-1);
+    expect(card?.text).toContain("53,400원"); // 지난번
+    expect(card?.text).toContain("42,900원"); // 지금
+    expect(card?.text).toMatch(/하락|📉/);
+  });
+
+  it("가격이 그대로면 '지난번과 같은 가격'이라고 알린다", async () => {
+    extractFromScreenshot.mockResolvedValue(VISION_RESULT_FULL);
+
+    await handleUpdate(photoMessage());
+    await handleUpdate(photoMessage());
+
+    const card = edited.at(-1);
+    expect(card?.text).toContain("같은 가격");
   });
 });
 

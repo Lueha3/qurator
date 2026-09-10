@@ -70,6 +70,11 @@ export interface CardDeal {
   linkCount: number;
   /** 링크 검증에서 걸린 것들 (다른 상품을 가리킴, 커미션 파라미터 없음 등) */
   linkWarnings?: string[];
+  /**
+   * "지난번 ○○원 → 지금 ○○원 (N% 하락)" 한 줄 — price-analysis.ts의 buildPriceChangeNote가
+   * 만든다. 이 상품을 다시 찍어 보낸 게 처음이면(비교할 직전 기록이 없으면) null.
+   */
+  priceChangeNote?: string | null;
 }
 
 function priceLine(d: CardDeal): string {
@@ -97,6 +102,8 @@ function header(d: CardDeal): string {
 /** 1단계: 봇이 URL을 파싱해 띄우는 후보 카드 */
 export function candidateCard(d: CardDeal): { text: string; keyboard: InlineKeyboard } {
   const coupon = d.couponDesc ? html`\n쿠폰 ${d.couponDesc}` : "";
+  // 재촬영이면 바로 여기서 "그때 얼마 → 지금 얼마"가 뜬다 — [❓ 버튼 설명]·/help가 약속한 바로 그 기능.
+  const priceChange = d.priceChangeNote ? `\n${d.priceChangeNote}` : "";
   const note =
     d.parseSource === "none"
       ? "\n\n⚠️ 상품 정보를 읽지 못했습니다. [✏️ 정보 고치기]로 채워주세요."
@@ -131,7 +138,7 @@ export function candidateCard(d: CardDeal): { text: string; keyboard: InlineKeyb
         ],
       ];
 
-  return { text: `${header(d)}${coupon}${note}`, keyboard };
+  return { text: `${header(d)}${coupon}${priceChange}${note}`, keyboard };
 }
 
 /** 2단계: 큐레이터센터에서 링크를 만들어 붙여넣기를 기다리는 카드 */

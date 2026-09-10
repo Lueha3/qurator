@@ -82,6 +82,19 @@ describe("카드 렌더링", () => {
     expect(card.text).toContain("읽지 못했습니다");
   });
 
+  it("priceChangeNote가 있으면 그대로 카드 본문에 담는다 — 재촬영 시 '지난번 vs 지금' 비교", () => {
+    const card = candidateCard({
+      ...DEAL,
+      priceChangeNote: "📉 지난번 48,000원 → 지금 42,900원 (11% 하락)",
+    });
+    expect(card.text).toContain("지난번 48,000원 → 지금 42,900원 (11% 하락)");
+  });
+
+  it("priceChangeNote가 없으면(첫 캡처) 아무 것도 덧붙이지 않는다", () => {
+    const card = candidateCard({ ...DEAL, priceChangeNote: null });
+    expect(card.text).not.toMatch(/지난번/);
+  });
+
   it("후보 카드에는 항상 [버튼 설명]이 있다 — 버튼 뜻을 카드에서 바로 확인할 수 있어야 한다", () => {
     for (const parseSource of ["json-ld", "none"]) {
       const card = candidateCard({ ...DEAL, parseSource });

@@ -17,7 +17,7 @@ import { canonicalizeMusinsaUrl } from "../url-guard";
 import { looksLikeNonProductPage, parseProductPage } from "../product-parser";
 import { parseCuratorLink } from "../curator-link";
 import { recordParsedSnapshot, recordSnapshot } from "../price-snapshot";
-import { BF2025_OBSERVED_AT } from "../price-analysis";
+import { BF2025_OBSERVED_AT, buildPriceAnalyses, buildPriceChangeNote } from "../price-analysis";
 import { addWatch, countActiveWatches, listActiveWatches, removeWatch } from "../watch";
 import { isCrawlessMode } from "../policy";
 import { formatKRW, formatShortDateTime } from "../format";
@@ -141,7 +141,11 @@ type DealRecord = NonNullable<
   Awaited<ReturnType<typeof db.deal.findFirst<{ include: typeof DEAL_WITH_RELATIONS }>>>
 >;
 
-function toCardDeal(deal: DealRecord, linkWarnings?: string[]): CardDeal {
+function toCardDeal(
+  deal: DealRecord,
+  linkWarnings?: string[],
+  priceChangeNote?: string | null
+): CardDeal {
   return {
     id: deal.id,
     brand: deal.product.brandName,
@@ -158,6 +162,7 @@ function toCardDeal(deal: DealRecord, linkWarnings?: string[]): CardDeal {
     parseSource: deal.parseSource,
     linkCount: deal.curatorLinks.length,
     linkWarnings,
+    priceChangeNote,
   };
 }
 
@@ -450,6 +455,11 @@ async function captureFromUrl(rawUrl: string, chatId: string, sourceMessageId: n
   // 절대 throw하지 않고, 가격을 못 읽었으면 조용히 건너뛴다.
   await recordParsedSnapshot(product.id, parsed, "USER_URL");
 
+  // 같은 링크를 다시 던졌을 때도 스크린샷 경로와 동일하게 "그때 얼마 → 지금 얼마"를 보여준다.
+  const priceChangeNote = buildPriceChangeNote(
+    (await buildPriceAnalyses([product.id])).get(product.id)
+  );
+
   await audit({
     actor: "HUMAN",
     action: "deal.captured",
@@ -457,7 +467,7 @@ async function captureFromUrl(rawUrl: string, chatId: string, sourceMessageId: n
     detail: `사용자가 던진 URL 1건 (텔레그램 메시지 ${sourceMessageId}) → ${finalCanonical} / 파싱 ${parsed.source}`,
   });
 
-  const card = candidateCard(toCardDeal(deal));
+  const card = candidateCard(toCardDeal(deal, undefined, priceChangeNote));
   const failureNote = result.ok
     ? ""
     : `\n\n⚠️ ${escapeHtml(result.reason)}\n<i>정보를 직접 입력해 계속 진행할 수 있습니다.</i>`;
@@ -559,6 +569,13 @@ async function processScreenshotPhotos(
     source: "SCREENSHOT",
   });
 
+  // 같은 상품을 재촬영했을 때 "그때 얼마 → 지금 얼마"를 카드에 바로 보여준다 — 방금 위에서
+  // 기록한 스냅샷이 포함된 상태로 다시 조회하므로, previous는 그 직전(바로 전번) 기록이 된다.
+  // 첫 기록이면(비교할 게 없으면) null — BUTTON_GUIDE·/help가 약속한 바로 그 비교다.
+  const priceChangeNote = buildPriceChangeNote(
+    (await buildPriceAnalyses([product.id])).get(product.id)
+  );
+
   // product-parser.ts의 countFields()와 같은 정신: null이 아닌 필드 수 = "얼마나 채워졌나".
   const parseFieldCount = [
     result.brand,
@@ -595,7 +612,7 @@ async function processScreenshotPhotos(
   });
 
   // 링크 경로와 동일한 후보 카드 — 사용자에게는 두 입력 경로가 이 지점부터 구분되지 않는다.
-  const card = candidateCard(toCardDeal(deal));
+  const card = candidateCard(toCardDeal(deal, undefined, priceChangeNote));
   await editMessage({
     chatId,
     messageId: statusMessageId,

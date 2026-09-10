@@ -9,6 +9,7 @@
 
 import { db } from "./db";
 import type { SnapshotSource } from "@prisma/client";
+import { formatKRW } from "./format";
 
 /** 기준가로 인정할 최소 표본 수. 미만이면 실할인율을 계산하지 않는다. */
 export const MIN_BASELINE_SAMPLES = 3;
@@ -180,6 +181,12 @@ export interface PriceAnalysis {
    * current와 같은 스냅샷이면(표본 1건) null로 둔다 — 자기 자신과 비교하는 카드는 의미가 없다.
    */
   first: SnapshotLike | null;
+  /**
+   * 바로 직전 자동 스냅샷(current 다음으로 최신). "방금 다시 찍었더니 지난번과 얼마나
+   * 달라졌나"의 재료다 — first(최초 기록)와는 다른 질문에 답한다: first는 "추적 시작 대비",
+   * previous는 "바로 어제/직전 대비". 표본이 2건 미만이면 null.
+   */
+  previous: SnapshotLike | null;
   /** 지금 시점의 평상시 기준가 — "지금 가격이 싼 편인가"의 판단 근거 */
   currentBaseline: Baseline;
   events: EventSummary[];
@@ -196,10 +203,39 @@ export function analyzeSnapshots(snapshots: SnapshotLike[], now: Date = new Date
   return {
     current: automatic[0] ?? null,
     first: automatic.length >= 2 ? oldest : null,
+    previous: automatic[1] ?? null,
     currentBaseline: computeBaseline(snapshots, now),
     events: summarizeEvents(snapshots),
     snapshotCount: snapshots.length,
   };
+}
+
+/**
+ * 방금 캡처와 바로 직전 캡처를 한 줄로 비교한다 — 텔레그램 후보 카드에서 "재촬영했더니
+ * 뭐가 달라졌나"를 즉시 보여주기 위한 것이다 (docs/06 §3.1). PriceStrip(워크스페이스)의
+ * "첫 기록 vs 현재"와는 다른 질문 — 여기는 "바로 전 vs 지금"만 본다.
+ *
+ * previous가 없으면(첫 기록이라 비교 대상이 없음) null — 아무것도 보여주지 않는 것 자체가
+ * "비교할 게 없다"는 정직한 신호다. salePrice가 둘 다 있어야 계산한다.
+ */
+export function buildPriceChangeNote(analysis: PriceAnalysis | undefined): string | null {
+  if (!analysis) return null;
+  const { current, previous } = analysis;
+  if (!current || !previous) return null;
+  if (current.salePrice === null || previous.salePrice === null) return null;
+
+  const prevLabel = formatKRW(previous.salePrice);
+  const nowLabel = formatKRW(current.salePrice);
+
+  if (current.salePrice === previous.salePrice) {
+    return `➡️ 지난번과 같은 가격이에요 (${nowLabel})`;
+  }
+
+  const rate = discountRate(previous.salePrice, current.salePrice);
+  if (rate === null) return `${prevLabel} → ${nowLabel}`;
+  return rate > 0
+    ? `📉 지난번 ${prevLabel} → 지금 ${nowLabel} (${rate}% 하락)`
+    : `📈 지난번 ${prevLabel} → 지금 ${nowLabel} (${Math.abs(rate)}% 상승)`;
 }
 
 /**
