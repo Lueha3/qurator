@@ -18,17 +18,41 @@ export const CB = {
   newDeal: (dealId: string) => `v1:new:${dealId}`,
   /** BF 가격 워치에 이 상품을 등록 (docs/05 §4.6) */
   watch: (dealId: string) => `v1:wch:${dealId}`,
+  /** 각 버튼이 무슨 뜻인지 설명 — 카드에서 바로 열어본다 */
+  help: (dealId: string) => `v1:hlp:${dealId}`,
 } as const;
 
-export type CallbackAction = "int" | "skp" | "apv" | "hok" | "man" | "new" | "wch";
+export type CallbackAction = "int" | "skp" | "apv" | "hok" | "man" | "new" | "wch" | "hlp";
 
 export function parseCallbackData(
   data: string
 ): { action: CallbackAction; dealId: string } | null {
-  const m = data.match(/^v1:(int|skp|apv|hok|man|new|wch):([0-9a-f-]{36})$/);
+  const m = data.match(/^v1:(int|skp|apv|hok|man|new|wch|hlp):([0-9a-f-]{36})$/);
   if (!m) return null;
   return { action: m[1] as CallbackAction, dealId: m[2] };
 }
+
+/**
+ * 버튼 설명서 — [❓ 버튼 설명]이 띄우는 본문.
+ *
+ * 여기 문장이 곧 버튼의 계약이다. 특히 두 가지를 반드시 말한다:
+ *   ① 스크린샷을 보낸 순간 가격은 이미 기록됐다 (버튼은 "그 다음"을 고르는 것일 뿐)
+ *   ② [올릴게요]는 바로 발행하지 않는다 (링크 → 승인 단계가 남아 있다)
+ * 이 둘을 모르면 [기록 완료]가 "버리기"로, [올릴게요]가 "즉시 발행"으로 읽힌다.
+ */
+export const BUTTON_GUIDE =
+  "❓ <b>버튼 설명</b>\n\n" +
+  "✅ <b>이 상품 올릴게요</b>\n" +
+  "발행 준비를 시작합니다. 큐레이터센터에서 링크를 만들어 이 대화에 붙여넣으면 카톡 문구가 완성됩니다. " +
+  "<i>바로 발행되지 않습니다 — 마지막에 승인 단계가 있습니다.</i>\n\n" +
+  "📈 <b>가격만 지켜보기</b>\n" +
+  "지금 올리진 않지만 가격 변화를 계속 보고 싶을 때. 추적 목록에 넣어두면, 나중에 같은 상품을 다시 찍어 보낼 때 " +
+  "“그때 얼마 → 지금 얼마”가 자동으로 비교됩니다.\n\n" +
+  "✔️ <b>기록 완료</b>\n" +
+  "이 카드를 닫습니다. <i>삭제가 아닙니다</i> — 스크린샷을 보낸 순간 가격은 이미 저장됐으니, 발행만 하지 않고 끝내는 것입니다.\n\n" +
+  "✏️ <b>정보 고치기</b>\n" +
+  "브랜드·상품명·가격을 잘못 읽었을 때 바로잡습니다.\n\n" +
+  "💡 <b>스크린샷을 보내는 것만으로 가격은 항상 기록됩니다.</b> 버튼은 “이 다음에 무엇을 할지”를 고르는 것입니다.";
 
 export interface CardDeal {
   id: string;
@@ -51,7 +75,7 @@ export interface CardDeal {
 function priceLine(d: CardDeal): string {
   // 가격을 못 읽었을 때 0원을 찍으면 그대로 광고 고지와 함께 오픈채팅에 나갈 수 있다.
   // 사실 필드가 비었다는 것을 사람이 반드시 보게 한다.
-  if (!d.listPrice && !d.salePrice && !d.finalPrice) return "⚠️ 가격 미확인 — 직접 입력 필요";
+  if (!d.listPrice && !d.salePrice && !d.finalPrice) return "⚠️ 가격 미확인 — [정보 고치기] 필요";
 
   const effective = d.finalPrice ?? d.salePrice ?? d.listPrice;
   if (d.salePrice != null && d.listPrice > 0 && d.salePrice < d.listPrice) {
@@ -75,29 +99,36 @@ export function candidateCard(d: CardDeal): { text: string; keyboard: InlineKeyb
   const coupon = d.couponDesc ? html`\n쿠폰 ${d.couponDesc}` : "";
   const note =
     d.parseSource === "none"
-      ? "\n\n⚠️ 상품 정보를 읽지 못했습니다. [직접 입력]으로 채워주세요."
+      ? "\n\n⚠️ 상품 정보를 읽지 못했습니다. [✏️ 정보 고치기]로 채워주세요."
       : d.parseSource === "opengraph"
         ? "\n\n<i>일부 정보만 읽었습니다 — 승인 전 확인해주세요.</i>"
         : "";
 
-  // 아무 필드도 못 읽었으면 [이거 올릴래]를 내지 않는다 — 빈 딜을 진행시키면
+  // 아무 필드도 못 읽었으면 [올릴게요]를 내지 않는다 — 빈 딜을 진행시키면
   // "(브랜드 미입력) 0원"이 고지문과 함께 오픈채팅에 나갈 수 있다.
+  //
+  // 배치 규칙: 주 동작(발행)은 한 줄을 독점한다. 나머지는 "올리진 않는다"는 점에서 같은 급이라
+  // 아래 줄에 묶고, 그 둘의 차이(계속 지켜보나 / 여기서 닫나)를 [❓ 버튼 설명]이 받는다.
   const canProceed = d.parseSource !== "none";
   const keyboard: InlineKeyboard = canProceed
     ? [
+        [{ text: "✅ 이 상품 올릴게요", callback_data: CB.interested(d.id) }],
         [
-          { text: "✅ 이거 올릴래", callback_data: CB.interested(d.id) },
-          { text: "⏭ 스킵", callback_data: CB.skip(d.id) },
+          // 딜로 올리지 않더라도 가격 추적만 걸어둘 수 있다 — BF 후보를 미리 담아두는 동선.
+          { text: "📈 가격만 지켜보기", callback_data: CB.watch(d.id) },
+          { text: "✔️ 기록 완료", callback_data: CB.skip(d.id) },
         ],
         [
-          { text: "✏️ 직접 입력", callback_data: CB.manual(d.id) },
-          // 딜로 올리지 않더라도 가격 추적만 걸어둘 수 있다 — BF 후보를 미리 담아두는 동선.
-          { text: "📈 BF 추적", callback_data: CB.watch(d.id) },
+          { text: "✏️ 정보 고치기", callback_data: CB.manual(d.id) },
+          { text: "❓ 버튼 설명", callback_data: CB.help(d.id) },
         ],
       ]
     : [
-        [{ text: "✏️ 직접 입력", callback_data: CB.manual(d.id) }],
-        [{ text: "⏭ 스킵", callback_data: CB.skip(d.id) }],
+        [{ text: "✏️ 정보 고치기", callback_data: CB.manual(d.id) }],
+        [
+          { text: "✔️ 기록 완료", callback_data: CB.skip(d.id) },
+          { text: "❓ 버튼 설명", callback_data: CB.help(d.id) },
+        ],
       ];
 
   return { text: `${header(d)}${coupon}${note}`, keyboard };
@@ -115,7 +146,10 @@ export function awaitingLinkCard(
       "<i>큐레이터센터에서 링크를 만든 뒤, 이 대화에 그대로 붙여넣으면 됩니다.</i>",
     keyboard: [
       [{ text: "🔗 큐레이터센터 열기", url: curatorCenterUrl }],
-      [{ text: "⏭ 스킵", callback_data: CB.skip(d.id) }],
+      [
+        { text: "✔️ 기록 완료", callback_data: CB.skip(d.id) },
+        { text: "❓ 버튼 설명", callback_data: CB.help(d.id) },
+      ],
     ],
   };
 }
@@ -147,7 +181,7 @@ export function approvalCard(
       [{ text: "🚀 승인 — 카톡 문구 받기", callback_data: CB.approve(d.id) }],
       [
         { text: "✏️ 훅 교체", callback_data: CB.rehook(d.id) },
-        { text: "⏭ 스킵", callback_data: CB.skip(d.id) },
+        { text: "✔️ 기록 완료", callback_data: CB.skip(d.id) },
       ],
     ],
   };
@@ -169,7 +203,12 @@ export function approvedCard(
 }
 
 export function skippedCard(d: CardDeal): { text: string; keyboard: InlineKeyboard } {
-  return { text: `${header(d)}\n\n⏭ 스킵했습니다.`, keyboard: [] };
+  // "스킵했습니다"는 버린 것처럼 읽힌다. 실제로는 스크린샷을 받은 시점에 이미 가격이
+  // 기록됐고 발행만 하지 않은 것이므로, 남은 것이 무엇인지 그대로 적는다.
+  return {
+    text: `${header(d)}\n\n✔️ <b>기록 완료</b> — 가격은 저장했고, 발행은 하지 않았습니다.`,
+    keyboard: [],
+  };
 }
 
 /**

@@ -442,3 +442,23 @@ describe("스킵", () => {
     expect(await db.auditLog.findFirst({ where: { action: "deal.skipped" } })).toBeTruthy();
   });
 });
+
+describe("버튼 설명", () => {
+  it("[버튼 설명]을 눌러도 카드는 그대로 두고 설명만 따로 보낸다", async () => {
+    gatewayFetch.mockResolvedValue({ ok: true, status: 200, body: PRODUCT_HTML, finalUrl: "x" });
+    await handleUpdate(userMessage("https://www.musinsa.com/products/1234567"));
+    const deal = await db.deal.findFirstOrThrow();
+
+    edited.length = 0;
+    sent.length = 0;
+    await handleUpdate(buttonTap(CB.help(deal.id)));
+
+    // 설명을 보려다 진행 중인 카드의 버튼이 사라지면 안 된다
+    expect(edited).toHaveLength(0);
+    expect(sent.at(-1)?.text).toContain("버튼 설명");
+
+    // 딜 상태도 건드리지 않는다 — 설명은 읽기 전용 동작이다
+    const after = await db.deal.findUniqueOrThrow({ where: { id: deal.id } });
+    expect(after.approvalStage).toBe(deal.approvalStage);
+  });
+});

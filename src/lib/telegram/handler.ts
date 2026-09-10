@@ -19,6 +19,7 @@ import { parseCuratorLink } from "../curator-link";
 import { recordParsedSnapshot, recordSnapshot } from "../price-snapshot";
 import { BF2025_OBSERVED_AT } from "../price-analysis";
 import { addWatch, countActiveWatches, listActiveWatches, removeWatch } from "../watch";
+import { isCrawlessMode } from "../policy";
 import { formatKRW, formatShortDateTime } from "../format";
 import { draftHookLine } from "../ai-hook";
 import { extractFromScreenshot } from "../vision-extract";
@@ -40,6 +41,7 @@ import {
   approvalCard,
   approvedCard,
   awaitingLinkCard,
+  BUTTON_GUIDE,
   candidateCard,
   CB,
   kakaoDeliveryMessage,
@@ -292,13 +294,14 @@ async function handleMessage(msg: TgMessage): Promise<void> {
       chatId,
       text:
         "<b>qurator</b>\n\n" +
-        "무신사 상품 링크를 보내면 카톡·스레드·인스타·노션용 완성 카드를 만들어 드립니다.\n\n" +
-        "1️⃣ 상품 URL 전송 (무신사 앱 공유 → 이 대화)\n" +
-        "2️⃣ [이거 올릴래] → 큐레이터 링크 붙여넣기\n" +
-        "3️⃣ [승인] → 카톡 문구 받기\n\n" +
-        "<b>BF 가격 추적</b>\n" +
-        "📈 /watch 상품링크 — 블프까지 가격 추적 등록\n" +
-        "📋 /watchlist — 추적 중인 상품 목록\n" +
+        "무신사 상품 <b>스크린샷</b>을 보내면 상품을 읽고, 가격을 기록하고, 카톡·스레드·인스타·노션용 완성 카드를 만들어 드립니다.\n\n" +
+        "1️⃣ 무신사 앱에서 상품 화면 스크린샷 → 이 대화로 공유 (링크를 보내도 됩니다)\n" +
+        "2️⃣ [✅ 이 상품 올릴게요] → 큐레이터 링크 붙여넣기\n" +
+        "3️⃣ [🚀 승인] → 카톡 문구 받기\n\n" +
+        "<i>카드의 [❓ 버튼 설명]을 누르면 각 버튼이 무슨 뜻인지 볼 수 있습니다.</i>\n\n" +
+        "<b>가격 추적</b>\n" +
+        "📈 /watch 상품링크 — 가격 추적 등록\n" +
+        "📋 /watchlist — 지켜보는 중인 상품 목록\n" +
         "🚫 /unwatch 상품링크 — 추적 해제\n" +
         "💾 /bf2025 상품링크 판매가 [정가] [쿠폰가] — 작년 블프 가격 수동 기록",
     });
@@ -690,7 +693,13 @@ async function handleManualBfEntry(text: string, chatId: string) {
 
 // ── BF 워치 등록/해제 ────────────────────────────────────────────────────
 
-/** 등록·해제 결과를 사람이 읽을 문장으로. 상한과 만료를 항상 함께 알려준다. */
+/**
+ * 등록·해제 결과를 사람이 읽을 문장으로. 상한과 만료를 항상 함께 알려준다.
+ *
+ * 크롤리스 모드(기본 켜짐)에서는 러너가 무신사에 요청을 보내지 않으므로 자동 기록이 **없다**
+ * (watch.ts의 크롤리스 게이트). 그런데도 "하루 1회 기록합니다"라고 알리면 오지 않을 데이터를
+ * 약속하는 셈이라, 실제로 일어나는 일(리마인더 → 사람이 다시 촬영)을 그대로 적는다.
+ */
 async function watchAddedMessage(
   productLabel: string,
   result: Awaited<ReturnType<typeof addWatch>>
@@ -698,13 +707,12 @@ async function watchAddedMessage(
   if (!result.ok) return `⚠️ ${result.reason}`;
   const until = result.expiresAt.toISOString().slice(0, 10);
   const head = result.alreadyActive
-    ? `📈 이미 추적 중입니다 — 기간을 ${until}까지 연장했습니다.`
-    : `📈 <b>BF 추적 시작</b> — ${productLabel}`;
-  return (
-    `${head}\n` +
-    `하루 1회 가격을 기록합니다 (행사 기간에는 2회) · 만료 ${until}\n` +
-    `<i>추적 ${result.activeCount}개</i>`
-  );
+    ? `📈 이미 지켜보는 중입니다 — 기간을 ${until}까지 연장했습니다.`
+    : `📈 <b>가격 추적 시작</b> — ${productLabel}`;
+  const how = (await isCrawlessMode())
+    ? "같은 상품을 다시 찍어 보내주시면 그때마다 가격 변화가 기록됩니다. 잊지 않도록 알림을 보내드릴게요."
+    : "하루 1회 가격을 기록합니다 (행사 기간에는 2회).";
+  return `${head}\n${how} · 만료 ${until}\n<i>지켜보는 중 ${result.activeCount}개</i>`;
 }
 
 /** `/watch <링크|번호>` · `/unwatch <링크|번호>` */
@@ -748,7 +756,7 @@ async function handleWatchList(chatId: string) {
   if (items.length === 0) {
     await sendMessage({
       chatId,
-      text: "추적 중인 상품이 없습니다.\n상품 카드의 [📈 BF 추적] 버튼이나 /watch 로 등록하세요.",
+      text: "지켜보는 중인 상품이 없습니다.\n상품 카드의 [📈 가격만 지켜보기] 버튼이나 /watch 로 등록하세요.",
     });
     return;
   }
@@ -765,7 +773,7 @@ async function handleWatchList(chatId: string) {
 
   await sendMessage({
     chatId,
-    text: `📋 <b>BF 추적 목록</b> (${activeCount}개)\n\n${lines.join("\n")}`,
+    text: `📋 <b>지켜보는 중인 상품</b> (${activeCount}개)\n\n${lines.join("\n")}`,
   });
 }
 
@@ -1026,6 +1034,11 @@ async function handleCallback(query: TgCallbackQuery): Promise<void> {
       });
       break;
     }
+
+    case "hlp":
+      // 카드는 건드리지 않는다 — 설명을 보려다 진행 중인 카드의 버튼이 사라지면 안 된다.
+      await sendMessage({ chatId, text: BUTTON_GUIDE });
+      break;
 
     case "apv":
       await approveDeal(deal);

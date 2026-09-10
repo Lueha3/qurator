@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   approvalCard,
+  BUTTON_GUIDE,
   candidateCard,
   CB,
   kakaoDeliveryMessage,
@@ -26,7 +27,7 @@ const DEAL: CardDeal = {
 
 describe("callback_data — 64바이트 한도 (텔레그램 하드 제약)", () => {
   it("모든 액션의 callback_data가 한도 안에 들어간다", () => {
-    for (const make of [CB.interested, CB.skip, CB.approve, CB.rehook, CB.manual]) {
+    for (const make of [CB.interested, CB.skip, CB.approve, CB.rehook, CB.manual, CB.watch, CB.help]) {
       const data = make(DEAL.id);
       expect(() => assertCallbackDataFits(data)).not.toThrow();
       expect(new TextEncoder().encode(data).length).toBeLessThanOrEqual(64);
@@ -79,6 +80,25 @@ describe("카드 렌더링", () => {
   it("파싱 실패 시 직접 입력을 안내한다", () => {
     const card = candidateCard({ ...DEAL, parseSource: "none" });
     expect(card.text).toContain("읽지 못했습니다");
+  });
+
+  it("후보 카드에는 항상 [버튼 설명]이 있다 — 버튼 뜻을 카드에서 바로 확인할 수 있어야 한다", () => {
+    for (const parseSource of ["json-ld", "none"]) {
+      const card = candidateCard({ ...DEAL, parseSource });
+      expect(
+        card.keyboard.flat().some((b) => b.callback_data === CB.help(DEAL.id)),
+        parseSource
+      ).toBe(true);
+    }
+  });
+
+  it("설명서는 오해하기 쉬운 두 가지를 반드시 말한다 (즉시 발행 아님 · 기록 완료는 삭제 아님)", () => {
+    expect(BUTTON_GUIDE).toContain("바로 발행되지 않습니다");
+    expect(BUTTON_GUIDE).toContain("삭제가 아닙니다");
+    // 네 버튼이 모두 설명돼야 한다 — 하나라도 빠지면 그 버튼은 뜻 없이 눌리게 된다
+    for (const label of ["이 상품 올릴게요", "가격만 지켜보기", "기록 완료", "정보 고치기"]) {
+      expect(BUTTON_GUIDE, label).toContain(label);
+    }
   });
 
   it("승인 카드는 발행될 내용을 <pre>로 그대로 보여준다 (본 것 = 나가는 것)", () => {
