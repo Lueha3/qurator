@@ -60,6 +60,16 @@ export interface PriceHistoryDTO {
   currentCouponPrice: number | null;
   /** 서버에서 계산한 상대 시각 문자열 ("3시간 전"). 하이드레이션 불일치 방지 */
   currentCapturedLabel: string | null;
+  /**
+   * 가장 오래된 자동 스냅샷 — BF 이벤트 태그가 없어도 "몇 달 전 vs 지금"을 보여주기 위한 값.
+   * 자동 스냅샷이 2건 미만이면(비교 대상이 없으면) null.
+   */
+  firstSalePrice: number | null;
+  firstCouponPrice: number | null;
+  /** "6개월 전" 같은 상대 시각. currentCapturedLabel과 동일한 규칙으로 서버에서 확정한다 */
+  firstCapturedLabel: string | null;
+  /** 첫 기록 대비 현재가 변화율(%). 양수=하락, 음수=상승. 계산 불가하면 null */
+  firstChangeRate: number | null;
   snapshotCount: number;
 }
 

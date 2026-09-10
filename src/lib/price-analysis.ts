@@ -174,6 +174,12 @@ export function summarizeEvents(snapshots: SnapshotLike[]): EventSummary[] {
 export interface PriceAnalysis {
   /** 최신 자동 스냅샷. 수동 입력은 과거 시점 기록이므로 "현재가"가 될 수 없다. */
   current: SnapshotLike | null;
+  /**
+   * 가장 오래된 자동 스냅샷. BF 이벤트 태그가 없어도(=일반적인 "몇 달 전 vs 지금" 비교)
+   * "첫 기록 vs 현재" 카드의 재료가 된다 — events가 비어 있을 때의 유일한 시계열 비교 수단.
+   * current와 같은 스냅샷이면(표본 1건) null로 둔다 — 자기 자신과 비교하는 카드는 의미가 없다.
+   */
+  first: SnapshotLike | null;
   /** 지금 시점의 평상시 기준가 — "지금 가격이 싼 편인가"의 판단 근거 */
   currentBaseline: Baseline;
   events: EventSummary[];
@@ -185,9 +191,11 @@ export function analyzeSnapshots(snapshots: SnapshotLike[], now: Date = new Date
   const automatic = snapshots
     .filter((s) => s.source !== "MANUAL")
     .sort((a, b) => b.capturedAt.getTime() - a.capturedAt.getTime());
+  const oldest = automatic[automatic.length - 1] ?? null;
 
   return {
     current: automatic[0] ?? null,
+    first: automatic.length >= 2 ? oldest : null,
     currentBaseline: computeBaseline(snapshots, now),
     events: summarizeEvents(snapshots),
     snapshotCount: snapshots.length,

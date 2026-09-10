@@ -207,3 +207,37 @@ describe("analyzeSnapshots — 현재가", () => {
     expect(analysis.events).toEqual([]);
   });
 });
+
+describe("analyzeSnapshots — 첫 기록 (이벤트 태그 없는 일반 기간 비교)", () => {
+  const now = new Date("2027-03-01T12:00:00+09:00");
+
+  it("자동 스냅샷이 2건 이상이면 가장 오래된 것을 first로 준다", () => {
+    const analysis = analyzeSnapshots(
+      [
+        snap(new Date("2026-09-01T00:00:00+09:00"), 55000),
+        snap(new Date("2027-02-28T00:00:00+09:00"), 39900),
+      ],
+      now
+    );
+    expect(analysis.first?.salePrice).toBe(55000);
+    expect(analysis.current?.salePrice).toBe(39900);
+  });
+
+  it("자동 스냅샷이 1건뿐이면 first는 null이다 (자기 자신과 비교 금지)", () => {
+    const analysis = analyzeSnapshots([snap(new Date("2027-02-28T00:00:00+09:00"), 39900)], now);
+    expect(analysis.first).toBeNull();
+    expect(analysis.current?.salePrice).toBe(39900);
+  });
+
+  it("MANUAL 스냅샷은 first 후보에서 제외된다", () => {
+    const analysis = analyzeSnapshots(
+      [
+        snap(new Date("2025-11-21T00:00:00+09:00"), 39900, { source: "MANUAL", eventTag: "BF2025" }),
+        snap(new Date("2027-02-28T00:00:00+09:00"), 45000),
+      ],
+      now
+    );
+    // 자동 스냅샷이 1건뿐이므로(MANUAL 제외) first는 null
+    expect(analysis.first).toBeNull();
+  });
+});

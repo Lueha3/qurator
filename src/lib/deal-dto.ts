@@ -1,6 +1,6 @@
 import type { Channel } from "@prisma/client";
 import type { DealDTO, PriceHistoryDTO } from "./api-types";
-import type { PriceAnalysis } from "./price-analysis";
+import { discountRate, type PriceAnalysis } from "./price-analysis";
 import { formatRelativeFromNow } from "./format";
 
 export const DEAL_INCLUDE = {
@@ -64,6 +64,10 @@ export function toPriceHistoryDTO(
     currentCapturedLabel: analysis.current
       ? formatRelativeFromNow(analysis.current.capturedAt, now)
       : null,
+    firstSalePrice: analysis.first?.salePrice ?? null,
+    firstCouponPrice: analysis.first?.couponPrice ?? null,
+    firstCapturedLabel: analysis.first ? formatRelativeFromNow(analysis.first.capturedAt, now) : null,
+    firstChangeRate: discountRate(analysis.first?.salePrice ?? null, analysis.current?.salePrice ?? null),
     snapshotCount: analysis.snapshotCount,
   };
 }

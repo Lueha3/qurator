@@ -70,6 +70,40 @@ function EventCell({ event }: { event: PriceEventDTO }) {
   );
 }
 
+/**
+ * BF 이벤트 태그가 하나도 없을 때("몇 달 전 vs 지금" 같은 일반 기간 비교, 행사 기간 무관)
+ * 보여줄 카드. events가 비어 있어도 자동 스냅샷이 2건 이상이면 가장 오래된 것과 최신을 비교한다 —
+ * 6개월 뒤 다시 찍은 스크린샷처럼, BF 창 밖에서 쌓인 기록도 "첫 기록 vs 현재"로는 항상 보인다.
+ */
+function FirstRecordCell({ history }: { history: PriceHistoryDTO }) {
+  if (history.firstSalePrice === null) {
+    return (
+      <Cell label="행사 기록" tone="muted">
+        아직 없음
+        <div className="text-xs font-normal text-muted">
+          스냅샷 {history.snapshotCount}건 수집 중
+        </div>
+      </Cell>
+    );
+  }
+
+  const rate = history.firstChangeRate;
+  return (
+    <Cell label="첫 기록">
+      {formatKRW(history.firstSalePrice)}
+      {rate !== null && rate !== 0 && (
+        <span className="ml-1.5 text-xs text-muted">
+          현재 대비 {rate > 0 ? `${rate}% 하락` : `${Math.abs(rate)}% 상승`}
+        </span>
+      )}
+      <div className="text-xs font-normal text-muted">
+        {history.firstCapturedLabel} 기록
+        {history.firstCouponPrice !== null && ` · 쿠폰가 ${formatKRW(history.firstCouponPrice)}`}
+      </div>
+    </Cell>
+  );
+}
+
 export function PriceStrip({ history }: { history: PriceHistoryDTO }) {
   // 최근 두 행사만 — "작년 vs 올해"가 한눈에 들어오는 것이 목적이다.
   const events = history.events.slice(-2);
@@ -77,12 +111,7 @@ export function PriceStrip({ history }: { history: PriceHistoryDTO }) {
   return (
     <div className="mb-3 flex flex-wrap gap-2">
       {events.length === 0 ? (
-        <Cell label="행사 기록" tone="muted">
-          아직 없음
-          <div className="text-xs font-normal text-muted">
-            스냅샷 {history.snapshotCount}건 수집 중
-          </div>
-        </Cell>
+        <FirstRecordCell history={history} />
       ) : (
         events.map((e) => <EventCell key={e.eventTag} event={e} />)
       )}
