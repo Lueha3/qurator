@@ -76,6 +76,8 @@ interface TgMessage {
   text?: string;
   entities?: TgMessageEntity[];
   photo?: TgPhotoSize[];
+  /** 여러 장을 한 번에 보낸 "앨범"의 사진들이 공유하는 id. 낱장 사진에는 없다 (docs/06 §4.4). */
+  media_group_id?: string;
 }
 interface TgCallbackQuery {
   id: string;
@@ -283,7 +285,13 @@ async function handleMessage(msg: TgMessage): Promise<void> {
   // 수 없으므로(텍스트 URL과 달리) "무엇을 기다리는 중인지"를 되물을 모호함이 없다 —
   // 사진이 오면 항상 새 캡처를 시작한다 (docs/06-screenshot-capture.md §3).
   if (msg.photo && msg.photo.length > 0) {
-    await captureFromScreenshot(msg, chatId);
+    // 앨범(여러 장을 한 번에 전송)은 사진마다 별개의 update로 오므로, 한 캡처로 합치려면
+    // 버퍼링이 필요하다 — 낱장 사진은 그대로 즉시 처리한다 (docs/06 §4.4).
+    if (msg.media_group_id) {
+      await bufferGroupedScreenshot(msg, chatId);
+    } else {
+      await captureFromScreenshot(msg, chatId);
+    }
     return;
   }
 
@@ -463,48 +471,60 @@ async function captureFromUrl(rawUrl: string, chatId: string, sourceMessageId: n
 }
 
 /**
- * 스크린샷 1장을 캡처한다 — docs/06-screenshot-capture.md §3-§4의 1차 입력 경로.
+ * 다운로드한 스크린샷 1장 이상으로 상품을 캡처한다 — docs/06-screenshot-capture.md §3-§4의
+ * 1차 입력 경로. 낱장 사진 경로와 앨범(여러 장) 경로가 이 함수부터 합쳐진다: 여러 장이면
+ * 같은 상품 페이지를 위/아래로 나눠 찍은 것으로 보고 Claude Vision에 한 번에 같이 보낸다
+ * (vision-extract.ts가 다중 이미지를 받는다 — §4.4, "폰 화면에 상품 사진과 가격이 한 번에 안 담기는" 문제).
  * captureFromUrl과 대칭이지만 무신사에 요청을 전혀 보내지 않는다: Vision이 화면에서
  * 직접 읽으므로 gatewayFetch를 아예 거치지 않는다(§7 — 요청 0건).
  *
- * 이미지 바이트는 이 함수의 지역 변수(base64)에만 존재하다가 extractFromScreenshot 호출이
+ * 이미지 바이트는 이 함수의 지역 변수(images)에만 존재하다가 extractFromScreenshot 호출이
  * 끝나면 스코프를 벗어나 버려진다 — 디스크·DB·로그·감사 기록 어디에도 쓰지 않는다 (§4.3).
  */
-async function captureFromScreenshot(msg: TgMessage, chatId: string): Promise<void> {
-  const status = await sendMessage({ chatId, text: "🔎 스크린샷 확인하는 중…" });
+async function processScreenshotPhotos(
+  photos: TgPhotoSize[],
+  chatId: string,
+  statusMessageId: number,
+  sourceMessageId: number
+): Promise<void> {
+  const images: { data: string; mediaType: string }[] = [];
+  for (const photo of photos) {
+    try {
+      const file = await callMethod<{ file_path: string }>("getFile", { file_id: photo.file_id });
+      // 텔레그램 자체 CDN이다(무신사와 무관) — gatewayFetch가 아니라 전역 fetch를 직접 쓴다.
+      const response = await fetch(
+        `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`
+      );
+      // 텔레그램은 사진(photo)을 서버에서 항상 JPEG로 재인코딩한다 — 원래 사용자가 무엇을 보냈든
+      // photo 배열에는 mime 정보가 없으므로 고정값을 쓴다 (docs/06 §4.4).
+      images.push({
+        data: Buffer.from(await response.arrayBuffer()).toString("base64"),
+        mediaType: "image/jpeg",
+      });
+    } catch (err) {
+      // 앨범 중 한 장만 실패해도 나머지로 계속 진행한다 — 부분 정보가 전무보다 낫다.
+      console.error("[screenshot] 텔레그램 파일 다운로드 실패", err);
+    }
+  }
 
-  // 여러 해상도 중 배열의 마지막(가장 큰 사이즈)을 쓴다 — 작은 글씨(품번 등) 오독을 줄인다.
-  const photo = msg.photo![msg.photo!.length - 1];
-
-  let base64: string;
-  try {
-    const file = await callMethod<{ file_path: string }>("getFile", { file_id: photo.file_id });
-    // 텔레그램 자체 CDN이다(무신사와 무관) — gatewayFetch가 아니라 전역 fetch를 직접 쓴다.
-    const response = await fetch(
-      `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`
-    );
-    base64 = Buffer.from(await response.arrayBuffer()).toString("base64");
-  } catch (err) {
-    console.error("[screenshot] 텔레그램 파일 다운로드 실패", err);
+  if (images.length === 0) {
     await editMessage({
       chatId,
-      messageId: status.message_id,
+      messageId: statusMessageId,
       text: "⚠️ 스크린샷을 받지 못했습니다. 다시 보내주세요.",
     });
     return;
   }
 
-  // 텔레그램은 사진(photo)을 서버에서 항상 JPEG로 재인코딩한다 — 원래 사용자가 무엇을 보냈든
-  // photo 배열에는 mime 정보가 없으므로 고정값을 쓴다 (docs/06 §4.4).
-  const result = await extractFromScreenshot(base64, "image/jpeg");
-  // 이 아래로는 base64를 다시 참조하지 않는다 — 여기서 사실상 버려진다.
+  const result = await extractFromScreenshot(images);
+  // 이 아래로는 images를 다시 참조하지 않는다 — 여기서 사실상 버려진다.
 
   if (!result) {
     // Vision 실패(API 장애·타임아웃 등)는 ai-hook.ts와 같은 null 폴백이다 — 빈 딜을 만들면
     // 장애 상황에 워크스페이스가 껍데기 카드로 스팸된다. 아무것도 만들지 않고 안내만 한다.
     await editMessage({
       chatId,
-      messageId: status.message_id,
+      messageId: statusMessageId,
       text: "⚠️ 스크린샷을 읽지 못했습니다. 다시 시도해주시거나 /help의 직접 입력 방법을 이용해주세요.",
     });
     return;
@@ -515,7 +535,7 @@ async function captureFromScreenshot(msg: TgMessage, chatId: string): Promise<vo
     // (docs/06 §3.3: "이건 실패가 아니라 엉뚱한 화면을 찍은 것" — 소음으로 남기지 않는다).
     await editMessage({
       chatId,
-      messageId: status.message_id,
+      messageId: statusMessageId,
       text: "상품 페이지 상단(브랜드·상품명·가격이 보이는 화면)을 찍어주세요.",
     });
     return;
@@ -555,7 +575,7 @@ async function captureFromScreenshot(msg: TgMessage, chatId: string): Promise<vo
       approvalStage: "CANDIDATE",
       salePrice: result.salePrice,
       telegramChatId: chatId,
-      telegramMessageId: status.message_id,
+      telegramMessageId: statusMessageId,
       // JSON-LD/OpenGraph가 아니라 Vision 추출이라는 것을 카드·감사 로그가 구분할 수 있게 한다.
       parseSource: "vision",
       parseFieldCount,
@@ -568,17 +588,110 @@ async function captureFromScreenshot(msg: TgMessage, chatId: string): Promise<vo
     action: "deal.captured",
     approvalRef: deal.id,
     // 이미지 자체는 절대 남기지 않는다 — 매칭 결과와 메시지 ID만 증적으로 남는다 (docs/06 §4.3/§7).
-    detail: `스크린샷 캡처 (텔레그램 메시지 ${msg.message_id}) → 상품 매칭 ${matchedBy}`,
+    detail:
+      images.length > 1
+        ? `스크린샷 ${images.length}장 캡처 (텔레그램 메시지 ${sourceMessageId}~) → 상품 매칭 ${matchedBy}`
+        : `스크린샷 캡처 (텔레그램 메시지 ${sourceMessageId}) → 상품 매칭 ${matchedBy}`,
   });
 
   // 링크 경로와 동일한 후보 카드 — 사용자에게는 두 입력 경로가 이 지점부터 구분되지 않는다.
   const card = candidateCard(toCardDeal(deal));
   await editMessage({
     chatId,
-    messageId: status.message_id,
+    messageId: statusMessageId,
     text: card.text,
     keyboard: card.keyboard,
   });
+}
+
+/** 사진 1장 경로 — 즉시 처리한다(앨범과 달리 더 올지 기다릴 이유가 없다). */
+async function captureFromScreenshot(msg: TgMessage, chatId: string): Promise<void> {
+  const status = await sendMessage({ chatId, text: "🔎 스크린샷 확인하는 중…" });
+  // 여러 해상도 중 배열의 마지막(가장 큰 사이즈)을 쓴다 — 작은 글씨(품번 등) 오독을 줄인다.
+  const photo = msg.photo![msg.photo!.length - 1];
+  await processScreenshotPhotos([photo], chatId, status.message_id, msg.message_id);
+}
+
+// ── 앨범(여러 장) 스크린샷 병합 ──────────────────────────────────────────
+//
+// 폰 화면 하나로 상품 사진(위)과 가격(아래)이 한 스크린샷에 다 안 담기는 경우, 두 장으로 나눠
+// 찍어 텔레그램 "앨범"(여러 장 한 번에 전송)으로 보낼 수 있다. 텔레그램은 앨범을 사진마다
+// 별개의 update로 쪼개 보내므로, update 하나만 보고는 몇 장이 더 오는지 알 수 없다 — 그래서
+// media_group_id별로 잠깐 모았다가 한 번에 처리한다.
+
+interface PendingMediaGroup {
+  chatId: string;
+  photos: TgPhotoSize[];
+  statusMessageId: number;
+  sourceMessageId: number;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+/**
+ * 프로세스 메모리 버퍼. 재시작하면 비지만, 앨범 도착 간격(수백 ms~2초)만 버티면 되므로
+ * webhook route의 재전송 중복 캐시와 같은 이유로 이걸로 충분하다 — 봇 프로세스는
+ * 폴링·webhook 어느 경로든 장기 실행 단일 프로세스다.
+ */
+const pendingMediaGroups = new Map<string, PendingMediaGroup>();
+
+/** 앨범 사진 사이의 대기 시간. 너무 짧으면 마지막 장을 놓치고, 너무 길면 카드가 늦게 뜬다. */
+export const MEDIA_GROUP_DEBOUNCE_MS = 1500;
+
+/**
+ * 한 캡처에 합칠 최대 장수. 무신사 상품 페이지는 위/아래로 나눠 2~3장이면 충분하다 —
+ * 그 이상은 실수로 여러 상품을 한 앨범에 같이 보낸 경우일 가능성이 크므로 이 캡처엔 안 쓴다
+ * (Vision 입력·비용이 무한정 커지지 않게 하는 상한이지 사진을 버리는 건 아니다).
+ */
+export const MAX_GROUP_PHOTOS = 4;
+
+/**
+ * 앨범의 사진 한 장이 도착했다 — 버퍼에 쌓고 타이머를 리셋할 뿐, 여기서 처리를 기다리지
+ * 않는다(디바운스 타이머를 await하면 폴링 루프가 같은 앨범의 다음 사진을 못 받는다).
+ */
+async function bufferGroupedScreenshot(msg: TgMessage, chatId: string): Promise<void> {
+  const groupId = msg.media_group_id!;
+  const photo = msg.photo![msg.photo!.length - 1];
+  const existing = pendingMediaGroups.get(groupId);
+
+  if (existing) {
+    clearTimeout(existing.timer);
+    if (existing.photos.length < MAX_GROUP_PHOTOS) existing.photos.push(photo);
+    existing.timer = setTimeout(() => flushMediaGroupSafely(groupId), MEDIA_GROUP_DEBOUNCE_MS);
+    return;
+  }
+
+  // 앨범의 첫 사진에서만 상태 메시지를 보낸다 — 장마다 "확인하는 중"이 여러 개 뜨면 소란스럽다.
+  const status = await sendMessage({
+    chatId,
+    text: "🔎 스크린샷 확인하는 중… (더 있으면 잠시 기다립니다)",
+  });
+  pendingMediaGroups.set(groupId, {
+    chatId,
+    photos: [photo],
+    statusMessageId: status.message_id,
+    sourceMessageId: msg.message_id,
+    timer: setTimeout(() => flushMediaGroupSafely(groupId), MEDIA_GROUP_DEBOUNCE_MS),
+  });
+}
+
+/** setTimeout 콜백은 async를 await할 수 없다 — 에러가 조용히 사라지지 않게 여기서 잡는다. */
+function flushMediaGroupSafely(groupId: string): void {
+  flushMediaGroup(groupId).catch((err) => {
+    console.error("[screenshot] 앨범 처리 실패", groupId, err);
+  });
+}
+
+/** 디바운스 타이머가 만료되면 그때까지 모인 사진들로 한 번에 캡처를 진행한다. */
+async function flushMediaGroup(groupId: string): Promise<void> {
+  const group = pendingMediaGroups.get(groupId);
+  if (!group) return; // 이미 처리됐거나(방어적) 존재하지 않는 그룹
+  pendingMediaGroups.delete(groupId);
+  await processScreenshotPhotos(
+    group.photos,
+    group.chatId,
+    group.statusMessageId,
+    group.sourceMessageId
+  );
 }
 
 // ── 작년 BF 가격 수동 입력 ───────────────────────────────────────────────

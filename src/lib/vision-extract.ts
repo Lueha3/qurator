@@ -70,8 +70,20 @@ const SYSTEM_PROMPT = `너는 무신사(Musinsa) 패션 앱 상품 페이지 스
 - 가격은 한국 원화 정수만 쓴다. 쉼표·"원" 접미사·통화 기호를 넣지 마라 (예: 53400, "53,400원" 아님).
 - 오직 JSON 객체 하나만 응답한다. 마크다운 코드펜스·설명·인사말을 붙이지 마라.`;
 
-function buildUserPrompt(): string {
-  return `이 스크린샷에서 아래 필드를 정확히 이 이름으로 채운 JSON 객체 하나만 응답해라. 다른 텍스트는 절대 넣지 마라.
+/**
+ * 폰 화면 하나로 상품명·이미지와 가격이 다 안 담기는 경우, 사용자가 위/아래로 나눠 여러 장을
+ * 찍어 한 번에(텔레그램 앨범) 보낼 수 있다 (docs/06 §4.4). 그럴 땐 모델에게 "따로 판단할
+ * 여러 장면"이 아니라 "한 화면을 나눠 찍은 조각들"이라는 것을 명시해야 한다 — 안 그러면
+ * 한 장만 보고 답하거나, 장마다 다른 상품으로 오인할 수 있다.
+ */
+function buildUserPrompt(imageCount: number): string {
+  const multiImageNote =
+    imageCount > 1
+      ? `이 ${imageCount}장은 같은 상품 페이지 하나를 위/아래로 나눠 찍은 스크린샷이다(한 화면에 다 안 담겨서). ` +
+        `장마다 다른 상품으로 보지 말고, 전부 종합해서 필드를 채워라 — 예를 들어 한 장엔 브랜드·상품명·이미지만, ` +
+        `다른 장엔 가격·쿠폰가만 보일 수 있다.\n\n`
+      : "";
+  return `${multiImageNote}이 스크린샷에서 아래 필드를 정확히 이 이름으로 채운 JSON 객체 하나만 응답해라. 다른 텍스트는 절대 넣지 마라.
 
 {
   "isProductPage": boolean,
@@ -148,17 +160,25 @@ function toResult(raw: unknown): VisionExtractResult | null {
   };
 }
 
+/** 다운로드해 메모리에 들고 있는 스크린샷 1장 — 디스크·DB 경유 없이 바로 API로 간다 */
+export interface ScreenshotImage {
+  data: string; // base64
+  mediaType: string;
+}
+
 /**
- * 스크린샷 1장에서 상품 필드를 추출한다. 실패 시(키 없음/타임아웃/API 에러/비-JSON 응답/
- * 필수 필드 누락) null을 반환하며, 이는 오류가 아니라 정상적인 폴백 경로다 —
+ * 스크린샷 1장(또는 같은 상품 페이지를 나눠 찍은 여러 장)에서 상품 필드를 추출한다.
+ * 실패 시(키 없음/타임아웃/API 에러/비-JSON 응답/필수 필드 누락) null을 반환하며,
+ * 이는 오류가 아니라 정상적인 폴백 경로다 —
  * 호출부는 null을 "빈 카드 + 직접 입력"으로 처리한다 (docs/06 §3.3).
  *
  * 이미지 원본은 이 함수를 벗어나 저장되지 않는다 — 호출부도 응답을 받은 뒤 base64를 버려야 한다.
  */
 export async function extractFromScreenshot(
-  imageBase64: string,
-  mediaType: string
+  images: ScreenshotImage[]
 ): Promise<VisionExtractResult | null> {
+  if (images.length === 0) return null;
+
   const anthropic = getClient();
   if (!anthropic) {
     console.warn("[vision-extract] ANTHROPIC_API_KEY가 설정되지 않아 추출을 시도하지 않습니다.");
@@ -168,6 +188,15 @@ export async function extractFromScreenshot(
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    const imageBlocks = images.map((img) => ({
+      type: "image" as const,
+      source: {
+        type: "base64" as const,
+        media_type: toImageMediaType(img.mediaType),
+        data: img.data,
+      },
+    }));
 
     const response = await anthropic.messages.create(
       {
@@ -179,14 +208,8 @@ export async function extractFromScreenshot(
         messages: [
           {
             role: "user",
-            content: [
-              // 이미지 블록은 텍스트 지시보다 먼저 온다 (Anthropic vision 컨벤션).
-              {
-                type: "image",
-                source: { type: "base64", media_type: toImageMediaType(mediaType), data: imageBase64 },
-              },
-              { type: "text", text: buildUserPrompt() },
-            ],
+            // 이미지 블록들이 텍스트 지시보다 먼저 온다 (Anthropic vision 컨벤션).
+            content: [...imageBlocks, { type: "text", text: buildUserPrompt(images.length) }],
           },
         ],
       },

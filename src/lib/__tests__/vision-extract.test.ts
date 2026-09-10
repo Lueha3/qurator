@@ -20,6 +20,11 @@ function textResponse(text: string) {
   return { content: [{ type: "text", text }] };
 }
 
+/** 짧게 쓰기 위한 헬퍼 — extractFromScreenshot은 이미지 "배열"을 받는다(여러 장 병합 지원). */
+function img(data: string, mediaType = "image/jpeg") {
+  return { data, mediaType };
+}
+
 describe("extractFromScreenshot", () => {
   beforeEach(() => {
     create.mockReset();
@@ -49,7 +54,7 @@ describe("extractFromScreenshot", () => {
       )
     );
 
-    const result = await extractFromScreenshot("base64data", "image/jpeg");
+    const result = await extractFromScreenshot([img("base64data")]);
 
     expect(result).toEqual({
       isProductPage: true,
@@ -79,12 +84,49 @@ describe("extractFromScreenshot", () => {
     expect(content[1].type).toBe("text");
   });
 
+  it("이미지 여러 장을 보내면 전부 이미지 블록으로 담고, 프롬프트에 '나눠 찍은 것'이라고 명시한다", async () => {
+    create.mockResolvedValueOnce(textResponse(JSON.stringify({ isProductPage: true })));
+
+    await extractFromScreenshot([img("top-half", "image/jpeg"), img("bottom-half", "image/png")]);
+
+    const call = create.mock.calls[0][0];
+    const content = call.messages[0].content;
+    // 이미지 블록 2개 + 텍스트 블록 1개 — 이미지가 전부 텍스트보다 먼저 온다
+    expect(content).toHaveLength(3);
+    expect(content[0]).toEqual({
+      type: "image",
+      source: { type: "base64", media_type: "image/jpeg", data: "top-half" },
+    });
+    expect(content[1]).toEqual({
+      type: "image",
+      source: { type: "base64", media_type: "image/png", data: "bottom-half" },
+    });
+    expect(content[2].type).toBe("text");
+    expect(content[2].text).toContain("2장");
+    expect(content[2].text).toContain("나눠 찍은");
+  });
+
+  it("이미지가 1장이면 '나눠 찍은' 안내 문구를 넣지 않는다", async () => {
+    create.mockResolvedValueOnce(textResponse(JSON.stringify({ isProductPage: true })));
+
+    await extractFromScreenshot([img("base64data")]);
+
+    const content = create.mock.calls[0][0].messages[0].content;
+    expect(content[1].text).not.toContain("나눠 찍은");
+  });
+
+  it("이미지 배열이 비어 있으면 API를 부르지 않고 즉시 null을 반환한다", async () => {
+    const result = await extractFromScreenshot([]);
+    expect(result).toBeNull();
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it("코드펜스로 감싼 JSON도 벗겨서 파싱한다", async () => {
     create.mockResolvedValueOnce(
       textResponse("```json\n" + JSON.stringify({ isProductPage: false }) + "\n```")
     );
 
-    const result = await extractFromScreenshot("base64data", "image/png");
+    const result = await extractFromScreenshot([img("base64data", "image/png")]);
     expect(result?.isProductPage).toBe(false);
     expect(result?.confidence).toBe("low"); // 값이 없으면 방어적으로 low로 떨어진다
   });
@@ -104,7 +146,7 @@ describe("extractFromScreenshot", () => {
       )
     );
 
-    const result = await extractFromScreenshot("base64data", "image/jpeg");
+    const result = await extractFromScreenshot([img("base64data")]);
     expect(result).not.toBeNull();
     expect(result?.listPrice).toBeNull();
     expect(result?.salePrice).toBeNull();
@@ -115,7 +157,7 @@ describe("extractFromScreenshot", () => {
   it("비-JSON/깨진 응답은 예외 없이 null을 반환한다", async () => {
     create.mockResolvedValueOnce(textResponse("죄송하지만 이 이미지를 분석할 수 없습니다."));
 
-    const result = await extractFromScreenshot("base64data", "image/jpeg");
+    const result = await extractFromScreenshot([img("base64data")]);
     expect(result).toBeNull();
   });
 
@@ -124,14 +166,14 @@ describe("extractFromScreenshot", () => {
       textResponse(JSON.stringify({ brand: "쿠어", productName: "오버셔츠" }))
     );
 
-    const result = await extractFromScreenshot("base64data", "image/jpeg");
+    const result = await extractFromScreenshot([img("base64data")]);
     expect(result).toBeNull();
   });
 
   it("API 호출이 예외를 던져도(네트워크/타임아웃) null로 처리하며 throw하지 않는다", async () => {
     create.mockRejectedValueOnce(new Error("network error"));
 
-    const result = await extractFromScreenshot("base64data", "image/jpeg");
+    const result = await extractFromScreenshot([img("base64data")]);
     expect(result).toBeNull();
   });
 
@@ -142,7 +184,7 @@ describe("extractFromScreenshot", () => {
     vi.resetModules();
     const fresh = await import("../vision-extract");
 
-    const result = await fresh.extractFromScreenshot("base64data", "image/jpeg");
+    const result = await fresh.extractFromScreenshot([img("base64data")]);
 
     expect(result).toBeNull();
     expect(create).not.toHaveBeenCalled();

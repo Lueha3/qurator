@@ -44,7 +44,7 @@ vi.mock("../../vision-extract", () => ({
   extractFromScreenshot: (...args: unknown[]) => extractFromScreenshot(...args),
 }));
 
-const { handleUpdate } = await import("../handler");
+const { handleUpdate, MEDIA_GROUP_DEBOUNCE_MS, MAX_GROUP_PHOTOS } = await import("../handler");
 const { db } = await import("../../db");
 const { CB } = await import("../cards");
 
@@ -65,6 +65,23 @@ function photoMessage(userId = Number(CHAT_ID)) {
       photo: [
         { file_id: "photo-small", width: 90, height: 90 },
         { file_id: "photo-large", width: 1280, height: 1706, file_size: 234_567 },
+      ],
+    },
+  };
+}
+
+/** 앨범(여러 장을 한 번에 전송)의 사진 한 장 — 같은 media_group_id를 공유한다. */
+function albumPhotoMessage(mediaGroupId: string, fileIdSuffix: string, userId = Number(CHAT_ID)) {
+  return {
+    update_id: nextMessageId++,
+    message: {
+      message_id: nextMessageId++,
+      from: { id: userId },
+      chat: { id: Number(CHAT_ID) },
+      media_group_id: mediaGroupId,
+      photo: [
+        { file_id: `photo-small-${fileIdSuffix}`, width: 90, height: 90 },
+        { file_id: `photo-large-${fileIdSuffix}`, width: 1280, height: 1706, file_size: 234_567 },
       ],
     },
   };
@@ -202,6 +219,69 @@ describe("스크린샷 해피패스 (docs/06 §3-4)", () => {
     expect(log?.detail ?? "").not.toMatch(/가짜 jpeg|base64/i);
     expect(log?.payloadSnapshot).toBeFalsy();
   });
+});
+
+// 폰 화면 하나로 상품 사진(위)과 가격(아래)이 한 스크린샷에 다 안 담기는 문제 — 해결책은
+// 앨범(여러 장 한 번에 전송)을 한 캡처로 합치는 것. 텔레그램은 앨범을 사진마다 별개의
+// update로 쪼개 보내므로(같은 media_group_id 공유), 디바운스로 모아야 한다.
+//
+// 이 스위트는 실제 타이머로 기다린다(가짜 타이머 대신) — 디바운스 콜백 안에서 Prisma·
+// 텔레그램 목까지 이어지는 여러 단계 await 체인이라, 가짜 타이머의 마이크로태스크 플러시와
+// 맞물리면 체인이 테스트 종료 시점에 덜 끝난 채로 다음 테스트로 새어나가 FK 오류 등으로 깨진다.
+// 디바운스가 1.5초라 다소 느리지만(테스트당 최대 ~2초), 안정성이 우선이다.
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+describe("앨범(여러 장) 스크린샷 — docs/06 §4.4 병합", () => {
+  it("같은 media_group_id의 사진 2장을 모아 한 번에 Vision에 보낸다", async () => {
+    extractFromScreenshot.mockResolvedValue(VISION_RESULT_FULL);
+
+    const groupId = "album-merge-1";
+    await handleUpdate(albumPhotoMessage(groupId, "a"));
+
+    // 디바운스 창이 끝나기 전엔 아직 처리되지 않는다 — 더 올 수도 있으니 기다린다.
+    await sleep(500);
+    expect(extractFromScreenshot).not.toHaveBeenCalled();
+
+    await handleUpdate(albumPhotoMessage(groupId, "b"));
+    await sleep(MEDIA_GROUP_DEBOUNCE_MS + 300);
+
+    expect(extractFromScreenshot).toHaveBeenCalledTimes(1);
+    const [images] = extractFromScreenshot.mock.calls[0];
+    expect(images).toHaveLength(2);
+
+    // 상태 메시지는 앨범 첫 장에서만 1번 나간다 — 장마다 뜨면 소란스럽다.
+    expect(sent.filter((s) => s.text.includes("확인하는 중"))).toHaveLength(1);
+
+    const deal = await db.deal.findFirstOrThrow();
+    expect(deal.parseSource).toBe("vision");
+  }, 10_000);
+
+  it("최대 장수를 넘는 사진은 이 캡처에 쓰지 않는다", async () => {
+    extractFromScreenshot.mockResolvedValue(VISION_RESULT_FULL);
+
+    const groupId = "album-merge-2";
+    for (const suffix of ["a", "b", "c", "d", "e"]) {
+      await handleUpdate(albumPhotoMessage(groupId, suffix));
+    }
+    await sleep(MEDIA_GROUP_DEBOUNCE_MS + 300);
+
+    expect(extractFromScreenshot).toHaveBeenCalledTimes(1);
+    const [images] = extractFromScreenshot.mock.calls[0];
+    expect(images).toHaveLength(MAX_GROUP_PHOTOS);
+  }, 10_000);
+
+  it("서로 다른 media_group_id는 각자 따로 캡처된다", async () => {
+    extractFromScreenshot.mockResolvedValue(VISION_RESULT_FULL);
+
+    await handleUpdate(albumPhotoMessage("group-x", "a"));
+    await handleUpdate(albumPhotoMessage("group-y", "a"));
+    await sleep(MEDIA_GROUP_DEBOUNCE_MS + 300);
+
+    expect(extractFromScreenshot).toHaveBeenCalledTimes(2);
+    expect(await db.deal.count()).toBe(2);
+  }, 10_000);
 });
 
 describe("Vision 실패 — API 장애/타임아웃 (docs/06 §3.3)", () => {
