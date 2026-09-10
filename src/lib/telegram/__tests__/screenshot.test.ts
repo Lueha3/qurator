@@ -245,16 +245,22 @@ describe("재촬영 시 가격 변화 안내 (docs/06 §3.1)", () => {
     expect(card?.text).toContain("53,400원"); // 지난번
     expect(card?.text).toContain("42,900원"); // 지금
     expect(card?.text).toMatch(/하락|📉/);
+    // "얼마나 할인이 붙었는지" 과정 전체 — 정가 대비 할인율 변화(40%→52%)와 쿠폰 적용가까지.
+    expect(card?.text).toContain("정가 89,000원 기준 할인율 40% → 52%");
+    expect(card?.text).toContain("쿠폰 적용 시 45,000원 (49% 할인)");
   });
 
-  it("가격이 그대로면 '지난번과 같은 가격'이라고 알린다", async () => {
+  it("판매가가 그대로면 '지난번과 같은 판매가'라고 알리고, 정가·쿠폰가 내역도 함께 보여준다", async () => {
     extractFromScreenshot.mockResolvedValue(VISION_RESULT_FULL);
 
     await handleUpdate(photoMessage());
     await handleUpdate(photoMessage());
 
     const card = edited.at(-1);
-    expect(card?.text).toContain("같은 가격");
+    expect(card?.text).toContain("같은 판매가");
+    // 정가 대비 할인율과 쿠폰 적용가도 항상 함께 보여준다(읽혔을 때) — "얼마나 할인됐는지" 과정 전체.
+    expect(card?.text).toContain("정가 89,000원 기준 할인율");
+    expect(card?.text).toContain("쿠폰 적용 시 45,000원");
   });
 });
 

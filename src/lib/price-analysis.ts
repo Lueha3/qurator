@@ -211,12 +211,16 @@ export function analyzeSnapshots(snapshots: SnapshotLike[], now: Date = new Date
 }
 
 /**
- * 방금 캡처와 바로 직전 캡처를 한 줄로 비교한다 — 텔레그램 후보 카드에서 "재촬영했더니
- * 뭐가 달라졌나"를 즉시 보여주기 위한 것이다 (docs/06 §3.1). PriceStrip(워크스페이스)의
- * "첫 기록 vs 현재"와는 다른 질문 — 여기는 "바로 전 vs 지금"만 본다.
+ * 방금 캡처와 바로 직전 캡처를 비교해 "가격이 어떻게 바뀌었나"의 전 과정을 보여준다 —
+ * 텔레그램 후보 카드용 (docs/06 §3.1). PriceStrip(워크스페이스)의 "첫 기록 vs 현재"와는
+ * 다른 질문 — 여기는 "바로 전 vs 지금"만 본다. 최대 3줄:
+ *   ① 판매가 자체가 어떻게 바뀌었나 (항상)
+ *   ② 정가 대비 실할인율이 어떻게 바뀌었나 (정가를 읽었을 때만)
+ *   ③ 쿠폰 적용 시 최종가 (화면에 쿠폰가가 보였을 때만)
  *
  * previous가 없으면(첫 기록이라 비교 대상이 없음) null — 아무것도 보여주지 않는 것 자체가
- * "비교할 게 없다"는 정직한 신호다. salePrice가 둘 다 있어야 계산한다.
+ * "비교할 게 없다"는 정직한 신호다. 마찬가지로 정가·쿠폰가는 실제로 읽힌 경우에만 줄을 더한다
+ * — 없는 숫자를 지어내지 않는다 (docs/06 §3의 "확신의 정도가 숫자와 함께 보여야 한다" 원칙).
  */
 export function buildPriceChangeNote(analysis: PriceAnalysis | undefined): string | null {
   if (!analysis) return null;
@@ -224,18 +228,58 @@ export function buildPriceChangeNote(analysis: PriceAnalysis | undefined): strin
   if (!current || !previous) return null;
   if (current.salePrice === null || previous.salePrice === null) return null;
 
-  const prevLabel = formatKRW(previous.salePrice);
-  const nowLabel = formatKRW(current.salePrice);
+  const lines: string[] = [];
 
+  // ① 판매가 헤드라인
+  const prevSale = formatKRW(previous.salePrice);
+  const nowSale = formatKRW(current.salePrice);
   if (current.salePrice === previous.salePrice) {
-    return `➡️ 지난번과 같은 가격이에요 (${nowLabel})`;
+    lines.push(`➡️ 지난번과 같은 판매가예요 (${nowSale})`);
+  } else {
+    const rate = discountRate(previous.salePrice, current.salePrice);
+    lines.push(
+      rate === null || rate === 0
+        ? `${prevSale} → ${nowSale}`
+        : rate > 0
+          ? `📉 지난번 ${prevSale} → 지금 ${nowSale} (${rate}% 하락)`
+          : `📈 지난번 ${prevSale} → 지금 ${nowSale} (${Math.abs(rate)}% 상승)`
+    );
   }
 
-  const rate = discountRate(previous.salePrice, current.salePrice);
-  if (rate === null) return `${prevLabel} → ${nowLabel}`;
-  return rate > 0
-    ? `📉 지난번 ${prevLabel} → 지금 ${nowLabel} (${rate}% 하락)`
-    : `📈 지난번 ${prevLabel} → 지금 ${nowLabel} (${Math.abs(rate)}% 상승)`;
+  // ② 정가 대비 실할인율 — 정가가 그 사이 달라졌거나 이번에 못 읽었으면 "전후 비교"를
+  // 지어내지 않고 지금 값만 보여준다. 같은 정가를 기준으로 삼을 수 있을 때만 화살표로 잇는다.
+  const listPrice = current.listPrice;
+  if (listPrice !== null && listPrice > 0) {
+    const nowRate = discountRate(listPrice, current.salePrice);
+    if (nowRate !== null) {
+      const prevRate =
+        previous.listPrice === listPrice && previous.salePrice !== null
+          ? discountRate(listPrice, previous.salePrice)
+          : null;
+      lines.push(
+        prevRate !== null
+          ? `정가 ${formatKRW(listPrice)} 기준 할인율 ${prevRate}% → ${nowRate}%`
+          : `정가 ${formatKRW(listPrice)} 기준 할인율 ${nowRate}%`
+      );
+    }
+  }
+
+  // ③ 쿠폰 적용가 — 로그인 상태 화면값이라 등급할인이 섞여 있을 수 있다(docs/06 §4.1).
+  // 그대로 보여주되 어떤 쿠폰인지는 단정하지 않는다.
+  if (current.couponPrice !== null && current.couponPrice > 0) {
+    const couponRate =
+      listPrice !== null && listPrice > 0 ? discountRate(listPrice, current.couponPrice) : null;
+    const couponLabel = couponRate !== null ? ` (${couponRate}% 할인)` : "";
+    if (previous.couponPrice !== null && previous.couponPrice !== current.couponPrice) {
+      lines.push(
+        `쿠폰 적용 시 지난번 ${formatKRW(previous.couponPrice)} → 지금 ${formatKRW(current.couponPrice)}${couponLabel}`
+      );
+    } else {
+      lines.push(`쿠폰 적용 시 ${formatKRW(current.couponPrice)}${couponLabel}`);
+    }
+  }
+
+  return lines.join("\n");
 }
 
 /**
