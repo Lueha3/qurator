@@ -9,9 +9,7 @@ vi.mock("../fetch-gateway", () => ({
 }));
 
 const { db } = await import("../db");
-const { addWatch, removeWatch, runWatchCycle, expireWatches, countActiveWatches } = await import(
-  "../watch"
-);
+const { addWatch, removeWatch, runWatchCycle, countActiveWatches } = await import("../watch");
 const { setCrawlessMode } = await import("../policy");
 
 const HOUR = 3_600_000;
@@ -88,22 +86,6 @@ describe("크롤리스 게이트 — 기본값은 '요청하지 않는다'", () 
     expect(gatewayFetch).not.toHaveBeenCalled();
   });
 
-  it("크롤리스여도 만료 해제는 계속 돈다 — 목적이 끝난 상품을 방치하지 않는다", async () => {
-    const [product] = await seedProducts(1);
-    await addWatch(product.id);
-    await db.watchItem.update({
-      where: { productId: product.id },
-      data: { expiresAt: new Date(Date.now() - DAY) },
-    });
-    await setCrawlessMode(true);
-
-    const result = await runWatchCycle();
-
-    expect(result.crawless).toBe(true);
-    expect(result.expired).toBe(1);
-    expect(await countActiveWatches()).toBe(0);
-  });
-
   it("사람이 명시적으로 끄면 그때부터 수집한다", async () => {
     const [product] = await seedProducts(1);
     await addWatch(product.id);
@@ -119,7 +101,7 @@ describe("크롤리스 게이트 — 기본값은 '요청하지 않는다'", () 
 });
 
 describe("워치 등록 — 상한이 실제로 막는다", () => {
-  it("등록하면 활성 1건이 되고 만료가 90일 뒤로 잡힌다", async () => {
+  it("등록하면 활성 1건이 된다", async () => {
     const [product] = await seedProducts(1);
     const now = new Date();
     const result = await addWatch(product.id, now);
@@ -127,8 +109,15 @@ describe("워치 등록 — 상한이 실제로 막는다", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.activeCount).toBe(1);
-    const days = Math.round((result.expiresAt.getTime() - now.getTime()) / DAY);
-    expect(days).toBe(90);
+  });
+
+  it("자동으로 만료되지 않는다 — 몇 년 뒤에도 여전히 활성이다 (2026-09-10 변경)", async () => {
+    const [product] = await seedProducts(1);
+    const now = new Date();
+    await addWatch(product.id, now);
+
+    const farFuture = new Date(now.getTime() + 5 * 365 * DAY);
+    expect(await countActiveWatches(farFuture)).toBe(1);
   });
 
   it("첫 조회 시각은 등록 직후가 아니다 (동기화 지문 제거)", async () => {
@@ -174,17 +163,6 @@ describe("워치 등록 — 상한이 실제로 막는다", () => {
     expect(await removeWatch(product.id)).toBe(false);
   });
 
-  it("만료된 워치는 자동으로 해제된다", async () => {
-    const [product] = await seedProducts(1);
-    await addWatch(product.id);
-    await db.watchItem.update({
-      where: { productId: product.id },
-      data: { expiresAt: new Date(Date.now() - DAY) },
-    });
-
-    expect(await expireWatches()).toBe(1);
-    expect(await countActiveWatches()).toBe(0);
-  });
 });
 
 describe("워치 사이클 — 빈도 규율", () => {

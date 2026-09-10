@@ -432,13 +432,14 @@ enum SnapshotSource {
 
 // ── watch_items ─────────────────────────────────────────────────────────
 // BF 추적 대상 — 현표가 명시적으로 등록한 상품만. 발굴·카탈로그 수집은 하지 않는다.
-// 상한(기본 30)과 만료는 docs/05 §3.2 — 목적이 끝난 상품에 트래픽이 잔존하지 않게 한다.
+// 상한(기본 30)은 docs/05 §3.2. 자동 만료는 없다 — 종료는 /unwatch로 사람이 직접 한다
+// (2026-09-10 변경, watch.ts 참고).
 model WatchItem {
   id        String   @id @default(uuid())
   productId String   @unique
   product   Product  @relation(fields: [productId], references: [id])
   createdAt DateTime @default(now())
-  expiresAt DateTime // 등록 시 +90일 기본
+  expiresAt DateTime // 사실상 만료되지 않는 값(약 100년 뒤) — active만이 실제 종료 신호다
   active    Boolean  @default(true)
 
   /**

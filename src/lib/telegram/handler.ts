@@ -694,7 +694,9 @@ async function handleManualBfEntry(text: string, chatId: string) {
 // ── BF 워치 등록/해제 ────────────────────────────────────────────────────
 
 /**
- * 등록·해제 결과를 사람이 읽을 문장으로. 상한과 만료를 항상 함께 알려준다.
+ * 등록·해제 결과를 사람이 읽을 문장으로. 상한을 항상 함께 알려준다.
+ *
+ * 자동 만료는 없다 — /unwatch로 해제할 때까지 계속 지켜본다(2026-09-10 변경, watch.ts 참고).
  *
  * 크롤리스 모드(기본 켜짐)에서는 러너가 무신사에 요청을 보내지 않으므로 자동 기록이 **없다**
  * (watch.ts의 크롤리스 게이트). 그런데도 "하루 1회 기록합니다"라고 알리면 오지 않을 데이터를
@@ -705,14 +707,16 @@ async function watchAddedMessage(
   result: Awaited<ReturnType<typeof addWatch>>
 ): Promise<string> {
   if (!result.ok) return `⚠️ ${result.reason}`;
-  const until = result.expiresAt.toISOString().slice(0, 10);
   const head = result.alreadyActive
-    ? `📈 이미 지켜보는 중입니다 — 기간을 ${until}까지 연장했습니다.`
+    ? `📈 이미 지켜보는 중입니다 — ${productLabel}`
     : `📈 <b>가격 추적 시작</b> — ${productLabel}`;
   const how = (await isCrawlessMode())
     ? "같은 상품을 다시 찍어 보내주시면 그때마다 가격 변화가 기록됩니다. 잊지 않도록 알림을 보내드릴게요."
     : "하루 1회 가격을 기록합니다 (행사 기간에는 2회).";
-  return `${head}\n${how} · 만료 ${until}\n<i>지켜보는 중 ${result.activeCount}개</i>`;
+  return (
+    `${head}\n${how}\n` +
+    `<i>자동으로 끝나지 않습니다 — 그만 지켜보려면 /unwatch로 해제해주세요. 지켜보는 중 ${result.activeCount}개</i>`
+  );
 }
 
 /** `/watch <링크|번호>` · `/unwatch <링크|번호>` */
@@ -767,7 +771,7 @@ async function handleWatchList(chatId: string) {
       : "아직 조회 전";
     return (
       `${i + 1}. ${escapeHtml(item.product.brandName)} ${escapeHtml(item.product.productName)}\n` +
-      `   마지막 조회 ${last} · 만료 ${item.expiresAt.toISOString().slice(0, 10)}`
+      `   마지막 조회 ${last}`
     );
   });
 

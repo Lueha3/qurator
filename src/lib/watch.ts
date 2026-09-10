@@ -18,8 +18,16 @@ import { canonicalizeMusinsaUrl } from "./url-guard";
 import { getWatchLimits, isCrawlessMode } from "./policy";
 import { audit } from "./audit";
 
-/** 워치 등록 기본 유효기간(일). 목적이 끝난 상품에 트래픽이 잔존하지 않게 한다. */
-export const WATCH_DEFAULT_DAYS = 90;
+/**
+ * 자동 만료는 없다 — 종료는 사람이 /unwatch로 직접 한다 (2026-09-10 변경).
+ *
+ * 원래는 "목적이 끝난 상품에 트래픽이 잔존하지 않게" 90일 뒤 자동 해제였다. 그런데 그 트래픽은
+ * 크롤리스 모드(기본 켜짐, docs/05 §3.4)에서 애초에 발생하지 않는다 — 자동 조회가 없으니 방치돼도
+ * 무신사에 요청이 나가지 않는다. 남는 건 "리마인더가 언제까지 오는가"뿐인데, 그건 사람이 판단할
+ * 일이지 날짜 계산이 대신할 일이 아니다. expiresAt 컬럼(스키마 변경 없이 유지)은 여전히
+ * "active AND expiresAt > now"로 조회되므로, 사실상 만료되지 않는 값을 심어 항상 참이 되게 한다.
+ */
+const NEVER_EXPIRES_MS = 100 * 365 * 86_400_000; // ~100년 — "만료 없음"의 동작 상 의미
 
 const FIRST_CHECK_OFFSET_MIN_MS = 1 * 3_600_000;
 const FIRST_CHECK_OFFSET_MAX_MS = 6 * 3_600_000;
@@ -33,7 +41,7 @@ export function firstWatchCheckAt(from: Date = new Date()): Date {
 }
 
 export type AddWatchResult =
-  | { ok: true; alreadyActive: boolean; expiresAt: Date; activeCount: number }
+  | { ok: true; alreadyActive: boolean; activeCount: number }
   | { ok: false; reason: string; activeCount: number };
 
 /**
@@ -58,10 +66,11 @@ export async function addWatch(
     };
   }
 
-  const expiresAt = new Date(now.getTime() + WATCH_DEFAULT_DAYS * 86_400_000);
+  const expiresAt = new Date(now.getTime() + NEVER_EXPIRES_MS);
   await db.watchItem.upsert({
     where: { productId },
-    // 재등록은 기간만 연장한다. checkAfter를 다시 밀면 재등록을 반복해 조회를 영영 미룰 수 있다.
+    // 재등록(이미 활성)은 사실상 아무 것도 바꾸지 않는다 — 자동 만료가 없으니 "연장"할 기간도 없다.
+    // checkAfter를 다시 밀지 않는 이유는 그대로다: 반복 재등록으로 조회를 영영 미룰 수 있기 때문.
     update: { active: true, expiresAt },
     create: { productId, expiresAt, checkAfter: firstWatchCheckAt(now) },
   });
@@ -70,13 +79,12 @@ export async function addWatch(
     actor: "HUMAN",
     action: "watch.added",
     approvalRef: productId,
-    detail: `BF 워치 등록 (만료 ${expiresAt.toISOString().slice(0, 10)})`,
+    detail: "BF 워치 등록 (자동 만료 없음 — /unwatch로 해제)",
   });
 
   return {
     ok: true,
     alreadyActive: isActiveNow,
-    expiresAt,
     activeCount: isActiveNow ? activeCount : activeCount + 1,
   };
 }
@@ -102,21 +110,6 @@ export async function listActiveWatches(now: Date = new Date()) {
   });
 }
 
-/**
- * 만료된 워치를 내린다. 러너가 매 사이클 먼저 호출한다 —
- * 만료 처리를 사람 손에 맡기면 목적이 끝난 상품을 몇 달씩 계속 두드리게 된다.
- */
-export async function expireWatches(now: Date = new Date()): Promise<number> {
-  const { count } = await db.watchItem.updateMany({
-    where: { active: true, expiresAt: { lte: now } },
-    data: { active: false },
-  });
-  if (count > 0) {
-    await audit({ actor: "SYSTEM", action: "watch.expired", detail: `${count}건 자동 해제` });
-  }
-  return count;
-}
-
 /** 사이클을 즉시 끝내야 하는 신호 — 헬스체커와 같은 목록을 쓴다(같은 규율이어야 한다). */
 const STOP_CYCLE_OUTCOMES = new Set([
   "BLOCKED_CIRCUIT",
@@ -133,7 +126,6 @@ export interface WatchCycleResult {
   recorded: number;
   /** 조회는 됐지만 가격을 못 읽은 수 — 누적되면 파서 점검 신호다 */
   parseFailed: number;
-  expired: number;
   /** 이번 사이클에 적용된 재조회 간격의 근거 (행사 창이면 태그) */
   eventTag: string | null;
   /** 조기 종료 사유. 조용히 멈추지 않기 위해 반드시 위로 올린다 */
@@ -175,13 +167,10 @@ export async function runWatchCycle(now: Date = new Date()): Promise<WatchCycleR
     checked: 0,
     recorded: 0,
     parseFailed: 0,
-    expired: 0,
     eventTag: null,
     stoppedEarly: null,
     crawless: false,
   };
-
-  result.expired = await expireWatches(now);
 
   const { limits, eventTag, intervalMs } = await watchCadence(now);
   result.eventTag = eventTag;

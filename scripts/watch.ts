@@ -42,7 +42,7 @@ async function dryRun() {
     console.log(
       `  · ${item.product.brandName} ${item.product.productName}\n` +
         `    ${item.product.canonicalUrl}\n` +
-        `    마지막 조회 ${last} · 만료 ${item.expiresAt.toISOString().slice(0, 10)}`
+        `    마지막 조회 ${last}`
     );
   }
 }
@@ -55,9 +55,7 @@ async function once() {
   // 크롤리스는 고장이 아니라 확정된 운영 모드다. 그래도 조용히 끝내지는 않는다 —
   // "매일 잘 돌고 있는데 아무것도 안 쌓인다"가 이 프로젝트에서 가장 비싼 침묵이다.
   if (result.crawless) {
-    console.log(
-      `[watch] 크롤리스 모드 (docs/05 §3.4) — 요청 0건. 만료해제 ${result.expired}건 (${seconds}초)`
-    );
+    console.log(`[watch] 크롤리스 모드 (docs/05 §3.4) — 요청 0건 (${seconds}초)`);
     console.log("[watch] 가격 기록은 봇 호스트의 리마인더가 담당합니다: npm run remind");
     console.log("[watch] 해제하려면 §3.3 게이트를 실측해 §9에 기록한 뒤 crawlessMode=off");
     return;
@@ -66,7 +64,7 @@ async function once() {
   const eventNote = result.eventTag ? ` · 행사 창 ${result.eventTag}(하루 2회)` : "";
   console.log(
     `[watch] 조회 ${result.checked}건 · 스냅샷 ${result.recorded}건 · ` +
-      `파싱실패 ${result.parseFailed}건 · 만료해제 ${result.expired}건 (${seconds}초)${eventNote}`
+      `파싱실패 ${result.parseFailed}건 (${seconds}초)${eventNote}`
   );
 
   // 조기 종료를 조용히 넘기지 않는다 — 몇 주째 아무것도 수집하지 않는데
