@@ -48,7 +48,13 @@ async function main() {
       for (const update of updates) {
         offset = Math.max(offset, update.update_id + 1); // 처리 완료를 텔레그램에 알리는 커서
         try {
-          await handleUpdate(update);
+          // 지연 작업(앨범 디바운스)은 떼어내 실행한다 — 여기서 await하면 루프가 멈춰
+          // 같은 앨범의 다음 사진을 못 받고, 병합할 대상이 영영 한 장뿐이게 된다.
+          await handleUpdate(update, (work) => {
+            void work().catch((err) =>
+              console.error("[bot] 지연 작업 실패", update.update_id, err)
+            );
+          });
         } catch (err) {
           console.error("[bot] 업데이트 처리 실패", update.update_id, err);
         }

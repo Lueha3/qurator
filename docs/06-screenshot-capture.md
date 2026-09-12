@@ -180,14 +180,27 @@ notes              string|null  애매한 점 ("가격이 두 개 보임" 등)
 - 텔레그램은 앨범을 사진마다 **별개의 update**로 쪼개 보낸다(`media_group_id`로 묶임). 한 update만
   보고는 몇 장이 더 오는지 알 수 없으므로, `media_group_id`별로 짧게(`MEDIA_GROUP_DEBOUNCE_MS`,
   1.5초) 버퍼링했다가 더 안 오면 그때까지 모인 것으로 처리한다 (`handler.ts`의
-  `bufferGroupedScreenshot`/`flushMediaGroup`).
+  `bufferGroupedScreenshot`/`flushAlbumCapture`).
 - 모인 이미지들은 `extractFromScreenshot`에 **한 번에** 전달된다 — Claude에게 "같은 페이지를
   나눠 찍은 조각들"이라고 명시하고, 종합해서 하나의 JSON으로 답하게 한다(`vision-extract.ts`).
 - 상한은 `MAX_GROUP_PHOTOS`(4장) — 그 이상은 실수로 여러 상품을 한 앨범에 같이 보낸 경우로 보고
   이 캡처엔 안 쓴다.
 - 낱장 사진(`media_group_id` 없음)은 지금처럼 즉시 처리한다 — 버퍼링 지연이 없다.
-- 버퍼는 프로세스 메모리다(webhook route의 재전송 캐시와 같은 근거) — 폴링·webhook 모두
-  장기 실행 단일 프로세스라 충분하다.
+
+**버퍼는 DB다 (2026-09-12 변경 — 원래는 프로세스 메모리였다).** 서버리스(Vercel) 배포에서는 같은
+앨범의 update들이 서로 다른 인스턴스로 흩어질 수 있어, 메모리에 모으면 각 인스턴스가 자기가 받은
+한 장만 들고 있다가 병합이 영영 성립하지 않는다. 그래서 `AlbumCapture`/`AlbumCapturePhoto`
+테이블에 모은다 (담는 건 텔레그램 `file_id`뿐 — 이미지 바이트는 여전히 어디에도 저장하지 않는다, §4.3).
+
+- **리더 선출은 DB 유니크 제약에 맡긴다**: `AlbumCapture.mediaGroupId`가 `@id`라, 같은 앨범의
+  여러 요청이 동시에 들어와도 `create`에 성공하는 쪽은 정확히 하나뿐이다. 그 하나가 상태 메시지를
+  띄우고 디바운스 뒤 전체를 처리하며, 나머지는 자기 사진만 넣고 끝낸다.
+- **디바운스 대기를 누가 붙잡아 두는가는 실행 환경이 정한다** (`handleUpdate(update, defer)`):
+  webhook은 `after()`(응답 후에도 함수를 살려둠), 폴링 스크립트는 detach(루프를 막으면 같은 앨범의
+  다음 사진을 못 받는다). 핸들러가 `next/server`를 직접 import하면 폴링 스크립트(tsx)에서 깨지므로
+  주입받는 구조다.
+- 처리 직후 버퍼 행을 **먼저 지운다**(중복 처리 방지). 리더 실행이 죽어 남은 행은 10분 뒤
+  `sweepStaleAlbums`가 치운다.
 
 ---
 

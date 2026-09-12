@@ -267,14 +267,27 @@ function copyUrl(cardId: string): string | null {
 
 // ── 진입점 ──────────────────────────────────────────────────────────────
 
-export async function handleUpdate(update: TgUpdate): Promise<void> {
+/**
+ * "응답을 돌려준 뒤에도 계속 돌아야 하는 일"을 어떻게 잡아둘지는 실행 환경이 정한다.
+ *   - webhook(Vercel 서버리스): `after()` — 응답 후 함수가 얼어붙지 않게 붙잡아 준다.
+ *   - 폴링 스크립트: 그냥 떼어내 실행(detach) — 폴링 루프를 막으면 같은 앨범의 다음 사진을 못 받는다.
+ * 핸들러가 `next/server`를 직접 import하면 폴링 스크립트(tsx)에서 깨지므로, 주입받는다.
+ */
+export type DeferWork = (work: () => Promise<void>) => void;
+
+/** 기본값: 떼어내 실행하고 에러만 로그로 남긴다(폴링·테스트 기본 동작). */
+const detachAndLog: DeferWork = (work) => {
+  void work().catch((err) => console.error("[telegram] 지연 작업 실패", err));
+};
+
+export async function handleUpdate(update: TgUpdate, defer: DeferWork = detachAndLog): Promise<void> {
   if (update.callback_query) return handleCallback(update.callback_query);
-  if (update.message) return handleMessage(update.message);
+  if (update.message) return handleMessage(update.message, defer);
 }
 
 // ── 메시지 처리 ──────────────────────────────────────────────────────────
 
-async function handleMessage(msg: TgMessage): Promise<void> {
+async function handleMessage(msg: TgMessage, defer: DeferWork): Promise<void> {
   if (!isAuthorized(msg.from?.id)) {
     await audit({
       actor: "SYSTEM",
@@ -293,7 +306,8 @@ async function handleMessage(msg: TgMessage): Promise<void> {
     // 앨범(여러 장을 한 번에 전송)은 사진마다 별개의 update로 오므로, 한 캡처로 합치려면
     // 버퍼링이 필요하다 — 낱장 사진은 그대로 즉시 처리한다 (docs/06 §4.4).
     if (msg.media_group_id) {
-      await bufferGroupedScreenshot(msg, chatId);
+      await sweepStaleAlbums(new Date());
+      await bufferGroupedScreenshot(msg, chatId, defer);
     } else {
       await captureFromScreenshot(msg, chatId);
     }
@@ -492,15 +506,15 @@ async function captureFromUrl(rawUrl: string, chatId: string, sourceMessageId: n
  * 끝나면 스코프를 벗어나 버려진다 — 디스크·DB·로그·감사 기록 어디에도 쓰지 않는다 (§4.3).
  */
 async function processScreenshotPhotos(
-  photos: TgPhotoSize[],
+  fileIds: string[],
   chatId: string,
   statusMessageId: number,
   sourceMessageId: number
 ): Promise<void> {
   const images: { data: string; mediaType: string }[] = [];
-  for (const photo of photos) {
+  for (const fileId of fileIds) {
     try {
-      const file = await callMethod<{ file_path: string }>("getFile", { file_id: photo.file_id });
+      const file = await callMethod<{ file_path: string }>("getFile", { file_id: fileId });
       // 텔레그램 자체 CDN이다(무신사와 무관) — gatewayFetch가 아니라 전역 fetch를 직접 쓴다.
       const response = await fetch(
         `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`
@@ -626,7 +640,7 @@ async function captureFromScreenshot(msg: TgMessage, chatId: string): Promise<vo
   const status = await sendMessage({ chatId, text: "🔎 스크린샷 확인하는 중…" });
   // 여러 해상도 중 배열의 마지막(가장 큰 사이즈)을 쓴다 — 작은 글씨(품번 등) 오독을 줄인다.
   const photo = msg.photo![msg.photo!.length - 1];
-  await processScreenshotPhotos([photo], chatId, status.message_id, msg.message_id);
+  await processScreenshotPhotos([photo.file_id], chatId, status.message_id, msg.message_id);
 }
 
 // ── 앨범(여러 장) 스크린샷 병합 ──────────────────────────────────────────
@@ -635,21 +649,10 @@ async function captureFromScreenshot(msg: TgMessage, chatId: string): Promise<vo
 // 찍어 텔레그램 "앨범"(여러 장 한 번에 전송)으로 보낼 수 있다. 텔레그램은 앨범을 사진마다
 // 별개의 update로 쪼개 보내므로, update 하나만 보고는 몇 장이 더 오는지 알 수 없다 — 그래서
 // media_group_id별로 잠깐 모았다가 한 번에 처리한다.
-
-interface PendingMediaGroup {
-  chatId: string;
-  photos: TgPhotoSize[];
-  statusMessageId: number;
-  sourceMessageId: number;
-  timer: ReturnType<typeof setTimeout>;
-}
-
-/**
- * 프로세스 메모리 버퍼. 재시작하면 비지만, 앨범 도착 간격(수백 ms~2초)만 버티면 되므로
- * webhook route의 재전송 중복 캐시와 같은 이유로 이걸로 충분하다 — 봇 프로세스는
- * 폴링·webhook 어느 경로든 장기 실행 단일 프로세스다.
- */
-const pendingMediaGroups = new Map<string, PendingMediaGroup>();
+//
+// 버퍼는 **DB**다(프로세스 메모리가 아니라). 서버리스(Vercel)에서는 같은 앨범의 update들이
+// 서로 다른 인스턴스로 흩어질 수 있어, 메모리에 모으면 각자 한 장씩만 들고 있다가 병합이
+// 영영 성립하지 않는다 (2026-09-12 변경, schema.prisma의 AlbumCapture 주석 참고).
 
 /** 앨범 사진 사이의 대기 시간. 너무 짧으면 마지막 장을 놓치고, 너무 길면 카드가 늦게 뜬다. */
 export const MEDIA_GROUP_DEBOUNCE_MS = 1500;
@@ -661,54 +664,96 @@ export const MEDIA_GROUP_DEBOUNCE_MS = 1500;
  */
 export const MAX_GROUP_PHOTOS = 4;
 
-/**
- * 앨범의 사진 한 장이 도착했다 — 버퍼에 쌓고 타이머를 리셋할 뿐, 여기서 처리를 기다리지
- * 않는다(디바운스 타이머를 await하면 폴링 루프가 같은 앨범의 다음 사진을 못 받는다).
- */
-async function bufferGroupedScreenshot(msg: TgMessage, chatId: string): Promise<void> {
-  const groupId = msg.media_group_id!;
-  const photo = msg.photo![msg.photo!.length - 1];
-  const existing = pendingMediaGroups.get(groupId);
+/** 처리되지 못하고 남은 앨범 버퍼를 청소하는 기준. 리더 실행이 중간에 죽은 경우를 자가 복구한다. */
+const ALBUM_STALE_MS = 10 * 60_000;
 
-  if (existing) {
-    clearTimeout(existing.timer);
-    if (existing.photos.length < MAX_GROUP_PHOTOS) existing.photos.push(photo);
-    existing.timer = setTimeout(() => flushMediaGroupSafely(groupId), MEDIA_GROUP_DEBOUNCE_MS);
-    return;
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * 앨범의 사진 한 장이 도착했다.
+ *
+ * 리더 선출은 DB 유니크 제약에 맡긴다 — `AlbumCapture.mediaGroupId`가 @id라, 같은 앨범의
+ * 여러 요청이 동시에 들어와도 create에 성공하는 쪽은 정확히 하나뿐이다. 그 하나가
+ * ① 상태 메시지를 띄우고 ② 디바운스 뒤 전체를 처리한다. 나머지는 자기 사진만 넣고 끝낸다.
+ */
+async function bufferGroupedScreenshot(
+  msg: TgMessage,
+  chatId: string,
+  defer: DeferWork
+): Promise<void> {
+  const mediaGroupId = msg.media_group_id!;
+  // 여러 해상도 중 배열의 마지막(가장 큰 사이즈)을 쓴다 — 작은 글씨(품번 등) 오독을 줄인다.
+  const photo = msg.photo![msg.photo!.length - 1];
+
+  let isLeader = true;
+  try {
+    await db.albumCapture.create({
+      data: { mediaGroupId, chatId, sourceMessageId: msg.message_id },
+    });
+  } catch {
+    // 이미 있다 = 다른 요청이 리더다. (유니크 위반 외의 오류도 여기로 오지만, 그 경우
+    // 아래 사진 insert가 FK 위반으로 실패하며 같은 에러 경로를 타므로 따로 구분하지 않는다.)
+    isLeader = false;
   }
+
+  await db.albumCapturePhoto.create({ data: { mediaGroupId, fileId: photo.file_id } });
+  if (!isLeader) return;
 
   // 앨범의 첫 사진에서만 상태 메시지를 보낸다 — 장마다 "확인하는 중"이 여러 개 뜨면 소란스럽다.
   const status = await sendMessage({
     chatId,
     text: "🔎 스크린샷 확인하는 중… (더 있으면 잠시 기다립니다)",
   });
-  pendingMediaGroups.set(groupId, {
-    chatId,
-    photos: [photo],
-    statusMessageId: status.message_id,
-    sourceMessageId: msg.message_id,
-    timer: setTimeout(() => flushMediaGroupSafely(groupId), MEDIA_GROUP_DEBOUNCE_MS),
+  await db.albumCapture.update({
+    where: { mediaGroupId },
+    data: { statusMessageId: status.message_id },
+  });
+
+  // 리더만 디바운스를 건다. defer는 실행 환경이 정한다 — webhook은 after()(응답 후에도 살려둠),
+  // 폴링은 detach(루프가 같은 앨범의 다음 사진을 계속 받아야 하므로 await하지 않는다).
+  defer(async () => {
+    await sleep(MEDIA_GROUP_DEBOUNCE_MS);
+    await flushAlbumCapture(mediaGroupId);
   });
 }
 
-/** setTimeout 콜백은 async를 await할 수 없다 — 에러가 조용히 사라지지 않게 여기서 잡는다. */
-function flushMediaGroupSafely(groupId: string): void {
-  flushMediaGroup(groupId).catch((err) => {
-    console.error("[screenshot] 앨범 처리 실패", groupId, err);
+/**
+ * 디바운스가 끝났다 — 그때까지 모인 사진들로 한 번에 캡처를 진행한다.
+ * 버퍼 행을 **먼저** 지워 중복 처리를 막는다(지운 뒤 실패하면 그 앨범은 포기하는 쪽이,
+ * 카드가 두 장 뜨는 것보다 낫다).
+ */
+export async function flushAlbumCapture(mediaGroupId: string): Promise<void> {
+  const album = await db.albumCapture.findUnique({
+    where: { mediaGroupId },
+    include: { photos: { orderBy: { createdAt: "asc" } } },
   });
-}
+  if (!album || album.statusMessageId === null) return;
 
-/** 디바운스 타이머가 만료되면 그때까지 모인 사진들로 한 번에 캡처를 진행한다. */
-async function flushMediaGroup(groupId: string): Promise<void> {
-  const group = pendingMediaGroups.get(groupId);
-  if (!group) return; // 이미 처리됐거나(방어적) 존재하지 않는 그룹
-  pendingMediaGroups.delete(groupId);
+  await db.albumCapture.delete({ where: { mediaGroupId } }); // photos는 cascade로 함께 삭제
+
+  const fileIds = album.photos.slice(0, MAX_GROUP_PHOTOS).map((p) => p.fileId);
+  if (fileIds.length === 0) return;
+
   await processScreenshotPhotos(
-    group.photos,
-    group.chatId,
-    group.statusMessageId,
-    group.sourceMessageId
+    fileIds,
+    album.chatId,
+    album.statusMessageId,
+    album.sourceMessageId
   );
+}
+
+/** 리더 실행이 죽어 남겨진 버퍼를 치운다. 새 앨범이 들어올 때마다 곁다리로 한 번씩 돈다. */
+async function sweepStaleAlbums(now: Date): Promise<void> {
+  try {
+    await db.albumCapture.deleteMany({
+      where: { createdAt: { lt: new Date(now.getTime() - ALBUM_STALE_MS) } },
+    });
+  } catch (err) {
+    // 청소 실패가 캡처를 막을 이유는 없다.
+    console.warn("[screenshot] 오래된 앨범 버퍼 청소 실패", err);
+  }
 }
 
 // ── 작년 BF 가격 수동 입력 ───────────────────────────────────────────────

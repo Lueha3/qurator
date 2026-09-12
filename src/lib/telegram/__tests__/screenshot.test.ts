@@ -44,7 +44,7 @@ vi.mock("../../vision-extract", () => ({
   extractFromScreenshot: (...args: unknown[]) => extractFromScreenshot(...args),
 }));
 
-const { handleUpdate, MEDIA_GROUP_DEBOUNCE_MS, MAX_GROUP_PHOTOS } = await import("../handler");
+const { handleUpdate, flushAlbumCapture, MAX_GROUP_PHOTOS } = await import("../handler");
 const { db } = await import("../../db");
 const { CB } = await import("../cards");
 
@@ -152,6 +152,7 @@ async function resetDb() {
   await db.watchItem.deleteMany();
   await db.product.deleteMany();
   await db.auditLog.deleteMany();
+  await db.albumCapture.deleteMany(); // photos는 cascade
 }
 
 beforeEach(async () => {
@@ -266,29 +267,40 @@ describe("재촬영 시 가격 변화 안내 (docs/06 §3.1)", () => {
 
 // 폰 화면 하나로 상품 사진(위)과 가격(아래)이 한 스크린샷에 다 안 담기는 문제 — 해결책은
 // 앨범(여러 장 한 번에 전송)을 한 캡처로 합치는 것. 텔레그램은 앨범을 사진마다 별개의
-// update로 쪼개 보내므로(같은 media_group_id 공유), 디바운스로 모아야 한다.
+// update로 쪼개 보내므로(같은 media_group_id 공유), DB에 잠깐 모았다가 한 번에 처리한다.
 //
-// 이 스위트는 실제 타이머로 기다린다(가짜 타이머 대신) — 디바운스 콜백 안에서 Prisma·
-// 텔레그램 목까지 이어지는 여러 단계 await 체인이라, 가짜 타이머의 마이크로태스크 플러시와
-// 맞물리면 체인이 테스트 종료 시점에 덜 끝난 채로 다음 테스트로 새어나가 FK 오류 등으로 깨진다.
-// 디바운스가 1.5초라 다소 느리지만(테스트당 최대 ~2초), 안정성이 우선이다.
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// 테스트는 디바운스 시간을 실제로 기다리지 않는다. handleUpdate가 "지연 작업"을 주입받은
+// defer로 넘기므로, 여기서는 그걸 모아뒀다가 원할 때 직접 실행하면 된다 — 타이밍에 기대지 않아
+// 결정적이고, 서버리스에서 실제로 일어나는 일(after()가 같은 작업을 실행)과 구조가 같다.
+describe("앨범(여러 장) 스크린샷 — docs/06 §4.4.1 병합", () => {
+  /** handleUpdate가 넘긴 지연 작업을 붙잡아 둔다 (프로덕션에선 after()/detach가 하는 일) */
+  function collectDeferred() {
+    const deferred: Array<() => Promise<void>> = [];
+    return {
+      defer: (work: () => Promise<void>) => deferred.push(work),
+      /** 디바운스 대기는 건너뛰고 즉시 병합 처리만 실행한다 */
+      async flushNow(groupId: string) {
+        deferred.length = 0;
+        await flushAlbumCapture(groupId);
+      },
+      count: () => deferred.length,
+    };
+  }
 
-describe("앨범(여러 장) 스크린샷 — docs/06 §4.4 병합", () => {
   it("같은 media_group_id의 사진 2장을 모아 한 번에 Vision에 보낸다", async () => {
     extractFromScreenshot.mockResolvedValue(VISION_RESULT_FULL);
+    const d = collectDeferred();
 
     const groupId = "album-merge-1";
-    await handleUpdate(albumPhotoMessage(groupId, "a"));
+    await handleUpdate(albumPhotoMessage(groupId, "a"), d.defer);
+    await handleUpdate(albumPhotoMessage(groupId, "b"), d.defer);
 
-    // 디바운스 창이 끝나기 전엔 아직 처리되지 않는다 — 더 올 수도 있으니 기다린다.
-    await sleep(500);
+    // 디바운스가 끝나기 전엔 아직 아무것도 처리하지 않는다 — 더 올 수도 있으니 기다리는 중이다.
     expect(extractFromScreenshot).not.toHaveBeenCalled();
+    // 지연 작업은 리더(첫 사진) 하나만 건다 — 장마다 걸면 같은 앨범이 여러 번 처리된다.
+    expect(d.count()).toBe(1);
 
-    await handleUpdate(albumPhotoMessage(groupId, "b"));
-    await sleep(MEDIA_GROUP_DEBOUNCE_MS + 300);
+    await d.flushNow(groupId);
 
     expect(extractFromScreenshot).toHaveBeenCalledTimes(1);
     const [images] = extractFromScreenshot.mock.calls[0];
@@ -299,32 +311,52 @@ describe("앨범(여러 장) 스크린샷 — docs/06 §4.4 병합", () => {
 
     const deal = await db.deal.findFirstOrThrow();
     expect(deal.parseSource).toBe("vision");
-  }, 10_000);
+
+    // 처리된 버퍼는 남지 않는다 (다음 요청이 같은 앨범을 또 처리하면 카드가 두 장 뜬다)
+    expect(await db.albumCapture.count()).toBe(0);
+    expect(await db.albumCapturePhoto.count()).toBe(0);
+  });
 
   it("최대 장수를 넘는 사진은 이 캡처에 쓰지 않는다", async () => {
     extractFromScreenshot.mockResolvedValue(VISION_RESULT_FULL);
+    const d = collectDeferred();
 
     const groupId = "album-merge-2";
     for (const suffix of ["a", "b", "c", "d", "e"]) {
-      await handleUpdate(albumPhotoMessage(groupId, suffix));
+      await handleUpdate(albumPhotoMessage(groupId, suffix), d.defer);
     }
-    await sleep(MEDIA_GROUP_DEBOUNCE_MS + 300);
+    await d.flushNow(groupId);
 
     expect(extractFromScreenshot).toHaveBeenCalledTimes(1);
     const [images] = extractFromScreenshot.mock.calls[0];
     expect(images).toHaveLength(MAX_GROUP_PHOTOS);
-  }, 10_000);
+  });
 
   it("서로 다른 media_group_id는 각자 따로 캡처된다", async () => {
     extractFromScreenshot.mockResolvedValue(VISION_RESULT_FULL);
+    const d = collectDeferred();
 
-    await handleUpdate(albumPhotoMessage("group-x", "a"));
-    await handleUpdate(albumPhotoMessage("group-y", "a"));
-    await sleep(MEDIA_GROUP_DEBOUNCE_MS + 300);
+    await handleUpdate(albumPhotoMessage("group-x", "a"), d.defer);
+    await handleUpdate(albumPhotoMessage("group-y", "a"), d.defer);
+    await flushAlbumCapture("group-x");
+    await flushAlbumCapture("group-y");
 
     expect(extractFromScreenshot).toHaveBeenCalledTimes(2);
     expect(await db.deal.count()).toBe(2);
-  }, 10_000);
+  });
+
+  it("이미 처리된 앨범을 또 flush해도 아무 일도 일어나지 않는다 (재전송·중복 호출 방어)", async () => {
+    extractFromScreenshot.mockResolvedValue(VISION_RESULT_FULL);
+    const d = collectDeferred();
+
+    const groupId = "album-merge-3";
+    await handleUpdate(albumPhotoMessage(groupId, "a"), d.defer);
+    await d.flushNow(groupId);
+    await flushAlbumCapture(groupId); // 두 번째 호출
+
+    expect(extractFromScreenshot).toHaveBeenCalledTimes(1);
+    expect(await db.deal.count()).toBe(1);
+  });
 });
 
 describe("Vision 실패 — API 장애/타임아웃 (docs/06 §3.3)", () => {

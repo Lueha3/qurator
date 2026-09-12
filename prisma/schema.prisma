@@ -467,3 +467,40 @@ model Policy {
 
   @@map("policy")
 }
+
+// ── album_captures ──────────────────────────────────────────────────────
+// 앨범(여러 장 한 번에 보낸 스크린샷)을 한 캡처로 합치기 위한 짧은 수명의 버퍼 — docs/06 §4.4.1.
+//
+// **왜 메모리가 아니라 DB인가**: 텔레그램은 앨범을 사진마다 별개의 update로 쪼개 보내는데,
+// 서버리스(Vercel)에서는 그 update들이 서로 다른 인스턴스로 흩어질 수 있다. 프로세스 메모리에
+// 모으면 인스턴스마다 자기가 받은 한 장만 들고 있게 되어 병합이 영영 성립하지 않는다.
+// 공유 저장소는 DB뿐이므로 여기 모은다 (2026-09-12 변경, 그 전에는 in-memory Map).
+//
+// 이 행은 처리 직후 삭제되는 임시 데이터다 — 이미지 자체는 절대 담지 않는다(§4.3).
+// 담는 것은 텔레그램 file_id뿐이며, 그것으로 다운로드는 캡처 시점에 메모리에서만 일어난다.
+model AlbumCapture {
+  /** 텔레그램 media_group_id. @id라 "먼저 만든 요청이 리더"를 DB 유니크 제약으로 정한다 */
+  mediaGroupId    String   @id
+  chatId          String
+  /** 앨범의 첫 사진 메시지 — 감사 로그에 남길 출처 */
+  sourceMessageId Int
+  /** 리더가 띄운 "확인하는 중…" 메시지. 그 자리에 최종 카드가 렌더된다 */
+  statusMessageId Int?
+  createdAt       DateTime @default(now())
+
+  photos AlbumCapturePhoto[]
+
+  @@map("album_captures")
+}
+
+model AlbumCapturePhoto {
+  id           String       @id @default(uuid())
+  mediaGroupId String
+  album        AlbumCapture @relation(fields: [mediaGroupId], references: [mediaGroupId], onDelete: Cascade)
+  /** 텔레그램 file_id (이미지 바이트가 아니다) */
+  fileId       String
+  createdAt    DateTime     @default(now())
+
+  @@index([mediaGroupId, createdAt])
+  @@map("album_capture_photos")
+}
