@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
+    "db:export": "tsx --env-file=.env scripts/export-data.ts",
+    "db:import": "tsx --env-file=.env scripts/import-data.ts",
     "bot": "tsx --env-file=.env scripts/bot-poll.ts",
     "gateway": "tsx --env-file=.env scripts/gateway.ts",
     "test": "vitest run",

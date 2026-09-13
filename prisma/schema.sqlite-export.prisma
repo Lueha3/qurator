@@ -1,22 +1,17 @@
-// qurator (HoneyFlow) — Phase 0~1 스키마
-// 정본: docs/02-architecture.md §3. 필드/enum은 정본과 동일하게 유지해
-// Phase 2+ (발행 어댑터·헬스체커·딜 레이더)로 갈 때 스키마 변경이 없도록 한다.
-//
-// DB: Supabase Postgres (2026-09-13 전환 — 그 전엔 로컬 SQLite였다, Vercel 서버리스
-// 배포와 함께 이관). 마이그레이션 이력은 docs/07-deploy.md 참고. creator_id가 이미 전
-// 테이블 FK라 Phase 3(RLS 멀티테넌트) 전환도 그대로 이어진다.
+// 구 SQLite dev.db를 Supabase(Postgres)로 이관하기 전, 딱 한 번 읽기 위한 전용 스키마.
+// 메인 prisma/schema.prisma가 postgresql로 전환된 뒤에도 scripts/export-data.ts가 이 파일로
+// 예전 dev.db를 그대로 읽을 수 있게 datasource만 sqlite로 고정한 사본이다.
+// 모델 정의는 이관 시점의 schema.prisma와 완전히 동일해야 한다 — 필드가 어긋나면 export가
+// 조용히 일부 컬럼을 빠뜨릴 수 있다. migrate 대상이 아니므로 prisma/migrations와 무관하다.
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma-sqlite-export-client"
 }
 
 datasource db {
-  provider  = "postgresql"
-  // 풀링 연결(PgBouncer, 포트 6543) — 서버리스 함수 다수가 동시에 열어도 커넥션이 안 마른다.
-  url       = env("DATABASE_URL")
-  // 비풀링 직접 연결(포트 5432) — 마이그레이션 전용. PgBouncer 트랜잭션 모드는 Prisma
-  // 마이그레이션이 쓰는 advisory lock·prepared statement를 지원하지 않는다.
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  url      = env("SQLITE_DATABASE_URL")
 }
 
 // ── creators ────────────────────────────────────────────────────────────

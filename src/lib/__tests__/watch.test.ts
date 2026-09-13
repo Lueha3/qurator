@@ -25,10 +25,15 @@ ${JSON.stringify({
 </script></head><body>${"본문 ".repeat(2000)}</body></html>`;
 
 async function resetDb() {
-  await db.priceSnapshot.deleteMany();
-  await db.watchItem.deleteMany();
+  await db.clickEvent.deleteMany();
+  await db.shortLink.deleteMany();
+  await db.post.deleteMany();
+  await db.contentCard.deleteMany();
+  await db.curatorLink.deleteMany();
   await db.deal.deleteMany();
   await db.productVariant.deleteMany();
+  await db.priceSnapshot.deleteMany();
+  await db.watchItem.deleteMany();
   await db.product.deleteMany();
   await db.creator.deleteMany();
   await db.policy.deleteMany();
