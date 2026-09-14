@@ -30,12 +30,16 @@
 1. [supabase.com](https://supabase.com)에서 프로젝트 생성 (무료 티어로 충분 — [04-roadmap.md] 비용표).
 2. **Settings → Database → Connection string**에서 두 개를 복사한다:
    - **Transaction pooler** (포트 6543) → `.env`의 `DATABASE_URL`. 앱 런타임(서버리스 함수 다수)이 이걸 쓴다.
-   - **Direct connection** (포트 5432) → `.env`의 `DIRECT_URL`. `prisma migrate`만 이걸 쓴다.
+   - **Session pooler** (포트 5432, pooler 호스트) → `.env`의 `DIRECT_URL`. `prisma migrate`만 이걸 쓴다.
      (PgBouncer 트랜잭션 모드는 마이그레이션이 필요로 하는 advisory lock을 지원하지 않는다.)
+     **"Direct connection"(`db.<project-ref>.supabase.co`)을 쓰지 않는다** — IPv6 전용이라 IPv6이 안
+     되는 네트워크(흔한 가정용 회선 포함)에서 `P1001: Can't reach database server`로 실패한다.
+     Session pooler는 같은 pooler 호스트의 5432 포트라 IPv4로도 접속되고, 세션 단위 기능(advisory
+     lock 등)도 지원해 마이그레이션에 문제없다.
 3. `prisma/schema.prisma`의 `datasource db`가 이미 이 두 값을 읽도록 돼 있다 — 스키마 수정은 필요 없다.
-4. 테이블 생성:
+4. 테이블 생성 (Windows `cmd`는 `set VAR=값` 후 `npx ...`, macOS/Linux는 아래처럼 한 줄로):
    ```bash
-   DATABASE_URL="<pooler url>" DIRECT_URL="<direct url>" npx prisma migrate deploy
+   DATABASE_URL="<transaction pooler url, 6543>" DIRECT_URL="<session pooler url, 5432>" npx prisma migrate deploy
    ```
    `prisma/migrations/20260913023212_init_postgres`가 전체 스키마(17개 모델)를 한 번에 만든다.
    그 이전 SQLite 시절 마이그레이션은 `prisma/migrations-sqlite-archive/`에 이력으로만 남아 있다
@@ -49,12 +53,16 @@
 어떤 채팅 세션도 실제 사업 데이터를 거치지 않는다 — PC에서 Supabase로 직접 올라간다.
 
 ```bash
+# 0) 이 PC에서 처음 하는 거라면, sqlite 전용 Prisma 클라이언트를 한 번 생성한다
+#    (node_modules 안에 생기는 산출물이라 git에는 없다 — 각자 PC에서 직접 만들어야 한다)
+SQLITE_DATABASE_URL="file:./prisma/dev.db" npx prisma generate --schema=prisma/schema.sqlite-export.prisma
+
 # 1) 옛 dev.db를 JSON으로 통째로 읽는다 (Postgres 전환 후에도 이 스키마로 sqlite를 그대로 읽는다)
 SQLITE_DATABASE_URL="file:./prisma/dev.db" npm run db:export
 #   → migration-dump.json 생성 (.gitignore에 이미 막혀 있음 — 커밋되지 않는다)
 
 # 2) Supabase에 테이블이 이미 있는 상태에서 (§2-4 완료 후) 그 JSON을 그대로 적재한다
-DATABASE_URL="<pooler url>" DIRECT_URL="<direct url>" npm run db:import
+DATABASE_URL="<transaction pooler url, 6543>" DIRECT_URL="<session pooler url, 5432>" npm run db:import
 ```
 
 - id를 원본 UUID 그대로 재사용하므로 관계(FK)가 자동으로 맞는다 — 별도 매핑표가 필요 없다.
@@ -75,7 +83,7 @@ DATABASE_URL="<pooler url>" DIRECT_URL="<direct url>" npm run db:import
    | 변수 | 비고 |
    |---|---|
    | `DATABASE_URL` | Supabase Transaction pooler (6543) |
-   | `DIRECT_URL` | Supabase Direct connection (5432) |
+   | `DIRECT_URL` | Supabase Session pooler (5432) — "Direct connection"이 아님, §2 참고 |
    | `ANTHROPIC_API_KEY` | Vision 추출용. 없으면 그레이스풀 디그레이드 |
    | `TELEGRAM_BOT_TOKEN` | BotFather 발급 |
    | `TELEGRAM_ALLOWED_CHAT_IDS` | 비우면 봇이 전 메시지 거부(fail closed) |

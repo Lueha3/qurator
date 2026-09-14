@@ -25,10 +25,23 @@ async function main() {
   }
 
   // 메인 @prisma/client(postgresql)와 절대 혼동되지 않게 별도 생성 경로에서 가져온다.
-  const { PrismaClient } = await import(
-    "../node_modules/.prisma-sqlite-export-client/index.js"
-  );
-  const src = new PrismaClient();
+  // 이 모듈은 각 PC에서 `prisma generate --schema=prisma/schema.sqlite-export.prisma`로만
+  // 만들어지는 산출물이라(git 미포함) 빌드 서버(Vercel 등)엔 애초에 없는 게 정상이다 —
+  // 경로를 변수로 감싸 TS가 정적 타입 검사 때 이 모듈을 찾으려 하지 않게 한다.
+  const sqliteClientPath = "../node_modules/.prisma-sqlite-export-client/index.js";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 빌드 시점엔 없는 모듈이라 타입을 낼 수 없다
+  let PrismaClientCtor: new () => Record<string, any>;
+  try {
+    ({ PrismaClient: PrismaClientCtor } = await import(sqliteClientPath));
+  } catch {
+    console.error(
+      "[export] sqlite 전용 Prisma 클라이언트가 없습니다. 이 PC에서 먼저 아래를 실행하세요:\n" +
+        "  SQLITE_DATABASE_URL=file:./prisma/dev.db npx prisma generate --schema=prisma/schema.sqlite-export.prisma\n" +
+        "(node_modules 안에 생기는 산출물이라 git엔 없고, 각자 PC에서 한 번씩 만들어야 합니다.)"
+    );
+    process.exit(1);
+  }
+  const src = new PrismaClientCtor();
 
   try {
     // FK 순서는 읽기에는 의미 없다 — export는 각 테이블을 통째로 읽기만 한다.
