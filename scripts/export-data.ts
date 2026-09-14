@@ -8,8 +8,8 @@
 //   1) (이 브랜치로 갈아타기 전) 지금 쓰던 커밋에서 아무것도 안 해도 됨 — 이 스크립트는
 //      메인 schema.prisma가 postgresql로 바뀐 뒤에도 별도 스키마(schema.sqlite-export.prisma)로
 //      옛 dev.db를 그대로 읽는다.
-//   2) SQLITE_DATABASE_URL=file:./prisma/dev.db npx prisma generate --schema=prisma/schema.sqlite-export.prisma
-//   3) SQLITE_DATABASE_URL=file:./prisma/dev.db npx tsx scripts/export-data.ts
+//   2) SQLITE_DATABASE_URL=file:./dev.db npx prisma generate --schema=prisma/schema.sqlite-export.prisma
+//   3) SQLITE_DATABASE_URL=file:./dev.db npx tsx scripts/export-data.ts
 //   4) 생성된 migration-dump.json을 확인 후 scripts/import-data.ts로 넘긴다.
 
 import { writeFileSync } from "node:fs";
@@ -19,7 +19,7 @@ async function main() {
   const sqliteUrl = process.env.SQLITE_DATABASE_URL;
   if (!sqliteUrl) {
     console.error(
-      "SQLITE_DATABASE_URL이 없습니다. 예: SQLITE_DATABASE_URL=file:./prisma/dev.db npx tsx scripts/export-data.ts"
+      "SQLITE_DATABASE_URL이 없습니다. 예: SQLITE_DATABASE_URL=file:./dev.db npx tsx scripts/export-data.ts"
     );
     process.exit(1);
   }
@@ -36,7 +36,7 @@ async function main() {
   } catch {
     console.error(
       "[export] sqlite 전용 Prisma 클라이언트가 없습니다. 이 PC에서 먼저 아래를 실행하세요:\n" +
-        "  SQLITE_DATABASE_URL=file:./prisma/dev.db npx prisma generate --schema=prisma/schema.sqlite-export.prisma\n" +
+        "  SQLITE_DATABASE_URL=file:./dev.db npx prisma generate --schema=prisma/schema.sqlite-export.prisma\n" +
         "(node_modules 안에 생기는 산출물이라 git엔 없고, 각자 PC에서 한 번씩 만들어야 합니다.)"
     );
     process.exit(1);

@@ -55,10 +55,10 @@
 ```bash
 # 0) 이 PC에서 처음 하는 거라면, sqlite 전용 Prisma 클라이언트를 한 번 생성한다
 #    (node_modules 안에 생기는 산출물이라 git에는 없다 — 각자 PC에서 직접 만들어야 한다)
-SQLITE_DATABASE_URL="file:./prisma/dev.db" npx prisma generate --schema=prisma/schema.sqlite-export.prisma
+SQLITE_DATABASE_URL="file:./dev.db" npx prisma generate --schema=prisma/schema.sqlite-export.prisma
 
 # 1) 옛 dev.db를 JSON으로 통째로 읽는다 (Postgres 전환 후에도 이 스키마로 sqlite를 그대로 읽는다)
-SQLITE_DATABASE_URL="file:./prisma/dev.db" npm run db:export
+SQLITE_DATABASE_URL="file:./dev.db" npm run db:export
 #   → migration-dump.json 생성 (.gitignore에 이미 막혀 있음 — 커밋되지 않는다)
 
 # 2) Supabase에 테이블이 이미 있는 상태에서 (§2-4 완료 후) 그 JSON을 그대로 적재한다
