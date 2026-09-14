@@ -11,12 +11,10 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:export": "tsx --env-file=.env scripts/export-data.ts",
     "db:import": "tsx --env-file=.env scripts/import-data.ts",
-    "bot": "tsx --env-file=.env scripts/bot-poll.ts",
     "gateway": "tsx --env-file=.env scripts/gateway.ts",
     "test": "vitest run",
     "health": "tsx --env-file=.env scripts/health-check.ts",
-    "watch": "tsx --env-file=.env scripts/watch.ts",
-    "remind": "tsx --env-file=.env scripts/remind.ts"
+    "watch": "tsx --env-file=.env scripts/watch.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

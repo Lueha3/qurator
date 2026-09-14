@@ -20,8 +20,8 @@ const MAX_TOKENS = 1024;
 // 텍스트 훅 생성(ai-hook.ts, 10초)보다 넉넉히 잡는다 — 이미지 토큰 처리가 텍스트만 보낼 때보다 오래 걸린다.
 const TIMEOUT_MS = 20_000;
 
-// SDK가 받는 media_type은 이 네 값만의 리터럴 유니온이다. 호출부(텔레그램 핸들러)는 텔레그램이
-// 알려주는 MIME 문자열을 그대로 넘기므로, 여기서 하나로 좁혀 SDK 타입과 맞춘다.
+// SDK가 받는 media_type은 이 네 값만의 리터럴 유니온이다. 호출부는 업로드된 파일의 MIME
+// 문자열을 그대로 넘기므로, 여기서 하나로 좁혀 SDK 타입과 맞춘다.
 type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
 function toImageMediaType(mediaType: string): ImageMediaType {
@@ -36,7 +36,7 @@ export interface VisionExtractResult {
   isProductPage: boolean;
   brand: string | null;
   productName: string | null;
-  /** 품번 — 작은 글씨라 텔레그램 압축 사진에서는 자주 null이 된다 (docs/06 §4.4) */
+  /** 품번 — 작은 글씨라 압축된 스크린샷에서는 자주 null이 된다 (docs/06 §4.4) */
   styleCode: string | null;
   /** 정가(취소선·"정가" 표기) — 원 단위 정수 */
   listPrice: number | null;
@@ -72,7 +72,7 @@ const SYSTEM_PROMPT = `너는 무신사(Musinsa) 패션 앱 상품 페이지 스
 
 /**
  * 폰 화면 하나로 상품명·이미지와 가격이 다 안 담기는 경우, 사용자가 위/아래로 나눠 여러 장을
- * 찍어 한 번에(텔레그램 앨범) 보낼 수 있다 (docs/06 §4.4). 그럴 땐 모델에게 "따로 판단할
+ * 찍어 한 번에 올릴 수 있다 (docs/06 §4.4). 그럴 땐 모델에게 "따로 판단할
  * 여러 장면"이 아니라 "한 화면을 나눠 찍은 조각들"이라는 것을 명시해야 한다 — 안 그러면
  * 한 장만 보고 답하거나, 장마다 다른 상품으로 오인할 수 있다.
  */

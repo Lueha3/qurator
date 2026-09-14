@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import type { ColorLinkInput, CreateDealInput, DealDTO } from "@/lib/api-types";
+import { Field, inputCls } from "./form";
 
 const EMPTY_FORM = {
   brand: "",
@@ -28,7 +30,8 @@ function toNumberOrUndefined(v: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-export function DealForm({ onCreated }: { onCreated: (deal: DealDTO) => void }) {
+export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void }) {
+  const router = useRouter();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [colorLinks, setColorLinks] = useState<ColorLinkInput[]>([]);
   const [useAiHook, setUseAiHook] = useState(true);
@@ -86,9 +89,11 @@ export function DealForm({ onCreated }: { onCreated: (deal: DealDTO) => void }) 
         setError(json.error ?? "카드 생성에 실패했습니다.");
         return;
       }
-      onCreated(json.deal as DealDTO);
       setForm(EMPTY_FORM);
       setColorLinks([]);
+      // 목록은 서버가 그린다 — 새로 읽어 오면 방금 만든 딜이 '진행 중' 맨 위에 온다.
+      router.refresh();
+      onCreated?.(json.deal as DealDTO);
     } catch {
       setError("서버에 연결할 수 없습니다.");
     } finally {
@@ -306,15 +311,3 @@ export function DealForm({ onCreated }: { onCreated: (deal: DealDTO) => void }) 
     </form>
   );
 }
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-muted">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-const inputCls =
-  "w-full rounded-md border border-line bg-background px-2.5 py-1.5 text-sm outline-none focus:border-honey";

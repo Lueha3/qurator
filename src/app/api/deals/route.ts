@@ -177,9 +177,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // 수동 폼은 링크까지 한 번에 받으므로 카드가 바로 렌더된다 — 승인 대기 단계로 들어간다.
     return tx.deal.update({
       where: { id: createdDeal.id },
-      data: { status: "READY" },
+      data: { status: "READY", approvalStage: "READY_TO_PUBLISH" },
       include: DEAL_INCLUDE,
     });
   });

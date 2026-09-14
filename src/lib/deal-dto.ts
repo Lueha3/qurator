@@ -1,21 +1,27 @@
-import type { Channel } from "@prisma/client";
+import type { ApprovalStage, Channel, LinkHealth } from "@prisma/client";
 import type { DealDTO, PriceHistoryDTO } from "./api-types";
-import { discountRate, type PriceAnalysis } from "./price-analysis";
+import { buildPriceChangeNote, discountRate, type PriceAnalysis } from "./price-analysis";
 import { formatRelativeFromNow } from "./format";
 
 export const DEAL_INCLUDE = {
-  product: true,
+  product: { include: { watchItem: { select: { active: true, expiresAt: true } } } },
+  curatorLinks: { select: { id: true, health: true } },
   contentCards: { orderBy: { channel: "asc" as const } },
 };
 
 type DealWithRelations = {
   id: string;
+  productId: string;
   status: string;
+  approvalStage: ApprovalStage;
+  parseSource: string | null;
   salePrice: number | null;
   discountRate: number | null;
+  couponCode: string | null;
   couponDesc: string | null;
   finalPrice: number | null;
   endsAt: Date | null;
+  curatorNote: string | null;
   hookLine: string | null;
   createdAt: Date;
   product: {
@@ -24,11 +30,15 @@ type DealWithRelations = {
     productName: string;
     styleCode: string | null;
     canonicalUrl: string;
+    musinsaGoodsNo: string | null;
     listPrice: number;
+    watchItem: { active: boolean; expiresAt: Date } | null;
   };
+  curatorLinks: { id: string; health: LinkHealth }[];
   contentCards: {
     id: string;
     channel: Channel;
+    version: number;
     bodyText: string;
     charCount: number;
     disclosureOk: boolean;
@@ -72,8 +82,19 @@ export function toPriceHistoryDTO(
   };
 }
 
-export function toDealDTO(deal: DealWithRelations, analysis?: PriceAnalysis): DealDTO {
-  const cards = deal.contentCards.map((c) => {
+export function toDealDTO(
+  deal: DealWithRelations,
+  analysis?: PriceAnalysis,
+  now: Date = new Date()
+): DealDTO {
+  // 카드는 불변·버전 누적이다 — 화면에는 채널별 **최신 버전**만 보여준다. 재렌더된 v2 옆에
+  // v1이 같이 보이면 어느 것이 나갈 카드인지 알 수 없다(approval-first의 "본 것 = 나가는 것").
+  const latestByChannel = new Map<Channel, DealWithRelations["contentCards"][number]>();
+  for (const c of deal.contentCards) {
+    const cur = latestByChannel.get(c.channel);
+    if (!cur || c.version > cur.version) latestByChannel.set(c.channel, c);
+  }
+  const cards = [...latestByChannel.values()].map((c) => {
     const aiFields: string[] = c.aiGeneratedFields ? JSON.parse(c.aiGeneratedFields) : [];
     const warnings: string[] = c.warnings ? JSON.parse(c.warnings) : [];
     return {
@@ -93,23 +114,34 @@ export function toDealDTO(deal: DealWithRelations, analysis?: PriceAnalysis): De
       ? "ai"
       : "human";
 
+  const watch = deal.product.watchItem;
+
   return {
     id: deal.id,
+    productId: deal.productId,
     brand: deal.product.brandName,
     productName: deal.product.productName,
     styleCode: deal.product.styleCode,
     canonicalUrl: deal.product.canonicalUrl,
+    musinsaGoodsNo: deal.product.musinsaGoodsNo,
     listPrice: deal.product.listPrice,
     salePrice: deal.salePrice,
     finalPrice: deal.finalPrice,
     discountRate: deal.discountRate,
+    couponCode: deal.couponCode,
     couponDesc: deal.couponDesc,
     endsAt: deal.endsAt ? deal.endsAt.toISOString() : null,
+    curatorNote: deal.curatorNote,
     hookLine: deal.hookLine,
     hookSource,
     status: deal.status,
+    approvalStage: deal.approvalStage,
+    parseSource: deal.parseSource,
+    linkCount: deal.curatorLinks.length,
+    watchActive: !!watch && watch.active && watch.expiresAt > now,
+    priceChangeNote: buildPriceChangeNote(analysis),
     createdAt: deal.createdAt.toISOString(),
     cards,
-    priceHistory: toPriceHistoryDTO(analysis),
+    priceHistory: toPriceHistoryDTO(analysis, now),
   };
 }

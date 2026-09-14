@@ -1,26 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// 웹 표면 접근 통제 — docs/03-account-safety.md §5.4.
+// 웹 표면 접근 통제 — docs/03-account-safety.md §5.4. (Next.js 16: middleware → proxy)
 //
-// 대시보드와 API는 카드 본문(bodyText)을 서빙하고, 그 안에는 큐레이터 링크가 원본 그대로 들어 있다
-// (utm_term ULID 포함). 인증 없이 열어두면 커미션 키가 인터넷에 공개되어, 우리가 게이트웨이에서
-// 그토록 막은 "제3자가 현표 실적으로 클릭을 쌓는" 사고가 훨씬 큰 규모로 일어난다.
-//
-// 예외는 /copy/* 하나뿐이다. 텔레그램 버튼으로 열려 세션 쿠키가 없으므로,
-// 그 경로는 URL에 실린 HMAC 서명 토큰으로 스스로를 방어한다(src/lib/signed-link.ts).
+// 대시보드·API·서버 액션은 카드 본문(bodyText)을 서빙하고, 그 안에는 큐레이터 링크가 원본 그대로
+// 들어 있다(utm_term ULID 포함). 인증 없이 열어두면 커미션 키가 인터넷에 공개되어, 우리가
+// 게이트웨이에서 그토록 막은 "제3자가 현표 실적으로 클릭을 쌓는" 사고가 훨씬 큰 규모로 일어난다.
+// 서버 액션은 페이지 경로로 POST되므로 같은 게이트 뒤에 있다.
 
 const COOKIE_NAME = "qurator_session";
 
-// 공개 경로. 각자 스스로를 방어할 수단이 있는 것만 여기 들어간다:
-//   /copy/    — HMAC 서명 + 만료 토큰 (텔레그램 인앱 브라우저엔 세션이 없다)
+// 공개 경로. 팔로워가 클릭하는 지면만 여기 들어간다:
 //   /l/       — 숏링크 리다이렉트. 팔로워가 클릭하는 지면이라 공개여야 한다
 //   /expired/ — 죽은 링크 안내(비커미션)
 //   /hub      — 링크허브. 프로필 링크로 공개되는 것이 존재 이유다
-//   /api/telegram/ — webhook 시크릿 헤더로 검증
 // 이 경로들은 전부 noindex를 달아 검색봇이 커미션 링크를 따라가지 못하게 한다.
-const PUBLIC_PREFIXES = ["/copy/", "/l/", "/expired/", "/hub", "/api/telegram/"];
+const PUBLIC_PREFIXES = ["/l/", "/expired/", "/hub"];
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
 
   const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));

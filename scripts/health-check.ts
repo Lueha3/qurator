@@ -9,7 +9,6 @@
 
 import { db } from "../src/lib/db";
 import { runHealthCheck } from "../src/lib/health-check";
-import { notifyDeadLinks } from "../src/lib/health-notify";
 
 const LOOP_INTERVAL_MS = 6 * 3_600_000;
 
@@ -30,8 +29,8 @@ async function once() {
   }
 
   if (result.died.length > 0) {
-    await notifyDeadLinks(result.died);
-    console.log(`[health] 품절 알림 ${result.died.length}건 전송`);
+    // 정정 공지는 웹 대시보드 상단 "품절 확인" 섹션이 보여준다 (src/lib/dashboard.ts).
+    console.log(`[health] 품절 확정 ${result.died.length}건 — 대시보드에서 정정 공지를 확인하세요.`);
   }
   if (result.frozen > 0) {
     console.log("[health] ⚠️ 판정보류가 있습니다 — 파서가 깨졌을 수 있으니 확인하세요.");

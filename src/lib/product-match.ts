@@ -3,29 +3,27 @@
 // 스크린샷 경로에는 goodsNo가 없다(무신사 요청 0건이 원칙이라 링크를 따라가 확정할 수 없다).
 // 그래서 "이 스크린샷이 어느 Product인가"를 추론해야 하고, 순서가 정확도의 전부다 — 뒤 단계로
 // 갈수록 "추측"의 비중이 커지므로 앞 단계에서 맞으면 그 자리에서 멈춘다:
-//   1) 같은 대화·10분 이내에 goodsNo 있는 딜 — 링크를 먼저 던지고 바로 스크린샷을 보낸 경우
-//   2) styleCode(품번) 정확 일치
-//   3) (brand, productName) 정규화 일치 — 단, 후보가 정확히 1개일 때만(모호하면 추측하지 않는다,
+//   1) styleCode(품번) 정확 일치
+//   2) (brand, productName) 정규화 일치 — 단, 후보가 정확히 1개일 때만(모호하면 추측하지 않는다,
 //      "never invent data" 원칙)
-//   4) 없으면 신규 Product 생성 (musinsaGoodsNo=null, source=SCREENSHOT)
+//   3) 없으면 신규 Product 생성 (musinsaGoodsNo=null, source=SCREENSHOT)
 // 나중에 큐레이터 링크가 오면 그 Product에 goodsNo를 채우는 것은 이 모듈의 책임이 아니다(§4.2 후반).
+//
+// (2026-09-14: 텔레그램 시절의 "같은 대화에서 링크를 먼저 던진 직후" 규칙은 웹 전환과 함께 사라졌다 —
+//  링크 던지기 경로 자체가 없다.)
 
 import { randomUUID } from "node:crypto";
 import { db } from "./db";
 import type { Product } from "@prisma/client";
 
-/** 1)의 "10분 이내" — 링크 던지기 직후의 스크린샷만 같은 상품으로 간주한다 (docs/06 §4.2) */
-const RECENT_LINKED_DEAL_WINDOW_MS = 10 * 60_000;
-
 export interface MatchProductInput {
   creatorId: string;
-  chatId: string;
   brand: string | null;
   productName: string | null;
   styleCode: string | null;
 }
 
-export type MatchedBy = "recentLinkedDeal" | "styleCode" | "nameMatch" | "created";
+export type MatchedBy = "styleCode" | "nameMatch" | "created";
 
 export interface MatchProductResult {
   product: Product;
@@ -53,22 +51,7 @@ function normalize(s: string): string {
 export async function matchOrCreateProduct(
   input: MatchProductInput
 ): Promise<MatchProductResult> {
-  // 1) 같은 대화, 10분 이내에 goodsNo가 있는 딜 — 큐레이터가 링크를 먼저 던진 직후의
-  //    스크린샷일 가능성이 매우 크므로 다른 단계보다 우선한다.
-  const recentDeal = await db.deal.findFirst({
-    where: {
-      telegramChatId: input.chatId,
-      createdAt: { gte: new Date(Date.now() - RECENT_LINKED_DEAL_WINDOW_MS) },
-      product: { musinsaGoodsNo: { not: null } },
-    },
-    include: { product: true },
-    orderBy: { createdAt: "desc" },
-  });
-  if (recentDeal) {
-    return { product: recentDeal.product, matchedBy: "recentLinkedDeal" };
-  }
-
-  // 2) styleCode(품번) 정확 일치 — creator 범위로 한정한다(다른 큐레이터의 동일 품번과 섞이지 않게).
+  // 1) styleCode(품번) 정확 일치 — creator 범위로 한정한다(다른 큐레이터의 동일 품번과 섞이지 않게).
   if (input.styleCode) {
     const byStyleCode = await db.product.findFirst({
       where: { creatorId: input.creatorId, styleCode: input.styleCode },
@@ -78,8 +61,8 @@ export async function matchOrCreateProduct(
     }
   }
 
-  // 3) (brand, productName) 정규화 일치 — 정확히 1개 후보일 때만 채택한다.
-  //    0개(신규로 넘어감)든 2개 이상(모호)이든 추측하지 않고 4)로 넘어간다.
+  // 2) (brand, productName) 정규화 일치 — 정확히 1개 후보일 때만 채택한다.
+  //    0개(신규로 넘어감)든 2개 이상(모호)이든 추측하지 않고 3)으로 넘어간다.
   if (input.brand && input.productName) {
     const targetBrand = normalize(input.brand);
     const targetName = normalize(input.productName);
@@ -92,11 +75,11 @@ export async function matchOrCreateProduct(
     }
   }
 
-  // 4) 신규 Product. canonicalUrl은 NOT NULL인데 아직 실제 URL이 없으므로, 진짜 무신사 URL과
+  // 3) 신규 Product. canonicalUrl은 NOT NULL인데 아직 실제 URL이 없으므로, 진짜 무신사 URL과
   //    절대 혼동될 수 없는 합성 sentinel 값을 쓴다(musinsa.com 형태로 짓지 않는다 — 나중에
   //    실제 URL이 온 것처럼 오인되면 dedup·헬스체크 로직이 오염된다).
-  // 미확인 브랜드/상품명 placeholder는 handler.ts의 captureFromUrl()과 동일한 문자열을 쓴다 —
-  // 두 입력 경로(링크/스크린샷)에서 같은 "미확인" 표기가 나와야 사람이 헷갈리지 않는다.
+  // 미확인 브랜드/상품명 placeholder는 두 입력 경로(수동 폼/스크린샷)에서 같은 "미확인" 표기가
+  // 나와야 사람이 헷갈리지 않는다.
   const created = await db.product.create({
     data: {
       creatorId: input.creatorId,
@@ -104,7 +87,7 @@ export async function matchOrCreateProduct(
       brandName: input.brand ?? "(브랜드 미입력)",
       productName: input.productName ?? "(상품명 미입력)",
       styleCode: input.styleCode,
-      listPrice: 0, // 0 = "미확인" sentinel (product-parser.ts/handler.ts와 동일한 관례)
+      listPrice: 0, // 0 = "미확인" sentinel (product-parser.ts와 동일한 관례)
       source: "SCREENSHOT",
     },
   });

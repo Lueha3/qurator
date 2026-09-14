@@ -73,21 +73,43 @@ export interface PriceHistoryDTO {
   snapshotCount: number;
 }
 
+export type ApprovalStageDTO =
+  | "CANDIDATE"
+  | "AWAITING_LINK"
+  | "READY_TO_PUBLISH"
+  | "APPROVED"
+  | "SKIPPED";
+
 export interface DealDTO {
   id: string;
+  productId: string;
   brand: string;
   productName: string;
   styleCode: string | null;
   canonicalUrl: string;
+  /** 무신사 상품번호. 스크린샷 상품은 큐레이터 링크가 붙기 전까지 null */
+  musinsaGoodsNo: string | null;
   listPrice: number;
   salePrice: number | null;
   finalPrice: number | null;
   discountRate: number | null;
+  couponCode: string | null;
   couponDesc: string | null;
   endsAt: string | null;
+  curatorNote: string | null;
   hookLine: string | null;
   hookSource: "ai" | "human" | null;
   status: string;
+  /** 승인 카드가 어느 단계에 있는가 — 후보→링크대기→발행승인→승인/기록완료 (docs/02 §6) */
+  approvalStage: ApprovalStageDTO;
+  /** 'vision' | 'manual' | 'json-ld' | 'opengraph' | 'none' — "읽지 못함"이면 진행 버튼을 내주지 않는다 */
+  parseSource: string | null;
+  /** 붙어 있는 큐레이터 링크 수 */
+  linkCount: number;
+  /** 이 상품이 가격 추적(워치) 중인가 */
+  watchActive: boolean;
+  /** "지난번 ○○원 → 지금 ○○원" 한 줄. 비교할 직전 기록이 없으면 null */
+  priceChangeNote: string | null;
   createdAt: string;
   cards: CardDTO[];
   /** 가격 이력 요약. 스냅샷이 없으면 null (BF 스트립을 그리지 않는다) */
@@ -97,6 +119,13 @@ export interface DealDTO {
 export interface CreateDealResponse {
   deal: DealDTO;
 }
+
+/** POST /api/capture 응답 — 스크린샷 캡처 결과 (docs/06 §3.3의 세 갈래 + 요청 오류) */
+export type CaptureResponse =
+  | { kind: "created"; dealId: string; priceChangeNote: string | null }
+  | { kind: "not_product_page" }
+  | { kind: "vision_failed" }
+  | { kind: "error"; error: string };
 
 export interface ApiErrorResponse {
   error: string;

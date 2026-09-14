@@ -6,9 +6,7 @@ import { audit } from "@/lib/audit";
 // docs/02-architecture.md §3.2: 반자동 채널은 "복사 시점을 presumed_done으로 간주" —
 // 별도 확인 탭을 요구하지 않는다.
 //
-// 이 경로는 middleware.ts의 인증 뒤에 있다(=/api/copy/* 는 공개 예외가 아니다).
-// 텔레그램에서 열리는 복사 웹뷰는 세션이 없으므로 이 라우트가 아니라
-// src/app/copy/[cardId]/actions.ts 의 서버 액션(서명 토큰 검증)을 쓴다.
+// 이 경로는 proxy.ts의 인증 뒤에 있다(=/api/cards/* 는 공개 예외가 아니다).
 
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;

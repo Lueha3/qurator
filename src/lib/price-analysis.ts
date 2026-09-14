@@ -212,7 +212,7 @@ export function analyzeSnapshots(snapshots: SnapshotLike[], now: Date = new Date
 
 /**
  * 방금 캡처와 바로 직전 캡처를 비교해 "가격이 어떻게 바뀌었나"의 전 과정을 보여준다 —
- * 텔레그램 후보 카드용 (docs/06 §3.1). PriceStrip(워크스페이스)의 "첫 기록 vs 현재"와는
+ * 후보 카드용 (docs/06 §3.1). PriceStrip의 "첫 기록 vs 현재"와는
  * 다른 질문 — 여기는 "바로 전 vs 지금"만 본다. 최대 3줄:
  *   ① 판매가 자체가 어떻게 바뀌었나 (항상)
  *   ② 정가 대비 실할인율이 어떻게 바뀌었나 (정가를 읽었을 때만)

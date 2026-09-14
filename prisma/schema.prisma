@@ -104,20 +104,15 @@ model Deal {
 
   status            DealStatus @default(DRAFT) // draft→ready→published→expired→archived (정본 enum)
 
-  // 텔레그램 승인 카드 상태 (docs/02 §6). Deal.status가 딜 자체의 생애주기라면,
+  // 승인 카드 상태 (docs/02 §6). Deal.status가 딜 자체의 생애주기라면,
   // approvalStage는 "카드 1장이 어느 단계에 있는가"다 — 후보→링크대기→발행승인.
+  // (2026-09-14: 텔레그램 채팅·메시지 앵커와 pendingInput은 웹 전환과 함께 제거 — 웹 UI는
+  //  어느 딜에 무엇을 입력하는지 화면이 이미 알고 있어 "대기 중인 입력" 개념이 필요 없다.)
   approvalStage     ApprovalStage @default(CANDIDATE)
-  telegramChatId    String? // 카드를 보낸 대화 (화이트리스트된 현표 chat_id)
-  telegramMessageId Int? // editMessageText로 같은 메시지를 상태 전이시키기 위한 앵커
   sourceUrlRaw      String? // 현표가 던진 원본 URL (정규화 전) — 감사·디버깅용
 
-  // 봇이 지금 이 딜에 대해 "무엇을 기다리는지". 한 대화에 이 값이 non-null인 딜은 최대 1건이며
-  // (setPendingInput이 나머지를 비운다), 그래서 사용자가 보낸 텍스트가 어느 딜의 무엇인지가
-  // 모호해지지 않는다. approvalStage만으로 라우팅하면 링크와 훅을 구분할 수 없다.
-  pendingInput      PendingInput?
-
   // 파싱 출처와 채워진 필드 수 — 카드에 "정보를 못 읽었다/일부만 읽었다"를 정확히 표시하기 위해 보존한다.
-  parseSource       String? // 'json-ld' | 'opengraph' | 'none'
+  parseSource       String? // 'vision' | 'manual' | 'json-ld' | 'opengraph' | 'none'
   parseFieldCount   Int      @default(0)
 
   salePrice         Int?
@@ -150,11 +145,6 @@ enum DealStatus {
   PUBLISHED
   EXPIRED
   ARCHIVED
-}
-
-enum PendingInput {
-  CURATOR_LINK // 큐레이터센터에서 만든 링크를 기다리는 중
-  HOOK // 새 훅 문구를 기다리는 중
 }
 
 enum ApprovalStage {
@@ -470,41 +460,4 @@ model Policy {
   updatedAt DateTime @updatedAt
 
   @@map("policy")
-}
-
-// ── album_captures ──────────────────────────────────────────────────────
-// 앨범(여러 장 한 번에 보낸 스크린샷)을 한 캡처로 합치기 위한 짧은 수명의 버퍼 — docs/06 §4.4.1.
-//
-// **왜 메모리가 아니라 DB인가**: 텔레그램은 앨범을 사진마다 별개의 update로 쪼개 보내는데,
-// 서버리스(Vercel)에서는 그 update들이 서로 다른 인스턴스로 흩어질 수 있다. 프로세스 메모리에
-// 모으면 인스턴스마다 자기가 받은 한 장만 들고 있게 되어 병합이 영영 성립하지 않는다.
-// 공유 저장소는 DB뿐이므로 여기 모은다 (2026-09-12 변경, 그 전에는 in-memory Map).
-//
-// 이 행은 처리 직후 삭제되는 임시 데이터다 — 이미지 자체는 절대 담지 않는다(§4.3).
-// 담는 것은 텔레그램 file_id뿐이며, 그것으로 다운로드는 캡처 시점에 메모리에서만 일어난다.
-model AlbumCapture {
-  /** 텔레그램 media_group_id. @id라 "먼저 만든 요청이 리더"를 DB 유니크 제약으로 정한다 */
-  mediaGroupId    String   @id
-  chatId          String
-  /** 앨범의 첫 사진 메시지 — 감사 로그에 남길 출처 */
-  sourceMessageId Int
-  /** 리더가 띄운 "확인하는 중…" 메시지. 그 자리에 최종 카드가 렌더된다 */
-  statusMessageId Int?
-  createdAt       DateTime @default(now())
-
-  photos AlbumCapturePhoto[]
-
-  @@map("album_captures")
-}
-
-model AlbumCapturePhoto {
-  id           String       @id @default(uuid())
-  mediaGroupId String
-  album        AlbumCapture @relation(fields: [mediaGroupId], references: [mediaGroupId], onDelete: Cascade)
-  /** 텔레그램 file_id (이미지 바이트가 아니다) */
-  fileId       String
-  createdAt    DateTime     @default(now())
-
-  @@index([mediaGroupId, createdAt])
-  @@map("album_capture_photos")
 }

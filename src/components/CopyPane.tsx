@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { recordCopy } from "@/app/copy/[cardId]/actions";
 
 type CopyState = "idle" | "copied" | "manual";
 
@@ -19,11 +18,11 @@ function estimateRows(text: string): number {
 }
 
 /**
- * 복사 웹뷰의 클라이언트 부분.
+ * 폰에서 카톡에 붙여넣을 문구를 복사하는 패널.
  *
  * iOS Safari 함정: 클릭 핸들러 안에서 await를 한 번이라도 거치면 user activation이 소실되어
- * writeText()가 NotAllowedError로 거부된다. 그래서 **텍스트는 서버에서 이미 렌더되어 props로
- * 들어와 있고, 핸들러는 완전히 동기적으로 시작한다** (fetch-on-click을 하지 않으면 이 문제 자체가 없다).
+ * writeText()가 NotAllowedError로 거부된다. 그래서 **텍스트는 props로 이미 들어와 있고,
+ * 핸들러는 완전히 동기적으로 시작한다** (fetch-on-click을 하지 않으면 이 문제 자체가 없다).
  *
  * 폴백 3단:
  *   ① navigator.clipboard.writeText — HTTPS/localhost + 제스처 필요
@@ -31,14 +30,23 @@ function estimateRows(text: string): number {
  *   ③ 전문을 선택된 상태로 노출 + "길게 눌러 복사" 안내 — 100% 탈출 경로
  * 실패를 조용히 삼키지 않는 것이 핵심이다.
  */
-export function CopyPane({ text, token }: { text: string; token: string }) {
+export function CopyPane({
+  text,
+  cardId,
+  label = "📋 카톡용 문구 복사",
+}: {
+  text: string;
+  /** 복사 사실을 발행 이력(Post)으로 남길 카드. 없으면 기록하지 않는다(정정문 등) */
+  cardId?: string;
+  label?: string;
+}) {
   const [state, setState] = useState<CopyState>("idle");
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
   function markCopied() {
     setState("copied");
     // 발행 이력 기록은 체감 속도에 영향 없게 fire-and-forget.
-    void recordCopy(token).catch(() => {});
+    if (cardId) fetch(`/api/cards/${cardId}/copy`, { method: "POST" }).catch(() => {});
   }
 
   function legacyCopy(): boolean {
@@ -76,15 +84,15 @@ export function CopyPane({ text, token }: { text: string; token: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <button
         type="button"
         onClick={handleCopy}
-        className={`w-full rounded-lg px-4 py-3.5 text-base font-semibold transition-colors ${
+        className={`w-full rounded-lg px-4 py-3 text-base font-semibold transition-colors ${
           state === "copied" ? "bg-ok text-white" : "bg-honey text-white active:opacity-90"
         }`}
       >
-        {state === "copied" ? "✓ 복사됨 — 카톡에 붙여넣으세요" : "📋 카톡용 문구 복사"}
+        {state === "copied" ? "✓ 복사됨 — 카톡에 붙여넣으세요" : label}
       </button>
 
       {state === "manual" && (

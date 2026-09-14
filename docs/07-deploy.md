@@ -5,23 +5,25 @@
 > 서버 관리(SSH, 프로세스 재시작, 디스크 관리)가 통째로 사라진다.
 >
 > 코드 쪽 준비는 이미 끝나 있었다: [03-account-safety.md]가 처음부터 요구한 "자격증명 제로·계정 비의존"
-> 원칙 덕에 무신사/카카오/Meta 계정에 영향 주는 것 없이 호스팅만 옮기면 됐다. `src/middleware.ts`의
+> 원칙 덕에 무신사/카카오/Meta 계정에 영향 주는 것 없이 호스팅만 옮기면 됐다. `src/proxy.ts`의
 > `APP_ACCESS_TOKEN` 게이트도 이미 있었으므로 "우리만 쓰는 앱"을 위한 추가 작업은 없었다.
+>
+> **추가 (2026-09-14)**: 텔레그램 봇을 폐기하고 입력·승인을 전부 웹앱으로 옮겼다([02 §6]).
+> 봇 토큰·webhook·chat_id 화이트리스트가 사라져 배포 절차도 그만큼 짧아졌다.
 
 ---
 
 ## 1. 무엇이 바뀌었는가
 
-| 항목 | 이전 (로컬/VPS) | 이후 (Vercel/Supabase) |
+| 항목 | 이전 (로컬/VPS + 텔레그램) | 이후 (Vercel/Supabase + 웹) |
 |---|---|---|
 | DB | SQLite 파일(`prisma/dev.db`) | Supabase Postgres |
-| 텔레그램 수신 | `scripts/bot-poll.ts` 장시간 폴링(`getUpdates`) | `/api/telegram/webhook` (Vercel Function) |
-| 앨범(여러 장) 버퍼 | 프로세스 메모리 `Map` | DB 테이블(`AlbumCapture`/`AlbumCapturePhoto`) — 서버리스 인스턴스가 메모리를 공유하지 않으므로 |
-| 응답 뒤 후속 작업(Vision 등) | 그냥 `await` (장시간 실행 프로세스) | `next/server`의 `after()` — 응답을 먼저 돌려주고 그 뒤에 이어 실행 |
+| 입력 | 텔레그램 봇에 사진 전송(`scripts/bot-poll.ts` 폴링 / webhook) | 웹앱에서 파일 선택 → `POST /api/capture` |
+| 여러 장 병합 | `media_group_id` 디바운스 + `AlbumCapture` 테이블 | 한 요청에 여러 파일 — 버퍼 자체가 불필요 |
+| 승인 UI | 봇 메시지 편집(`editMessageText`) | 웹 카드 + 서버 액션 (`src/app/actions.ts`) |
 | 배포 | 서버에 SSH·pm2/systemd | `git push` → Vercel 자동 빌드 |
 
-세 가지 코드 변경(webhook의 `after()`, 앨범 버퍼의 DB 이전, `defer` 주입 패턴)은 [06-screenshot-capture.md] §4.4.1에
-정리돼 있다. 이 문서는 **인프라 이관 절차**만 다룬다.
+이 문서는 **인프라 이관 절차**만 다룬다. 캡처 동작 자체는 [06-screenshot-capture.md] §4.4 참고.
 
 ---
 
@@ -41,7 +43,10 @@
    ```bash
    DATABASE_URL="<transaction pooler url, 6543>" DIRECT_URL="<session pooler url, 5432>" npx prisma migrate deploy
    ```
-   `prisma/migrations/20260913023212_init_postgres`가 전체 스키마(17개 모델)를 한 번에 만든다.
+   `20260913023212_init_postgres`가 전체 스키마를 만들고, `20260914071923_remove_telegram`이
+   텔레그램 전용 컬럼(`telegramChatId`·`telegramMessageId`·`pendingInput`)과 앨범 버퍼 테이블을
+   지운다. **이미 Supabase에 데이터를 넣은 뒤라면 이 명령을 한 번 더 실행해 두 번째 마이그레이션을
+   적용한다** — 지워지는 것은 텔레그램 전용 필드뿐이라 딜·상품·가격 이력은 그대로 남는다.
    그 이전 SQLite 시절 마이그레이션은 `prisma/migrations-sqlite-archive/`에 이력으로만 남아 있다
    (Postgres에는 적용 불가 — SQL 방언이 다름).
 
@@ -68,8 +73,7 @@ DATABASE_URL="<transaction pooler url, 6543>" DIRECT_URL="<session pooler url, 5
 - id를 원본 UUID 그대로 재사용하므로 관계(FK)가 자동으로 맞는다 — 별도 매핑표가 필요 없다.
 - `import`는 대상 DB의 `creators` 테이블이 비어 있을 때만 실행된다(중복 삽입 방지 안전장치).
   재시도해야 하면 Supabase 테이블을 비우고 처음부터 다시 실행한다.
-- `AlbumCapture`/`AlbumCapturePhoto`(스크린샷 앨범 임시 버퍼)는 의도적으로 이관 대상에서 뺐다 —
-  처리 중에만 잠깐 쓰는 행이라 새로 시작해도 무방하다.
+- 텔레그램 시절의 앨범 버퍼 테이블은 이관 대상이 아니었고, 이제 스키마에서도 사라졌다(§2).
 - 두 스크립트 모두 [scripts/export-data.ts]·[scripts/import-data.ts]에 상세 절차가 코드 주석으로 있다.
 
 ---
@@ -84,35 +88,23 @@ DATABASE_URL="<transaction pooler url, 6543>" DIRECT_URL="<session pooler url, 5
    |---|---|
    | `DATABASE_URL` | Supabase Transaction pooler (6543) |
    | `DIRECT_URL` | Supabase Session pooler (5432) — "Direct connection"이 아님, §2 참고 |
-   | `ANTHROPIC_API_KEY` | Vision 추출용. 없으면 그레이스풀 디그레이드 |
-   | `TELEGRAM_BOT_TOKEN` | BotFather 발급 |
-   | `TELEGRAM_ALLOWED_CHAT_IDS` | 비우면 봇이 전 메시지 거부(fail closed) |
-   | `TELEGRAM_WEBHOOK_SECRET` | 아래 §5에서 `setWebhook`에 넣을 값과 동일해야 함 |
+   | `ANTHROPIC_API_KEY` | Vision 추출용. 없으면 캡처가 "읽지 못했습니다"로 떨어지고 [직접 입력]으로 진행 |
    | `PUBLIC_BASE_URL` | 배포된 Vercel 주소 (예: `https://qurator.vercel.app`) |
    | `APP_ACCESS_TOKEN` | 대시보드 접근 암호. 비면 웹 표면 전체 503(fail closed) |
-   | `APP_SECRET` | 복사 웹뷰 링크 HMAC 서명용 |
 
-3. 배포 후 `/api/telegram/webhook` 라우트의 `maxDuration = 60`이 Vercel 플랜의 함수 실행시간 상한 안에
+3. 배포 후 `/api/capture` 라우트의 `maxDuration = 60`이 Vercel 플랜의 함수 실행시간 상한 안에
    있는지 확인한다 (Hobby 플랜은 기본 10초라 60초로 늘리려면 Pro가 필요할 수 있다 — Vercel 함수 설정 확인).
+   Vision 추출이 20초까지 걸리므로 이 값이 잘리면 캡처가 중간에 끊긴다.
 
 ---
 
-## 5. 텔레그램 webhook 전환
+## 5. 폰에서 쓰기
 
-로컬 폴링(`npm run bot`)과 프로덕션 webhook은 같은 봇 토큰에서 동시에 켤 수 없다(409 Conflict).
-배포가 끝나면 webhook으로 전환한다:
+배포된 주소를 **한 번만** `https://<주소>/?k=<APP_ACCESS_TOKEN>`으로 연다 — 쿠키가 심어지고(30일)
+주소창에서 토큰이 즉시 지워진다. 그 뒤 브라우저 메뉴의 "홈 화면에 추가"를 하면 앱 아이콘처럼 열린다.
 
-```bash
-curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
-  -d "url=https://<vercel-domain>/api/telegram/webhook" \
-  -d "secret_token=<TELEGRAM_WEBHOOK_SECRET>"
-```
-
-`secret_token`은 Vercel에 등록한 `TELEGRAM_WEBHOOK_SECRET`과 정확히 같아야 한다 — 다르면
-webhook route가 전부 403으로 거부한다(의도된 동작, §의 `secretMatches` 참고).
-
-이후 로컬에서 다시 폴링 개발을 하려면 `npm run bot`이 시작 시 자동으로 `deleteWebhook`을 호출하니
-별도 해제 작업은 필요 없다. 로컬 개발이 끝나면 위 `setWebhook`을 다시 호출해 프로덕션을 복구한다.
+- 쿠키가 만료되면 같은 `?k=` 주소로 다시 한 번 열면 된다.
+- 스크린샷 업로드는 파일 선택창에서 **사진첩 → 방금 찍은 스크린샷**을 고르는 흐름이다(카메라 아님).
 
 ---
 

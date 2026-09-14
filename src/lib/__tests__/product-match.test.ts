@@ -47,78 +47,21 @@ beforeEach(async () => {
   await resetDb();
 });
 
-describe("matchOrCreateProduct — recentLinkedDeal", () => {
-  it("같은 대화·10분 이내에 goodsNo가 있는 딜의 상품을 그대로 매칭한다", async () => {
+describe("matchOrCreateProduct — 최근 딜은 근거가 아니다", () => {
+  it("goodsNo가 있는 딜이 방금 생겼어도 이름이 다르면 그 상품에 붙이지 않는다", async () => {
     const creator = await seedCreator();
     const product = await seedProduct(creator.id, { musinsaGoodsNo: "123456" });
-    const chatId = "chat-1";
-    await db.deal.create({
-      data: {
-        productId: product.id,
-        creatorId: creator.id,
-        telegramChatId: chatId,
-      },
-    });
+    await db.deal.create({ data: { productId: product.id, creatorId: creator.id } });
 
     const result = await matchOrCreateProduct({
       creatorId: creator.id,
-      chatId,
-      brand: null,
-      productName: null,
-      styleCode: null,
-    });
-
-    expect(result.matchedBy).toBe("recentLinkedDeal");
-    expect(result.product.id).toBe(product.id);
-  });
-
-  it("10분보다 오래된 딜은 매칭하지 않는다(styleCode/nameMatch도 없으면 신규 생성)", async () => {
-    const creator = await seedCreator();
-    const product = await seedProduct(creator.id, { musinsaGoodsNo: "999999" });
-    const chatId = "chat-2";
-    const deal = await db.deal.create({
-      data: {
-        productId: product.id,
-        creatorId: creator.id,
-        telegramChatId: chatId,
-      },
-    });
-    await db.deal.update({
-      where: { id: deal.id },
-      data: { createdAt: new Date(Date.now() - 11 * 60_000) },
-    });
-
-    const result = await matchOrCreateProduct({
-      creatorId: creator.id,
-      chatId,
       brand: "다른브랜드",
       productName: "전혀 다른 상품",
       styleCode: null,
     });
 
     expect(result.matchedBy).toBe("created");
-  });
-
-  it("goodsNo가 없는(=아직 링크 안 붙은) 딜은 매칭 대상이 아니다", async () => {
-    const creator = await seedCreator();
-    const product = await seedProduct(creator.id, { musinsaGoodsNo: null });
-    const chatId = "chat-3";
-    await db.deal.create({
-      data: { productId: product.id, creatorId: creator.id, telegramChatId: chatId },
-    });
-
-    const result = await matchOrCreateProduct({
-      creatorId: creator.id,
-      chatId,
-      brand: "쿠어",
-      productName: "스탠다드 오버셔츠",
-      styleCode: null,
-    });
-
-    // goodsNo 없는 딜은 1)에서 걸리지 않지만, (brand, productName) 정규화가 같은 상품 1건과
-    // 일치하므로 3) nameMatch로 떨어진다 — recentLinkedDeal이 아니라는 것만 확인한다.
-    expect(result.matchedBy).toBe("nameMatch");
-    expect(result.product.id).toBe(product.id);
+    expect(result.product.id).not.toBe(product.id);
   });
 });
 
@@ -129,7 +72,6 @@ describe("matchOrCreateProduct — styleCode", () => {
 
     const result = await matchOrCreateProduct({
       creatorId: creator.id,
-      chatId: "chat-4",
       brand: null,
       productName: null,
       styleCode: "ABC-123",
@@ -146,7 +88,6 @@ describe("matchOrCreateProduct — styleCode", () => {
 
     const result = await matchOrCreateProduct({
       creatorId: creatorB.id,
-      chatId: "chat-5",
       brand: null,
       productName: null,
       styleCode: "SHARED-1",
@@ -167,7 +108,6 @@ describe("matchOrCreateProduct — nameMatch", () => {
     // 공백·대소문자·구두점이 달라도 정규화 후 같으면 매칭돼야 한다.
     const result = await matchOrCreateProduct({
       creatorId: creator.id,
-      chatId: "chat-6",
       brand: " 쿠어 ",
       productName: "스탠다드-오버셔츠",
       styleCode: null,
@@ -184,7 +124,6 @@ describe("matchOrCreateProduct — nameMatch", () => {
 
     const result = await matchOrCreateProduct({
       creatorId: creator.id,
-      chatId: "chat-7",
       brand: "쿠어",
       productName: "스탠다드 오버셔츠",
       styleCode: null,
@@ -201,7 +140,6 @@ describe("matchOrCreateProduct — created", () => {
 
     const result = await matchOrCreateProduct({
       creatorId: creator.id,
-      chatId: "chat-8",
       brand: "신규브랜드",
       productName: "신규 상품",
       styleCode: "NEW-001",
@@ -221,7 +159,6 @@ describe("matchOrCreateProduct — created", () => {
 
     const result = await matchOrCreateProduct({
       creatorId: creator.id,
-      chatId: "chat-9",
       brand: null,
       productName: null,
       styleCode: null,
@@ -237,7 +174,6 @@ describe("matchOrCreateProduct — created", () => {
 
     const result = await matchOrCreateProduct({
       creatorId: creator.id,
-      chatId: "chat-10",
       brand: null,
       productName: null,
       styleCode: null,

@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "qurator — 딜 카드 생성기",
-  description: "URL·가격·큐레이터 링크를 넣으면 고지문 포함 채널별 완성 카드가 나오는 Phase 0 워크스페이스",
+  title: "qurator",
+  description: "무신사 스크린샷을 올리면 가격을 기록하고 고지문 포함 채널별 완성 카드를 만드는 워크스페이스",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
