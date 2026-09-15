@@ -30,6 +30,7 @@
 | [docs/02-architecture.md](docs/02-architecture.md) | 시스템 아키텍처 — 컴포넌트, 데이터 모델, 파이프라인, 기술 스택 |
 | [docs/03-account-safety.md](docs/03-account-safety.md) | **계정 보호 설계** — 플랫폼별 정책 매트릭스, 가드레일, 킬 스위치, 금지 목록 |
 | [docs/04-roadmap.md](docs/04-roadmap.md) | 단계별 로드맵 — MVP부터 풀 시스템까지, KPI·비용 |
+| [docs/08-v2-plan.md](docs/08-v2-plan.md) | **qurator 2.0 기획안** — LTK 벤치마킹, 격차 분석, 하단 탭·성과·허브 v2 개발계획 |
 
 ## 시스템 한눈에
 
