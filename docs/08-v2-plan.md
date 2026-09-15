@@ -222,9 +222,24 @@ LTK가 못하는 것 — 우리가 지킬 것: 가격 이력·실할인율 판�
 
 기존 enum·불변식(`ShortLink` 원형 무변조, `ContentCard` 불변 등)은 변경 없음. 마이그레이션 1개.
 
-### 3.5 디자인 원칙
+### 3.5 디자인 원칙 — 벤치마크는 ShopMy
 
-1. **미니멀을 유지한다.** LTK의 그리드·배너·피드는 가져오지 않는다. 비교글이 칭찬하는 쪽(ShopMy식 단순함)이 우리 결이다.
+> **결정 (2026-09-15)**: 구조는 LTK(§1.6), **디자인은 ShopMy**를 벤치마크한다. 크리에이터 비교글이 일관되게
+> "LTK보다 깔끔하고 쉽다"고 평하는 쪽이고, 우리 결(미니멀·정보 우선)과 맞는다. 인접 카테고리에서는
+> Stan Store(앱스토어 4.9)가 "링크 목록이 아니라 스토어"라는 프레이밍으로 호평인데, 그 관점은 허브 v2에만 빌린다.
+
+ShopMy에서 가져오는 구체적 특징:
+
+| ShopMy | qurator 2.0 적용 |
+|---|---|
+| 스토어프론트 = **섹션(상단 탭) + 컬렉션(주제 묶음)**. "링크 더미"가 아니라 "부티크"로 보인다 | 허브 v2: 태그 섹션(§3.3), 가격·배지 한 줄, 링크 나열 금지 |
+| 크리에이터가 **Latest Finds / Most Popular** 순서를 고른다 | 허브 상단에 "최신" · "많이 본" 두 블록. 순서는 설정에서 |
+| 커미션 안 붙는 상품도 컬렉션에 넣을 수 있다(폐쇄형 아님) | 큐레이터 링크 없는 딜도 태그·저장함에 둘 수 있다(발행만 막힘 — 기존 불변식) |
+| 성과는 **Links / Earnings / 컬렉션별** 세 곳, 실시간 클릭·주문 | 성과 탭: 딜별·채널별·(태그별) — 표 하나, 그래프는 막대 1종 |
+| 모바일 앱은 값을 흐리게 가리고 웹에서 상세 | 우리는 1인용이라 가리지 않는다. 대신 성과 탭도 게이트 뒤 |
+| 여백·흰 바탕·가는 구분선·굵기로만 위계 | 카드 테두리 최소화, 색은 배지·주 버튼에만, 아이콘보다 문구 |
+
+1. **미니멀을 유지한다.** LTK의 그리드·배너·피드는 가져오지 않는다. ShopMy처럼 "정돈된 부티크"가 목표다.
 2. **한 손.** 주 동작은 하단(탭·FAB·카드의 주 버튼). 상단에는 읽기만.
 3. **상태는 색이 아니라 문구로.** 칩 텍스트가 곧 상태. 색은 보조.
 4. **없는 데이터를 그리지 않는다.** 빈 블록은 사라진다. 표본 부족은 "수집 중 (2/3)".
@@ -308,3 +323,7 @@ LTK 관련 사실은 아래에 근거한다. 앱 화면은 버전마다 바뀌�
 12. Stack Influence, "ShopMy vs LTK: Best Affiliate Platform 2026" (UX 비교)
 13. Laine and Layne, "ShopMy vs LTK" (UX 비교)
 14. Modern Retail, "LTK rolls out new social features…" / Digiday, "Shopping app LTK beefs up consumer app with focus on videos"
+15. ShopMy Creator Guide, "Deep-Dive: New Storefront" / "How to set up your shop" / "How to analyze your performance" (guide.shopmy.us)
+16. ShopMy 블로그, "Two Weeks of New Storefronts, Wishlists, and Circles" (shopmy.us/blog)
+17. Salty Vagabonds, "Is ShopMy Worth It in 2026?" / JetsetChristina, "ShopMy vs LTK" (크리에이터 UX 평가)
+18. Stan Store 리뷰 (creatorstackclub.com, howsociable.com) — 인접 카테고리 디자인 평판 참고
