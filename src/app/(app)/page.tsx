@@ -68,7 +68,7 @@ export default async function HomePage() {
                 </p>
                 <p className="mb-3 text-xs text-muted">
                   {HEALTH_LABEL[alert.health]} 확정
-                  {alert.confirmedAt && ` · ${formatRelativeFromNow(alert.confirmedAt, now)}`} · 링크허브·노션에서는 자동으로 내렸습니다.
+                  {alert.confirmedAt && ` · ${formatRelativeFromNow(alert.confirmedAt, now)}`} · 링크허브에서 내렸고, 이미 나간 링크는 안내 페이지로 갑니다.
                 </p>
                 <CopyPane text={alert.correction} label="📋 정정 공지 복사" />
               </div>

@@ -24,6 +24,7 @@ import { addWatch, removeWatch, type AddWatchResult } from "@/lib/watch";
 import { parsePriceInput, recordManualBfPrice, type ManualPriceResult } from "@/lib/price-entry";
 import { parseTagInput } from "@/lib/deal-tags";
 import { updateProfile, type ProfileResult } from "@/lib/profile";
+import { markSoldOut, restoreDeal, type LinkHealthResult } from "@/lib/link-health";
 
 /**
  * 딜 하나가 바뀌면 세 탭이 같이 바뀐다 — 홈(할 일 개수·최근), 딜(목록·시트), 설정(저장함 개수).
@@ -136,6 +137,20 @@ export async function unwatchAction(productId: string): Promise<boolean> {
   const removed = await removeWatch(productId);
   revalidateApp();
   return removed;
+}
+
+export async function markSoldOutAction(dealId: string): Promise<LinkHealthResult> {
+  const result = await markSoldOut(dealId);
+  revalidateApp();
+  revalidatePath("/hub");
+  return result;
+}
+
+export async function restoreDealAction(dealId: string): Promise<LinkHealthResult> {
+  const result = await restoreDeal(dealId);
+  revalidateApp();
+  revalidatePath("/hub");
+  return result;
 }
 
 export async function updateProfileAction(input: {

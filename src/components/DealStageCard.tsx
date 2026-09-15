@@ -5,7 +5,9 @@ import {
   approveAction,
   attachLinkAction,
   interestAction,
+  markSoldOutAction,
   replaceHookAction,
+  restoreDealAction,
   skipAction,
   watchAction,
 } from "@/app/actions";
@@ -266,7 +268,14 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
 
       {deal.approvalStage === "APPROVED" && (
         <div className="flex flex-col gap-3">
-          <p className="text-sm">✅ <b>승인 완료</b> — 아래 문구를 카톡에 붙여넣으세요.</p>
+          {deal.soldOut ? (
+            <p className="text-sm text-muted">
+              🚫 <b className="text-foreground">품절로 표시됨</b> — 링크허브에서 내려갔고, 이미 나간 링크는
+              안내 페이지로 갑니다.
+            </p>
+          ) : (
+            <p className="text-sm">✅ <b>승인 완료</b> — 아래 문구를 카톡에 붙여넣으세요.</p>
+          )}
           {kakao && <CopyPane text={kakao.bodyText} cardId={kakao.id} />}
           {others.length > 0 && (
             <details className="rounded-lg border border-line">
@@ -280,6 +289,29 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
               </div>
             </details>
           )}
+
+          {/*
+            품절은 사람이 표시한다 — 헬스체커는 무신사 요청이 필요해 robots에 막혀 있다(docs/05 §9.1).
+            누르는 순간 허브에서 내려가고, 이미 나간 카톡·노션 링크는 안내 페이지로 착지한다.
+          */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                run(async () => {
+                  const r = deal.soldOut
+                    ? await restoreDealAction(deal.id)
+                    : await markSoldOutAction(deal.id);
+                  if (!r.ok) setError(r.reason);
+                  else if (!deal.soldOut) setNotice("허브에서 내렸습니다. 홈에서 정정 공지를 복사해 카톡에 올려주세요.");
+                })
+              }
+              className={secondaryBtnCls}
+            >
+              {deal.soldOut ? "↩️ 품절 표시 되돌리기" : "🚫 품절로 표시"}
+            </button>
+          </div>
         </div>
       )}
 

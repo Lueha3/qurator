@@ -110,6 +110,8 @@ export interface DealDTO {
   linkCount: number;
   /** 이 상품이 가격 추적(워치) 중인가 */
   watchActive: boolean;
+  /** 품절·만료로 내려간 딜인가 — 허브에서 빠지고 숏링크가 안내 페이지로 간다 */
+  soldOut: boolean;
   /** "지난번 ○○원 → 지금 ○○원" 한 줄. 비교할 직전 기록이 없으면 null */
   priceChangeNote: string | null;
   createdAt: string;

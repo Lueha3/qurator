@@ -142,6 +142,7 @@ export function toDealDTO(
     parseSource: deal.parseSource,
     linkCount: deal.curatorLinks.length,
     watchActive: !!watch && watch.active && watch.expiresAt > now,
+    soldOut: deal.curatorLinks.some((l) => l.health !== "OK" && l.health !== "UNCHECKED"),
     priceChangeNote: buildPriceChangeNote(analysis),
     createdAt: deal.createdAt.toISOString(),
     cards,

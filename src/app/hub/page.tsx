@@ -183,7 +183,7 @@ export default async function HubPage() {
       )}
 
       <footer className="flex flex-col gap-1 pb-8 text-center text-[11px] text-muted">
-        <span>품절되거나 할인이 끝난 상품은 목록에서 자동으로 사라집니다.</span>
+        <span>품절되거나 할인이 끝난 상품은 목록에서 바로 내려갑니다.</span>
         {/* 배지가 과장으로 읽히지 않게, 근거의 범위를 말해둔다 */}
         {hasLowestBadge && <span>‘최저가’는 제가 기록해 온 가격 범위 안에서의 최저가입니다.</span>}
       </footer>
