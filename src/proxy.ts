@@ -9,6 +9,17 @@ import { NextRequest, NextResponse } from "next/server";
 
 const COOKIE_NAME = "qurator_session";
 
+/**
+ * 쿠키 대신 토큰을 직접 싣는 헤더. 아이폰 단축어처럼 **쿠키를 들고 다닐 수 없는 클라이언트**가
+ * `/api/capture`에 바로 올리기 위한 경로다 (docs/06 §4.5).
+ *
+ * `?k=`를 쓰지 않는 이유: 그 경로는 쿠키를 심고 리다이렉트하는데, 업로드 POST를 리다이렉트에
+ * 태우면 본문이 어떻게 되는지가 클라이언트 구현에 달린다. 헤더는 한 번에 끝난다.
+ * 덤으로 토큰이 주소·리퍼러·서버 로그의 URL에 남지 않고, 크로스사이트 폼은 커스텀 헤더를
+ * 붙일 수 없어 CSRF 표면도 쿠키보다 좁다.
+ */
+const TOKEN_HEADER = "x-app-token";
+
 // 공개 경로. 팔로워가 클릭하는 지면만 여기 들어간다:
 //   /l/       — 숏링크 리다이렉트. 팔로워가 클릭하는 지면이라 공개여야 한다
 //   /expired/ — 죽은 링크 안내(비커미션)
@@ -32,6 +43,12 @@ export function proxy(req: NextRequest) {
         { status: 503 }
       )
     );
+  }
+
+  // 헤더로 온 토큰은 리다이렉트도 쿠키도 없이 그 요청 하나만 통과시킨다.
+  const viaHeader = req.headers.get(TOKEN_HEADER);
+  if (viaHeader && safeEqual(viaHeader, expected)) {
+    return withNoIndex(NextResponse.next());
   }
 
   // ?k=<토큰>으로 한 번 들어오면 쿠키를 심어 이후 요청은 그냥 통과시킨다(북마크 편의).

@@ -74,6 +74,40 @@ export default async function SettingsPage() {
             아이폰 Safari에서 이 주소를 연 뒤 <b>공유 → 홈 화면에 추가</b>를 누르면 주소창 없이 앱처럼 열립니다.
             쿠키가 만료되면 <code className="font-mono">?k=</code> 주소로 한 번만 다시 열어주세요.
           </p>
+
+          {/* 단축어를 쓰면 앱을 여는 탭과 사진첩에서 고르는 탭이 둘 다 사라진다 (docs/06 §4.5) */}
+          <details className="mt-3 rounded-lg border border-line">
+            <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
+              ⚡️ 단축어로 공유 시트에서 바로 올리기
+            </summary>
+            <div className="flex flex-col gap-2 px-3 pb-3 text-xs leading-relaxed text-muted">
+              <p>무신사 앱에서 스크린샷 → 공유 → 단축어 선택. 웹앱을 열 필요가 없습니다.</p>
+              <ol className="flex list-decimal flex-col gap-1 pl-4">
+                <li>단축어 앱 → 새 단축어 → 이름 “꿀매 올리기”</li>
+                <li>
+                  <b>이미지 크기 조절</b> 추가 — 입력 <code className="font-mono">단축어 입력</code>, 가장 긴 변{" "}
+                  <b>1600</b>px <span className="text-danger">(빼지 마세요 — 원본은 업로드 상한에 걸립니다)</span>
+                </li>
+                <li>
+                  <b>URL 내용 가져오기</b> 추가 — URL <code className="font-mono">{"<이 앱 주소>"}/api/capture</code>, 방식{" "}
+                  <b>POST</b>
+                </li>
+                <li>
+                  헤더 <code className="font-mono">x-app-token</code> = Vercel 환경변수의{" "}
+                  <code className="font-mono">APP_ACCESS_TOKEN</code> 값
+                </li>
+                <li>
+                  본문 <b>양식</b> → 필드 이름 <code className="font-mono">images</code>, 종류 <b>파일</b>, 값{" "}
+                  <b>크기 조절된 이미지</b>
+                </li>
+                <li>단축어 설정(ⓘ) → “공유 시트에 표시” 켜고 입력 종류는 이미지만</li>
+              </ol>
+              <p>
+                카드는 다음에 이 앱을 열 때 딜 탭 맨 위에 있습니다. 한 상품을 위·아래로 나눠 찍었다면 사진 앱에서{" "}
+                <b>두 장을 함께 선택해</b> 공유하세요.
+              </p>
+            </div>
+          </details>
         </section>
       </main>
     </>
