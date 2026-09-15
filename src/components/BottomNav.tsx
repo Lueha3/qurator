@@ -4,11 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 // 하단 탭 — docs/08 §3.2. 주 동작은 전부 엄지 영역에 둔다.
-// 성과 탭은 V2-B에서 추가된다(빈 탭을 미리 만들지 않는다 — "없는 것을 그리지 않는다").
 
 const TABS = [
   { href: "/", label: "홈", icon: "◎" },
   { href: "/deals", label: "딜", icon: "▤" },
+  { href: "/stats", label: "성과", icon: "▨" },
   { href: "/settings", label: "설정", icon: "⚙" },
 ] as const;
 

@@ -5,8 +5,10 @@ import { dueForReminder } from "@/lib/watch-remind";
 import { isCrawlessMode } from "@/lib/policy";
 import { formatRelativeFromNow } from "@/lib/format";
 import { dealPriceLine } from "@/lib/deal-format";
+import { loadStats } from "@/lib/stats";
 import { PageHeader } from "@/components/PageHeader";
 import { CopyPane } from "@/components/CopyPane";
+import { StatTile } from "@/components/StatTile";
 
 // 홈 — docs/08 §3.3. 열면 3초 안에 "지금 할 일"이 보이는 것이 이 화면의 전부다.
 // 할 일이 없으면 그 블록 자체를 그리지 않는다(없는 데이터를 그리지 않는다 — PriceStrip과 같은 원칙).
@@ -17,10 +19,11 @@ const HEALTH_LABEL = { SOLDOUT: "품절", DEAD: "상품 페이지 없음", COUPO
 
 export default async function HomePage() {
   const now = new Date();
-  const [deals, crawless, deadLinks] = await Promise.all([
+  const [deals, crawless, deadLinks, stats] = await Promise.all([
     loadDeals(now),
     isCrawlessMode(),
     loadDeadLinkAlerts(),
+    loadStats(7, now),
   ]);
   const reminders = crawless ? await dueForReminder(now) : [];
 
@@ -93,6 +96,20 @@ export default async function HomePage() {
             </ul>
           </section>
         )}
+
+        <section className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-sm font-semibold text-muted">지난 7일</h2>
+            <Link href="/stats" className="text-xs font-medium text-honey hover:underline">
+              성과 보기
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <StatTile label="클릭" value={stats.clicks.value} prev={stats.clicks.prev} href="/stats" />
+            <StatTile label="발행" value={stats.posts.value} prev={stats.posts.prev} href="/stats" />
+            <StatTile label="허브 방문" value={stats.hubVisits.value} prev={stats.hubVisits.prev} href="/stats" />
+          </div>
+        </section>
 
         <section className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between">

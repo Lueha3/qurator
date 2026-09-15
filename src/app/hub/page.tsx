@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { DISCLOSURE } from "@/lib/disclosure";
 import { formatKRW } from "@/lib/format";
+import { classifyUserAgent } from "@/lib/shortlink";
 
 // 링크허브 — 링크트리 대체 (docs/02-architecture.md §10.4).
 //
@@ -21,7 +23,22 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/**
+ * 방문 기록 — 성과 탭의 "방문 대비 클릭"(CTR) 분모다.
+ * ClickEvent와 같은 규율: IP·referer를 저장하지 않고 봇 분류만 남긴다.
+ * 기록에 실패해도 페이지는 그대로 그린다 — 팔로워에게 링크를 보여주는 것이 먼저다.
+ */
+async function recordVisit(): Promise<void> {
+  try {
+    const uaClass = classifyUserAgent((await headers()).get("user-agent"));
+    await db.hubVisit.create({ data: { uaClass } });
+  } catch (err) {
+    console.error("[hub] 방문 기록 실패", err);
+  }
+}
+
 export default async function HubPage() {
+  await recordVisit();
   const creator = await db.creator.findFirst();
   const now = new Date();
 

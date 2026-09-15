@@ -308,6 +308,19 @@ model ClickEvent {
   @@map("click_events")
 }
 
+// ── hub_visits ──────────────────────────────────────────────────────────
+// 링크허브 페이지뷰. 성과 탭의 "허브 CTR"(방문 대비 클릭) 분모다 (docs/08 §3.4).
+// ClickEvent와 같은 규율을 따른다: IP·referer·개인정보를 저장하지 않고, 봇 분류만 남긴다.
+model HubVisit {
+  id      String   @id @default(uuid())
+  ts      DateTime @default(now())
+  /** 'human' | 'bot' — UA 기반 1차 분류. 봇 방문은 집계에서 제외한다. */
+  uaClass String   @default("human")
+
+  @@index([ts])
+  @@map("hub_visits")
+}
+
 // ── audit_log ───────────────────────────────────────────────────────────
 // docs/03-account-safety.md §11. append-only. 목적:
 //   ① 플랫폼이 계정을 제재했을 때 "전부 사람이 승인한 공식 API 사용"임을 입증
