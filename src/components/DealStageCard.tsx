@@ -59,7 +59,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
   const canProceed = deal.parseSource !== "none";
 
   return (
-    <article className="rounded-xl border border-line bg-panel p-4">
+    <article className="rounded-2xl border border-line bg-panel p-4">
       <header className="mb-2 flex items-start justify-between gap-2">
         <div>
           <span className="mb-1 inline-block rounded-full border border-line px-2 py-0.5 text-[11px] text-muted">

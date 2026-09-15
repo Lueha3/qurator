@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { CaptureResponse } from "@/lib/api-types";
+import { CameraIcon } from "./icons";
 
 // 캡처 진입점 — docs/08 §3.3. 모든 탭의 같은 자리(우하단)에 있고, 누르면 바로 사진첩이 열린다.
 // docs/06 §2의 "입력은 2탭"을 한 탭 더 줄이는 것이 목표이고, 여기가 그 한 탭이다.
@@ -141,8 +142,8 @@ export function CaptureFab() {
           style={{ bottom: "calc(4.5rem + env(safe-area-inset-bottom, 0px))" }}
         >
           <div
-            className={`rounded-xl px-4 py-3 text-sm shadow-lg ${
-              toast.tone === "ok" ? "bg-ok text-white" : "bg-danger text-white"
+            className={`elevated rounded-2xl px-4 py-3 text-sm ${
+              toast.tone === "ok" ? "bg-ok text-accent-ink" : "bg-danger text-accent-ink"
             }`}
           >
             <div className="font-medium">
@@ -162,12 +163,10 @@ export function CaptureFab() {
         disabled={!!busy}
         onClick={() => inputRef.current?.click()}
         aria-label="스크린샷 올리기"
-        className="fixed right-4 z-30 flex h-14 items-center gap-2 rounded-full bg-honey px-5 text-base font-semibold text-white shadow-lg transition-opacity active:opacity-90 disabled:opacity-70"
+        className="elevated fixed right-4 z-30 flex h-14 items-center gap-2 rounded-full bg-honey px-5 text-base font-semibold text-accent-ink transition-opacity active:opacity-90 disabled:opacity-70"
         style={{ bottom: "calc(4.25rem + env(safe-area-inset-bottom, 0px))" }}
       >
-        <span aria-hidden className="text-xl leading-none">
-          📷
-        </span>
+        <CameraIcon className="h-[22px] w-[22px]" />
         {busy ?? "올리기"}
       </button>
     </>

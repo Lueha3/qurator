@@ -304,7 +304,7 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-md bg-honey px-4 py-2.5 font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+        className="rounded-md bg-honey px-4 py-2.5 font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50"
       >
         {submitting ? "카드 생성 중…" : "카드 생성"}
       </button>

@@ -280,7 +280,10 @@ function DealRow({
               {STAGE_CHIP[deal.approvalStage]}
             </span>
             {deal.parseSource === "none" && <span className="text-[11px] text-danger">정보 없음</span>}
-            {deal.watchActive && !showRelease && <span aria-label="저장함" className="text-[11px]">📈</span>}
+            {/* 저장함 표시는 글자로 한다 — 이모지는 기기마다 그림이 달라 줄 높이가 흔들린다 */}
+            {deal.watchActive && !showRelease && (
+              <span className="rounded-full bg-honey-soft px-1.5 py-0.5 text-[11px] text-honey">저장함</span>
+            )}
           </div>
           <div className="truncate text-sm font-medium">
             {deal.brand} · {deal.productName}

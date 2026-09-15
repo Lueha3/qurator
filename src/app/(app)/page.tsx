@@ -37,7 +37,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <PageHeader title="qurator" subtitle="오른쪽 아래 [📷 올리기]로 스크린샷을 올리면 가격이 기록됩니다" />
+      <PageHeader title="qurator" subtitle="오른쪽 아래 올리기 버튼으로 스크린샷을 올리면 가격이 기록됩니다" />
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-5">
         {todo.length > 0 && (
           <section className="flex flex-col gap-2">
@@ -47,7 +47,7 @@ export default async function HomePage() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="rounded-xl border border-line bg-panel px-3 py-3 transition-colors hover:border-honey"
+                  className="rounded-2xl border border-line bg-panel px-3 py-3 transition-colors hover:border-honey"
                 >
                   <div className="text-xl font-semibold text-honey">{item.count}</div>
                   <div className="text-xs text-muted">{item.label}</div>
@@ -128,7 +128,7 @@ export default async function HomePage() {
                 <li key={deal.id}>
                   <Link
                     href={`/deals?d=${deal.id}`}
-                    className="flex items-start gap-3 rounded-xl border border-line bg-panel px-3.5 py-3 transition-colors hover:border-honey"
+                    className="flex items-start gap-3 rounded-2xl border border-line bg-panel px-3.5 py-3 transition-colors hover:border-honey"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">

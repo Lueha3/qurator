@@ -89,7 +89,7 @@ export function CopyPane({
         type="button"
         onClick={handleCopy}
         className={`w-full rounded-lg px-4 py-3 text-base font-semibold transition-colors ${
-          state === "copied" ? "bg-ok text-white" : "bg-honey text-white active:opacity-90"
+          state === "copied" ? "bg-ok text-accent-ink" : "bg-honey text-accent-ink active:opacity-90"
         }`}
       >
         {state === "copied" ? "✓ 복사됨 — 카톡에 붙여넣으세요" : label}

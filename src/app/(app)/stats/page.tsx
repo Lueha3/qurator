@@ -47,12 +47,12 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
           실제로 내보낸 횟수입니다.
         </p>
 
-        <section className="rounded-xl border border-line bg-panel p-4">
+        <section className="rounded-2xl border border-line bg-panel p-4">
           <h2 className="mb-3 text-sm font-semibold">지면별 클릭</h2>
           <MagnitudeBars rows={stats.bySurface} emptyText={`최근 ${days}일 동안 클릭이 없습니다.`} />
         </section>
 
-        <section className="rounded-xl border border-line bg-panel p-4">
+        <section className="rounded-2xl border border-line bg-panel p-4">
           <h2 className="mb-1 text-sm font-semibold">많이 눌린 딜</h2>
           <p className="mb-3 text-xs text-muted">다음에 무엇을 더 올릴지는 이 목록이 알려줍니다.</p>
           <MagnitudeBars
@@ -61,7 +61,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
           />
         </section>
 
-        <section className="rounded-xl border border-line bg-panel p-4">
+        <section className="rounded-2xl border border-line bg-panel p-4">
           <h2 className="mb-1 text-sm font-semibold">링크허브</h2>
           <p className="mb-3 text-xs text-muted">
             {stats.hubCtr === null
@@ -76,7 +76,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
           )}
         </section>
 
-        <section className="rounded-xl border border-line bg-panel p-4">
+        <section className="rounded-2xl border border-line bg-panel p-4">
           <h2 className="mb-3 text-sm font-semibold">오늘의 카톡 페이스</h2>
           <Meter
             label="오픈채팅에 내보낸 카드"

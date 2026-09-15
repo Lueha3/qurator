@@ -1,15 +1,25 @@
 @import "tailwindcss";
 
+/*
+  색 토큰 — 값은 눈이 아니라 대비 계산으로 골랐다 (docs/08 §3.5.1).
+  모든 글자 조합이 WCAG AA(본문 4.5:1), 입력 테두리 같은 UI 경계가 3:1을 넘는다.
+  이전 값(honey #c77800, muted #8a8171)은 본문 크기에서 3.4~3.9:1이라 기준 미달이었다.
+*/
 :root {
-  --background: #faf9f6;
-  --foreground: #1f1c17;
+  --background: #faf9f7;
+  --foreground: #1a1714;
   --panel: #ffffff;
-  --line: #e5dfd4;
-  --muted: #8a8171;
-  --honey: #c77800;
-  --honey-soft: #f5e8d3;
-  --ok: #2e6b4f;
-  --danger: #b3402e;
+  /** 장식용 구분선 — 카드 경계. 글자가 아니므로 대비 기준이 없다 */
+  --line: #e9e4dc;
+  /** 조작 가능한 요소의 테두리(입력칸 등) — 3:1을 넘겨야 어디를 눌러야 할지 보인다 */
+  --line-strong: #968c7e;
+  --muted: #6d6355;
+  --honey: #9a5a00;
+  --honey-soft: #fdf0da;
+  /** 강조색 위에 얹는 글자색. 라이트에서는 흰색, 다크에서는 진한 갈색이 된다 */
+  --accent-ink: #ffffff;
+  --ok: #1f6145;
+  --danger: #a1362a;
 }
 
 @theme inline {
@@ -17,33 +27,47 @@
   --color-foreground: var(--foreground);
   --color-panel: var(--panel);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-muted: var(--muted);
   --color-honey: var(--honey);
   --color-honey-soft: var(--honey-soft);
+  --color-accent-ink: var(--accent-ink);
   --color-ok: var(--ok);
   --color-danger: var(--danger);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  /*
+    라틴 글자·숫자는 Geist(직접 호스팅), 한글은 기기의 UI 서체를 쓴다.
+    아이폰에서 Apple SD Gothic Neo가 잡히는 것이 목적이다 — 웹폰트로 한글을 받으면
+    수 MB를 추가로 내려받아야 하고, 정작 기기 기본 서체보다 나을 것이 없다.
+  */
+  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    Pretendard, "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #171411;
-    --foreground: #eae4da;
-    --panel: #1f1b16;
-    --line: #332e27;
-    --muted: #a69c8d;
-    --honey: #f0a62e;
-    --honey-soft: #33270f;
-    --ok: #7fbe9e;
-    --danger: #e07a66;
+    --background: #16130f;
+    --foreground: #efe9df;
+    --panel: #1e1a15;
+    --line: #342e26;
+    --line-strong: #7d7364;
+    --muted: #a99e8d;
+    --honey: #f2ae3f;
+    --honey-soft: #3a2b11;
+    /* 다크의 강조색은 밝은 앰버다 — 그 위에 흰 글자를 얹으면 2:1까지 떨어진다 */
+    --accent-ink: #231a0b;
+    --ok: #7fc7a4;
+    --danger: #ef8b76;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  /* 가로/세로 전환 시 iOS가 글자를 임의로 키우지 않게 한다 */
+  -webkit-text-size-adjust: 100%;
 }
 
 /*
@@ -79,4 +103,11 @@ dialog.sheet::backdrop {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* 떠 있는 것(FAB·시트)에만 쓰는 단 하나의 그림자. 카드에는 쓰지 않는다 — 면은 선으로 나눈다 */
+.elevated {
+  box-shadow:
+    0 1px 2px rgb(26 23 20 / 0.08),
+    0 8px 24px rgb(26 23 20 / 0.12);
 }

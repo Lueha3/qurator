@@ -32,7 +32,7 @@ const UNTAGGED = "오늘의 꿀매";
 
 const BADGE_CLASS: Record<HubBadge["kind"], string> = {
   coupon: "bg-danger/10 text-danger",
-  lowest: "bg-honey text-white",
+  lowest: "bg-honey text-accent-ink",
   drop: "bg-honey-soft text-honey",
 };
 

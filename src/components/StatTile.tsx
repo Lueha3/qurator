@@ -40,9 +40,9 @@ export function StatTile({
     </>
   );
 
-  if (!href) return <div className="rounded-xl border border-line bg-panel px-3 py-3">{body}</div>;
+  if (!href) return <div className="rounded-2xl border border-line bg-panel px-3 py-3">{body}</div>;
   return (
-    <Link href={href} className="rounded-xl border border-line bg-panel px-3 py-3 transition-colors hover:border-honey">
+    <Link href={href} className="rounded-2xl border border-line bg-panel px-3 py-3 transition-colors hover:border-honey">
       {body}
     </Link>
   );
