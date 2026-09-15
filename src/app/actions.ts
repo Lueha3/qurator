@@ -23,31 +23,41 @@ import {
 import { addWatch, removeWatch, type AddWatchResult } from "@/lib/watch";
 import { parsePriceInput, recordManualBfPrice, type ManualPriceResult } from "@/lib/price-entry";
 
+/**
+ * 딜 하나가 바뀌면 세 탭이 같이 바뀐다 — 홈(할 일 개수·최근), 딜(목록·시트), 설정(저장함 개수).
+ * 셋 다 DB만 읽는 dynamic 페이지라 한 번에 무효화해도 비용이 없다.
+ */
+function revalidateApp(): void {
+  revalidatePath("/");
+  revalidatePath("/deals");
+  revalidatePath("/settings");
+}
+
 export async function interestAction(dealId: string): Promise<void> {
   await markInterested(dealId);
-  revalidatePath("/");
+  revalidateApp();
 }
 
 export async function skipAction(dealId: string): Promise<void> {
   await skipDeal(dealId);
-  revalidatePath("/");
+  revalidateApp();
 }
 
 export async function attachLinkAction(dealId: string, text: string): Promise<AttachLinkResult> {
   const result = await attachCuratorLink(dealId, text);
-  revalidatePath("/");
+  revalidateApp();
   return result;
 }
 
 export async function replaceHookAction(dealId: string, hookLine: string): Promise<HookResult> {
   const result = await replaceHook(dealId, hookLine);
-  revalidatePath("/");
+  revalidateApp();
   return result;
 }
 
 export async function approveAction(dealId: string): Promise<ApproveResult> {
   const result = await approveDeal(dealId);
-  revalidatePath("/");
+  revalidateApp();
   return result;
 }
 
@@ -107,21 +117,19 @@ export async function updateFactsAction(
   patch.endsAt = input.endsAt.trim() ? new Date(input.endsAt) : null;
 
   const result = await updateDealFacts(dealId, patch);
-  revalidatePath("/");
+  revalidateApp();
   return result;
 }
 
 export async function watchAction(productId: string): Promise<AddWatchResult> {
   const result = await addWatch(productId);
-  revalidatePath("/");
-  revalidatePath("/watch");
+  revalidateApp();
   return result;
 }
 
 export async function unwatchAction(productId: string): Promise<boolean> {
   const removed = await removeWatch(productId);
-  revalidatePath("/");
-  revalidatePath("/watch");
+  revalidateApp();
   return removed;
 }
 
@@ -137,7 +145,6 @@ export async function manualPriceAction(input: {
     listPrice: input.listPrice || null,
     couponPrice: input.couponPrice || null,
   });
-  revalidatePath("/");
-  revalidatePath("/watch");
+  revalidateApp();
   return result;
 }

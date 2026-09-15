@@ -10,7 +10,8 @@ import {
   watchAction,
 } from "@/app/actions";
 import type { DealDTO } from "@/lib/api-types";
-import { formatKRW, formatShortDateTime } from "@/lib/format";
+import { formatShortDateTime } from "@/lib/format";
+import { dealPriceLine } from "@/lib/deal-format";
 import { CopyPane } from "./CopyPane";
 import { DealCard } from "./DealCard";
 import { DealEditForm } from "./DealEditForm";
@@ -28,18 +29,6 @@ const STAGE_LABEL: Record<DealDTO["approvalStage"], string> = {
   APPROVED: "승인 완료",
   SKIPPED: "기록 완료",
 };
-
-function priceLine(d: DealDTO): string {
-  // 가격을 못 읽었을 때 0원을 찍으면 그대로 광고 고지와 함께 오픈채팅에 나갈 수 있다.
-  // 사실 필드가 비었다는 것을 사람이 반드시 보게 한다.
-  if (!d.listPrice && !d.salePrice && !d.finalPrice) return "⚠️ 가격 미확인 — [정보 고치기] 필요";
-  const effective = d.finalPrice ?? d.salePrice ?? d.listPrice;
-  if (d.salePrice != null && d.listPrice > 0 && d.salePrice < d.listPrice) {
-    const pct = d.discountRate != null ? ` (${d.discountRate}%)` : "";
-    return `${formatKRW(d.listPrice)} → ${formatKRW(effective)}${pct}`;
-  }
-  return formatKRW(effective || d.listPrice);
-}
 
 const CURATOR_CENTER = "https://www.musinsa.com/curator";
 
@@ -83,7 +72,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
             ) : null}
           </h3>
           <p className="text-sm">
-            {priceLine(deal)}
+            {dealPriceLine(deal)}
             {deal.couponDesc ? <span className="text-muted"> · 쿠폰 {deal.couponDesc}</span> : null}
           </p>
         </div>

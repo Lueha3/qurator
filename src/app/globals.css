@@ -45,3 +45,38 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/*
+  딜 시트 — docs/08 §3.3. 화면을 이동하지 않고 카드를 연다(카드 안에서 폼이 열리는 기존 원칙의 연장).
+  <dialog>를 쓰는 이유: 포커스 트랩과 Esc 닫기가 공짜다. 기본 스타일이 가운데 정렬이라
+  폰에서는 바닥에 붙는 시트가 되도록 margin을 직접 준다.
+*/
+dialog.sheet {
+  margin: auto auto 0 auto;
+  width: 100%;
+  max-width: 44rem;
+  max-height: 88dvh;
+  padding: 0;
+  border: none;
+  background: transparent;
+  overscroll-behavior: contain;
+}
+
+dialog.sheet::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+@media (min-width: 640px) {
+  dialog.sheet {
+    margin: auto;
+    max-height: 85dvh;
+  }
+}
+
+/* 필터 칩 줄 — 가로 스크롤은 하되 스크롤바는 보이지 않게 (ShopMy식 정돈된 여백) */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

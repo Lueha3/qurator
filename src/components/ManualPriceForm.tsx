@@ -56,17 +56,19 @@ export function ManualPriceForm({ products }: { products: ProductOption[] }) {
           ))}
         </select>
       </Field>
+      {/* 라벨을 짧게 둔다 — 폰 폭(390px) 3열에서 설명을 라벨에 넣으면 줄이 밀려 입력칸이 어긋난다 */}
       <div className="grid grid-cols-3 gap-3">
-        <Field label="작년 BF 판매가 *">
+        <Field label="판매가 *">
           <input inputMode="numeric" required value={salePrice} onChange={(e) => setSalePrice(e.target.value)} placeholder="39900" className={inputCls} />
         </Field>
-        <Field label="정가 (비우면 상품 정가)">
+        <Field label="정가">
           <input inputMode="numeric" value={listPrice} onChange={(e) => setListPrice(e.target.value)} placeholder="89000" className={inputCls} />
         </Field>
-        <Field label="쿠폰가 (선택)">
+        <Field label="쿠폰가">
           <input inputMode="numeric" value={couponPrice} onChange={(e) => setCouponPrice(e.target.value)} placeholder="37900" className={inputCls} />
         </Field>
       </div>
+      <p className="-mt-1 text-xs text-muted">작년 BF 당시 값입니다. 정가·쿠폰가는 비워도 됩니다(정가를 비우면 상품 정가를 씁니다).</p>
       {message && (
         <p className={`rounded-md px-3 py-2 text-sm ${message.tone === "ok" ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>
           {message.text}
