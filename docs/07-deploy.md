@@ -92,7 +92,17 @@ DATABASE_URL="<transaction pooler url, 6543>" DIRECT_URL="<session pooler url, 5
    | `PUBLIC_BASE_URL` | 배포된 Vercel 주소 (예: `https://qurator.vercel.app`) |
    | `APP_ACCESS_TOKEN` | 대시보드 접근 암호. 비면 웹 표면 전체 503(fail closed) |
 
-3. 배포 후 `/api/capture` 라우트의 `maxDuration = 60`이 Vercel 플랜의 함수 실행시간 상한 안에
+3. **마이그레이션은 빌드가 적용한다** (2026-09-15 추가).
+   `build` 스크립트가 `prisma generate && prisma migrate deploy && next build`다.
+   그 전에는 `prisma generate`만 돌아서, 새 마이그레이션이 생길 때마다 **코드는 배포되는데
+   DB 스키마는 그대로**인 상태가 됐다 — `hub_visits` 테이블과 `deals.tags`·`creators.bio`
+   컬럼이 없는 채로 V2-B/V2-D 코드가 올라가 `/hub`·`/stats`가 런타임에 깨졌다.
+   이제 스키마 적용에 실패하면 **배포 자체가 실패한다**. 스키마가 안 맞는 코드가 뜨는 것보다 낫다.
+   - `migrate deploy`는 `DIRECT_URL`(비풀링)을 쓴다 — Vercel 환경변수에 둘 다 있어야 한다.
+   - 이미 적용된 마이그레이션은 건너뛴다(멱등). 프리뷰 배포도 같은 DB를 보므로,
+     DB를 나누게 되면 이 스크립트를 다시 검토한다.
+
+4. 배포 후 `/api/capture` 라우트의 `maxDuration = 60`이 Vercel 플랜의 함수 실행시간 상한 안에
    있는지 확인한다 (Hobby 플랜은 기본 10초라 60초로 늘리려면 Pro가 필요할 수 있다 — Vercel 함수 설정 확인).
    Vision 추출이 20초까지 걸리므로 이 값이 잘리면 캡처가 중간에 끊긴다.
 
