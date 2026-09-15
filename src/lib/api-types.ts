@@ -99,6 +99,8 @@ export interface DealDTO {
   curatorNote: string | null;
   hookLine: string | null;
   hookSource: "ai" | "human" | null;
+  /** 링크허브 섹션 태그 (docs/08 §3.3). 없으면 빈 배열 */
+  tags: string[];
   status: string;
   /** 승인 카드가 어느 단계에 있는가 — 후보→링크대기→발행승인→승인/기록완료 (docs/02 §6) */
   approvalStage: ApprovalStageDTO;

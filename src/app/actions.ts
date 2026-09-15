@@ -22,6 +22,8 @@ import {
 } from "@/lib/deal-flow";
 import { addWatch, removeWatch, type AddWatchResult } from "@/lib/watch";
 import { parsePriceInput, recordManualBfPrice, type ManualPriceResult } from "@/lib/price-entry";
+import { parseTagInput } from "@/lib/deal-tags";
+import { updateProfile, type ProfileResult } from "@/lib/profile";
 
 /**
  * 딜 하나가 바뀌면 세 탭이 같이 바뀐다 — 홈(할 일 개수·최근), 딜(목록·시트), 설정(저장함 개수).
@@ -77,6 +79,8 @@ export interface FactsFormInput {
   endsAt: string;
   curatorNote: string;
   hookLine: string;
+  /** 쉼표로 구분한 허브 섹션 태그 ("가을 아우터, BF 픽") */
+  tags: string;
 }
 
 function intOrNull(raw: string, label: string): number | null | { error: string } {
@@ -114,6 +118,7 @@ export async function updateFactsAction(
   patch.couponDesc = input.couponDesc;
   patch.curatorNote = input.curatorNote;
   patch.hookLine = input.hookLine;
+  patch.tags = parseTagInput(input.tags);
   patch.endsAt = input.endsAt.trim() ? new Date(input.endsAt) : null;
 
   const result = await updateDealFacts(dealId, patch);
@@ -131,6 +136,16 @@ export async function unwatchAction(productId: string): Promise<boolean> {
   const removed = await removeWatch(productId);
   revalidateApp();
   return removed;
+}
+
+export async function updateProfileAction(input: {
+  bio: string;
+  curatorShopUrl: string;
+}): Promise<ProfileResult> {
+  const result = await updateProfile(input);
+  revalidateApp();
+  revalidatePath("/hub");
+  return result;
 }
 
 export async function manualPriceAction(input: {

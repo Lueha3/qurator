@@ -3,6 +3,7 @@ import { countActiveWatches } from "@/lib/watch";
 import { getWatchLimits, isCrawlessMode } from "@/lib/policy";
 import { PageHeader } from "@/components/PageHeader";
 import { ManualPriceForm } from "@/components/ManualPriceForm";
+import { ProfileForm } from "@/components/ProfileForm";
 
 // 설정 — docs/08 §3.3. 매일 쓰지는 않지만 있어야 하는 것들을 한곳에 모았다.
 // (작년 BF 수동 입력은 원래 /watch 하단에 있었다 — 딜 탭이 목록 전용이 되면서 이리로 옮겼다.)
@@ -23,30 +24,11 @@ export default async function SettingsPage() {
       <PageHeader title="설정" />
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 py-5">
         <section className="rounded-xl border border-line bg-panel p-4">
-          <h2 className="mb-2 text-sm font-semibold">프로필</h2>
-          <dl className="flex flex-col gap-1.5 text-sm">
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted">핸들</dt>
-              <dd className="truncate">@{creator?.handle ?? "(없음)"}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
-              <dt className="shrink-0 text-muted">큐레이션 샵</dt>
-              <dd className="truncate text-right">
-                {creator?.curatorShopUrl ? (
-                  <a
-                    href={creator.curatorShopUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-honey hover:underline"
-                  >
-                    {creator.curatorShopUrl.replace(/^https?:\/\//, "")}
-                  </a>
-                ) : (
-                  <span className="text-muted">미설정</span>
-                )}
-              </dd>
-            </div>
-          </dl>
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h2 className="text-sm font-semibold">프로필</h2>
+            <span className="truncate text-sm text-muted">@{creator?.handle ?? "(없음)"}</span>
+          </div>
+          <ProfileForm bio={creator?.bio ?? null} curatorShopUrl={creator?.curatorShopUrl ?? null} />
         </section>
 
         <section className="rounded-xl border border-line bg-panel p-4">

@@ -2,6 +2,7 @@ import type { ApprovalStage, Channel, LinkHealth } from "@prisma/client";
 import type { DealDTO, PriceHistoryDTO } from "./api-types";
 import { buildPriceChangeNote, discountRate, type PriceAnalysis } from "./price-analysis";
 import { formatRelativeFromNow } from "./format";
+import { parseTags } from "./deal-tags";
 
 export const DEAL_INCLUDE = {
   product: { include: { watchItem: { select: { active: true, expiresAt: true } } } },
@@ -23,6 +24,7 @@ type DealWithRelations = {
   endsAt: Date | null;
   curatorNote: string | null;
   hookLine: string | null;
+  tags: string | null;
   createdAt: Date;
   product: {
     id: string;
@@ -134,6 +136,7 @@ export function toDealDTO(
     curatorNote: deal.curatorNote,
     hookLine: deal.hookLine,
     hookSource,
+    tags: parseTags(deal.tags),
     status: deal.status,
     approvalStage: deal.approvalStage,
     parseSource: deal.parseSource,

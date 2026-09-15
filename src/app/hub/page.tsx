@@ -4,11 +4,16 @@ import { db } from "@/lib/db";
 import { DISCLOSURE } from "@/lib/disclosure";
 import { formatKRW } from "@/lib/format";
 import { classifyUserAgent } from "@/lib/shortlink";
+import { parseTags } from "@/lib/deal-tags";
+import { buildHubBadges, type HubBadge } from "@/lib/hub-badge";
 
-// 링크허브 — 링크트리 대체 (docs/02-architecture.md §10.4).
+// 링크허브 — 링크트리 대체 (docs/02-architecture.md §10.4, docs/08 §3.3 허브 v2).
 //
 // 링크트리 대비 얻는 것: 수동 편집 0, 품절 자동 숨김, 클릭 데이터 소유.
 // 현표는 프로필 링크를 여기로 한 번 바꾸면 이후 아무것도 하지 않는다.
+//
+// v2에서 더해진 것(2026-09-15): 한 줄 소개, 태그 섹션, 배지 1개.
+// 배지는 우리가 이미 가진 것(가격 스냅샷·쿠폰 마감)만으로 계산한다 — 무신사 요청 0건 그대로다.
 //
 // 공개 페이지다(팔로워가 클릭해야 하므로 미들웨어 인증 예외). 대신:
 //   - noindex/nofollow — 검색봇이 커미션 링크를 따라가 실적을 오염시키면 안 된다.
@@ -21,6 +26,14 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "꿀매각 아이템",
   robots: { index: false, follow: false },
+};
+
+const UNTAGGED = "오늘의 꿀매";
+
+const BADGE_CLASS: Record<HubBadge["kind"], string> = {
+  coupon: "bg-danger/10 text-danger",
+  lowest: "bg-honey text-white",
+  drop: "bg-honey-soft text-honey",
 };
 
 /**
@@ -60,11 +73,31 @@ export default async function HubPage() {
     take: 40,
   });
 
+  const badges = await buildHubBadges(deals, now);
+
+  // 태그 = 섹션. 태그가 여러 개면 그 딜은 각 섹션에 함께 걸린다(컬렉션과 같은 뜻).
+  // 태그가 하나도 없으면 지금까지처럼 "오늘의 꿀매" 한 섹션만 그려진다.
+  const sections = new Map<string, typeof deals>();
+  for (const deal of deals) {
+    const tags = parseTags(deal.tags);
+    for (const key of tags.length > 0 ? tags : [UNTAGGED]) {
+      const list = sections.get(key);
+      if (list) list.push(deal);
+      else sections.set(key, [deal]);
+    }
+  }
+  // 묶어둔 섹션이 먼저, 나머지("오늘의 꿀매")가 마지막.
+  const ordered = [...sections.entries()].sort(([a], [b]) =>
+    a === UNTAGGED ? 1 : b === UNTAGGED ? -1 : 0
+  );
+  const hasLowestBadge = [...badges.values()].some((b) => b.kind === "lowest");
+
   return (
     <main className="mx-auto flex max-w-lg flex-col gap-5 p-5">
       <header className="flex flex-col items-center gap-1 pt-4 text-center">
         <h1 className="text-xl font-semibold">꿀매각 아이템</h1>
         <p className="text-sm text-muted">@{creator?.handle ?? "maison_jenflox"}</p>
+        {creator?.bio && <p className="mt-1 text-sm">{creator.bio}</p>}
       </header>
 
       {/* 고지는 링크 목록 위에 상시 노출한다 — 개별 항목마다 붙이지 않아도 되도록 지면 상단 고정 */}
@@ -72,62 +105,72 @@ export default async function HubPage() {
         {DISCLOSURE.NOTION}
       </p>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-muted">오늘의 꿀매</h2>
-        {deals.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
-            지금은 살아있는 딜이 없어요. 곧 새 아이템이 올라옵니다.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {deals.map((deal) => {
-              // 쿠폰이 만료됐으면 쿠폰 적용가와 쿠폰 문구를 쓰지 않는다 —
-              // 이미 못 받는 할인을 광고하면 소비자 오인 표시가 된다.
-              const couponLive =
-                deal.couponExpiresAt == null || deal.couponExpiresAt > now;
-              const effective =
-                (couponLive ? deal.finalPrice : null) ?? deal.salePrice ?? deal.product.listPrice;
-              const discounted =
-                deal.salePrice != null &&
-                deal.product.listPrice > 0 &&
-                deal.salePrice < deal.product.listPrice;
+      {deals.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
+          지금은 살아있는 딜이 없어요. 곧 새 아이템이 올라옵니다.
+        </p>
+      ) : (
+        ordered.map(([title, rows]) => (
+          <section key={title} className="flex flex-col gap-2">
+            <h2 className="text-sm font-medium text-muted">{title}</h2>
+            <ul className="flex flex-col gap-2">
+              {rows.map((deal) => {
+                // 쿠폰이 만료됐으면 쿠폰 적용가와 쿠폰 문구를 쓰지 않는다 —
+                // 이미 못 받는 할인을 광고하면 소비자 오인 표시가 된다.
+                const couponLive = deal.couponExpiresAt == null || deal.couponExpiresAt > now;
+                const effective =
+                  (couponLive ? deal.finalPrice : null) ?? deal.salePrice ?? deal.product.listPrice;
+                const discounted =
+                  deal.salePrice != null &&
+                  deal.product.listPrice > 0 &&
+                  deal.salePrice < deal.product.listPrice;
+                const badge = badges.get(deal.id);
 
-              return (
-                <li key={deal.id}>
-                  {/* next/link가 아니라 순수 <a>를 쓴다: next/link는 뷰포트에 들어온 링크를
-                      프로덕션에서 자동 프리페치하고, 그 요청이 /l/{code} 라우트를 실제로 실행시켜
-                      누르지도 않은 클릭이 기록되고 커미션 URL로 302가 나간다. */}
-                  <a
-                    href={`/l/${deal.shortLinks[0].code}`}
-                    rel="nofollow noopener"
-                    className="flex flex-col gap-1 rounded-lg border border-line bg-panel px-4 py-3 transition-colors hover:border-honey"
-                  >
-                    <span className="text-sm font-medium">
-                      {deal.product.brandName} · {deal.product.productName}
-                    </span>
-                    <span className="text-xs text-muted">
-                      {effective > 0 ? (
-                        <>
-                          {discounted && (
-                            <span className="line-through">
-                              {formatKRW(deal.product.listPrice)}{" "}
-                            </span>
-                          )}
-                          <span className="font-medium text-honey">{formatKRW(effective)}</span>
-                          {deal.discountRate != null && ` (${deal.discountRate}%)`}
-                        </>
-                      ) : (
-                        "가격은 링크에서 확인"
-                      )}
-                      {couponLive && deal.couponDesc && ` · 쿠폰 ${deal.couponDesc}`}
-                    </span>
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+                return (
+                  <li key={`${title}-${deal.id}`}>
+                    {/* next/link가 아니라 순수 <a>를 쓴다: next/link는 뷰포트에 들어온 링크를
+                        프로덕션에서 자동 프리페치하고, 그 요청이 /l/{code} 라우트를 실제로 실행시켜
+                        누르지도 않은 클릭이 기록되고 커미션 URL로 302가 나간다. */}
+                    <a
+                      href={`/l/${deal.shortLinks[0].code}`}
+                      rel="nofollow noopener"
+                      className="flex flex-col gap-1 rounded-lg border border-line bg-panel px-4 py-3 transition-colors hover:border-honey"
+                    >
+                      <span className="flex items-start gap-2">
+                        <span className="flex-1 text-sm font-medium">
+                          {deal.product.brandName} · {deal.product.productName}
+                        </span>
+                        {badge && (
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE_CLASS[badge.kind]}`}
+                          >
+                            {badge.label}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-xs text-muted">
+                        {effective > 0 ? (
+                          <>
+                            {/* 공백을 취소선 밖에 둔다 — 안에 넣으면 취소선이 공백까지 덮어 두 숫자가 붙어 보인다 */}
+                            {discounted && (
+                              <span className="mr-1 line-through">{formatKRW(deal.product.listPrice)}</span>
+                            )}
+                            <span className="font-medium text-honey">{formatKRW(effective)}</span>
+                            {deal.discountRate != null && ` (${deal.discountRate}%)`}
+                          </>
+                        ) : (
+                          "가격은 링크에서 확인"
+                        )}
+                        {couponLive && deal.couponDesc && ` · 쿠폰 ${deal.couponDesc}`}
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))
+      )}
 
       {creator?.curatorShopUrl && (
         <a
@@ -139,8 +182,10 @@ export default async function HubPage() {
         </a>
       )}
 
-      <footer className="pb-8 text-center text-[11px] text-muted">
-        품절되거나 할인이 끝난 상품은 목록에서 자동으로 사라집니다.
+      <footer className="flex flex-col gap-1 pb-8 text-center text-[11px] text-muted">
+        <span>품절되거나 할인이 끝난 상품은 목록에서 자동으로 사라집니다.</span>
+        {/* 배지가 과장으로 읽히지 않게, 근거의 범위를 말해둔다 */}
+        {hasLowestBadge && <span>‘최저가’는 제가 기록해 온 가격 범위 안에서의 최저가입니다.</span>}
       </footer>
     </main>
   );

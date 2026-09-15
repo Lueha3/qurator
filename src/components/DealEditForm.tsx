@@ -3,6 +3,7 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { updateFactsAction, type FactsFormInput } from "@/app/actions";
 import type { DealDTO } from "@/lib/api-types";
+import { MAX_TAGS, formatTagInput } from "@/lib/deal-tags";
 import { Field, inputCls, primaryBtnCls, secondaryBtnCls } from "./form";
 
 /** ISO → datetime-local 입력값(로컬 시각, 초 없음) */
@@ -29,6 +30,7 @@ export function DealEditForm({ deal, onClose }: { deal: DealDTO; onClose: () => 
     endsAt: toLocalInput(deal.endsAt),
     curatorNote: deal.curatorNote ?? "",
     hookLine: deal.hookLine ?? "",
+    tags: formatTagInput(deal.tags),
   });
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -105,6 +107,12 @@ export function DealEditForm({ deal, onClose }: { deal: DealDTO; onClose: () => 
       <Field label="훅 문구">
         <input value={form.hookLine} onChange={(e) => set("hookLine", e.target.value)} placeholder="이 가격에 S부터 품절각" className={inputCls} />
       </Field>
+      <Field label={`링크허브 섹션 태그 (쉼표로 구분, 최대 ${MAX_TAGS}개)`}>
+        <input value={form.tags} onChange={(e) => set("tags", e.target.value)} placeholder="가을 아우터, BF 픽" className={inputCls} />
+      </Field>
+      <p className="-mt-2 text-xs text-muted">
+        태그를 붙이면 링크허브에서 그 이름의 섹션으로 묶입니다. 비워두면 “오늘의 꿀매”에 들어갑니다.
+      </p>
 
       {error && <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
 

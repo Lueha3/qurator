@@ -20,6 +20,7 @@ import { matchOrCreateProduct, type MatchedBy } from "./product-match";
 import { renderAllChannels, type DealFacts, type DealLink } from "./renderer";
 import { audit } from "./audit";
 import { ensureShortLink } from "./shortlink";
+import { serializeTags } from "./deal-tags";
 import { firstCheckAt } from "./health-check";
 import type { ApprovalStage, Channel } from "@prisma/client";
 
@@ -400,6 +401,8 @@ export interface DealFactsPatch {
   endsAt?: Date | null;
   curatorNote?: string | null;
   hookLine?: string | null;
+  /** 링크허브 섹션 태그. 빈 배열이면 "태그 없음"으로 저장된다 (docs/08 §3.3) */
+  tags?: string[];
 }
 
 export type UpdateFactsResult =
@@ -488,6 +491,7 @@ export async function updateDealFacts(
         endsAt: patch.endsAt,
         curatorNote: patch.curatorNote === undefined ? undefined : patch.curatorNote?.trim() || null,
         hookLine: patch.hookLine === undefined ? undefined : patch.hookLine?.trim() || null,
+        tags: patch.tags === undefined ? undefined : serializeTags(patch.tags),
         // 사람이 손본 딜은 "읽지 못함" 상태가 아니다 — 후보 카드가 진행 버튼을 다시 내준다.
         parseSource: deal.parseSource === "none" ? "manual" : undefined,
       },
