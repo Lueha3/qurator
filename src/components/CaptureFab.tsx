@@ -89,7 +89,12 @@ export function CaptureFab() {
 
       switch (body.kind) {
         case "created":
-          setToast({ tone: "ok", message: "카드를 만들었습니다.", detail: body.priceChangeNote });
+          setToast({
+            tone: "ok",
+            // 같은 상품을 다시 찍은 경우 "새로 만들었다"고 하면 거짓말이다 — 카드는 원래 있던 것이다.
+            message: body.reused ? "이미 있던 카드에 가격을 기록했습니다." : "카드를 만들었습니다.",
+            detail: body.priceChangeNote,
+          });
           // 방금 만든 카드를 딜 탭에서 곧바로 연다 — 캡처 다음 동작이 항상 이 카드 안에 있다.
           router.push(`/deals?d=${body.dealId}`);
           router.refresh();

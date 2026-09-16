@@ -126,7 +126,7 @@ export interface CreateDealResponse {
 
 /** POST /api/capture 응답 — 스크린샷 캡처 결과 (docs/06 §3.3의 세 갈래 + 요청 오류) */
 export type CaptureResponse =
-  | { kind: "created"; dealId: string; priceChangeNote: string | null }
+  | { kind: "created"; dealId: string; priceChangeNote: string | null; reused: boolean }
   | { kind: "not_product_page" }
   | { kind: "vision_failed" }
   | { kind: "error"; error: string };

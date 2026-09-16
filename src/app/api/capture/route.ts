@@ -46,7 +46,12 @@ export async function POST(req: NextRequest) {
 
   const result = await captureFromScreenshots(images);
   if (result.kind === "created") {
-    return reply({ kind: "created", dealId: result.dealId, priceChangeNote: result.priceChangeNote });
+    return reply({
+      kind: "created",
+      dealId: result.dealId,
+      priceChangeNote: result.priceChangeNote,
+      reused: result.reused,
+    });
   }
   return reply({ kind: result.kind });
 }

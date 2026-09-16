@@ -84,7 +84,14 @@ async function setStage(dealId: string, stage: ApprovalStage) {
 // ── 1. 캡처 ──────────────────────────────────────────────────────────────
 
 export type CaptureResult =
-  | { kind: "created"; dealId: string; matchedBy: MatchedBy; priceChangeNote: string | null }
+  | {
+      kind: "created";
+      dealId: string;
+      matchedBy: MatchedBy;
+      priceChangeNote: string | null;
+      /** 새 카드가 아니라 이미 열려 있던 카드를 갱신했는가 — 사람에게 다르게 말해야 한다 */
+      reused: boolean;
+    }
   /** 상품 페이지가 아닌 화면(장바구니·옵션 시트·홈) — 기록할 것이 없어 딜·스냅샷을 만들지 않는다 */
   | { kind: "not_product_page" }
   /** Vision 실패(API 장애·타임아웃·키 없음) — 빈 딜을 만들지 않고 안내만 한다 */
@@ -139,6 +146,49 @@ export async function captureFromScreenshots(images: ScreenshotImage[]): Promise
     result.salePrice,
   ].filter((v) => v !== null).length;
 
+  // 아직 손대지 않은 딜이 이 상품에 있으면 **새로 만들지 않고 그것을 갱신한다**.
+  //
+  // 홈의 리마인더가 "오늘 가격을 기록할 상품 N개 — 다시 찍어 올려주세요"라고 매일 조르는데
+  // (docs/05 §3.4, 크롤리스 모드에서 기준가가 쌓이는 유일한 경로다), 캡처마다 딜을 만들면
+  // 같은 상품의 후보 카드가 **매일 한 장씩 쌓인다**. 실제 운영에서 후보가 13장까지 불어났고
+  // 그중 상당수가 같은 상품이었다 — 딜 탭이 "지금 할 일"을 보여주는 화면이기를 그만둔 것이다.
+  //
+  // 승인·기록 완료된 딜은 재사용하지 않는다. 그건 끝난 판단이고, 다시 찍었다는 것은
+  // 새로 판단할 일이 생겼다는 뜻이다.
+  const open = await db.deal.findFirst({
+    where: {
+      productId: product.id,
+      approvalStage: { in: ["CANDIDATE", "AWAITING_LINK", "READY_TO_PUBLISH"] },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (open) {
+    await db.deal.update({
+      where: { id: open.id },
+      data: {
+        // 화면이 현재 가격의 근거다. 다만 이번에 못 읽은 값으로 이미 있는 값을 지우지는 않는다.
+        salePrice: result.salePrice ?? open.salePrice,
+        discountRate: result.discountRateShown ?? open.discountRate,
+        parseSource: parseFieldCount > 0 ? "vision" : open.parseSource,
+        parseFieldCount: Math.max(parseFieldCount, open.parseFieldCount),
+      },
+    });
+
+    // 승인 대기 카드는 "본 것 = 나가는 것"이다 — 가격이 바뀌었으면 카드도 다시 렌더해야
+    // 옛 가격이 고지문과 함께 나가는 일이 없다 (docs/02 §6).
+    if (open.approvalStage === "READY_TO_PUBLISH") await renderCards(open.id);
+
+    await audit({
+      actor: "HUMAN",
+      action: "deal.recaptured",
+      approvalRef: open.id,
+      detail: `스크린샷 ${images.length}장 재캡처 (웹 업로드) → 기존 ${open.approvalStage} 딜 갱신`,
+    });
+
+    return { kind: "created", dealId: open.id, matchedBy, priceChangeNote, reused: true };
+  }
+
   const deal = await db.deal.create({
     data: {
       productId: product.id,
@@ -161,7 +211,7 @@ export async function captureFromScreenshots(images: ScreenshotImage[]): Promise
     detail: `스크린샷 ${images.length}장 캡처 (웹 업로드) → 상품 매칭 ${matchedBy}`,
   });
 
-  return { kind: "created", dealId: deal.id, matchedBy, priceChangeNote };
+  return { kind: "created", dealId: deal.id, matchedBy, priceChangeNote, reused: false };
 }
 
 // ── 2. 후보 → 링크 대기 / 기록 완료 ─────────────────────────────────────

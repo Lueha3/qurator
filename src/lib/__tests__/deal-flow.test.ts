@@ -149,9 +149,10 @@ describe("스크린샷 캡처 (docs/06 §3-4)", () => {
     await capture(); // 53,400원
     const second = await capture({ ...VISION_FULL, salePrice: 42900 });
 
-    // 같은 브랜드·상품명·품번이므로 product-match가 같은 Product로 묶는다.
+    // 같은 브랜드·상품명·품번이므로 product-match가 같은 Product로 묶고,
+    // 열려 있던 후보 카드를 재사용하므로 딜은 늘지 않는다. 가격 기록만 쌓인다.
     expect(await db.product.count()).toBe(1);
-    expect(await db.deal.count()).toBe(2);
+    expect(await db.deal.count()).toBe(1);
     expect(await db.priceSnapshot.count()).toBe(2);
 
     expect(second.priceChangeNote).toContain("53,400원");
@@ -176,6 +177,54 @@ describe("스크린샷 캡처 (docs/06 §3-4)", () => {
     expect(await captureFromScreenshots([IMAGE])).toEqual({ kind: "not_product_page" });
     expect(await db.deal.count()).toBe(0);
     expect(await db.priceSnapshot.count()).toBe(0);
+  });
+
+  // 리마인더가 매일 "다시 찍어 올려주세요"라고 조르는 구조라, 캡처마다 딜을 만들면
+  // 같은 상품의 후보 카드가 매일 한 장씩 쌓인다(운영에서 실제로 13장까지 불어났다).
+  it("같은 상품을 다시 찍으면 새 딜을 만들지 않고 열려 있던 카드를 갱신한다", async () => {
+    const first = await capture();
+    expect(first.reused).toBe(false);
+
+    const second = await capture({ ...VISION_FULL, salePrice: 49000, discountRateShown: 45 });
+    expect(second.reused).toBe(true);
+    expect(second.dealId).toBe(first.dealId);
+    expect(await db.deal.count()).toBe(1);
+
+    const deal = await db.deal.findUniqueOrThrow({ where: { id: first.dealId } });
+    expect(deal.salePrice).toBe(49000);
+    expect(deal.discountRate).toBe(45);
+    // 가격 기록은 두 번 다 남는다 — 카드를 합쳤다고 이력이 합쳐지는 것은 아니다
+    expect(await db.priceSnapshot.count()).toBe(2);
+  });
+
+  it("이번에 못 읽은 값으로 이미 있던 값을 지우지 않는다", async () => {
+    const { dealId } = await capture();
+    await capture({ ...VISION_FULL, salePrice: null, discountRateShown: null });
+
+    const deal = await db.deal.findUniqueOrThrow({ where: { id: dealId } });
+    expect(deal.salePrice).toBe(53400);
+    expect(deal.discountRate).toBe(40);
+  });
+
+  it("링크 대기 중인 딜도 재사용한다 — 진행 중이던 판단을 되돌리지 않는다", async () => {
+    const { dealId } = await capture();
+    await markInterested(dealId);
+
+    const again = await capture({ ...VISION_FULL, salePrice: 51000 });
+    expect(again.dealId).toBe(dealId);
+    expect((await db.deal.findUniqueOrThrow({ where: { id: dealId } })).approvalStage).toBe(
+      "AWAITING_LINK"
+    );
+  });
+
+  it("기록 완료한 딜은 재사용하지 않는다 — 끝난 판단이고 다시 찍은 건 새 판단이다", async () => {
+    const { dealId } = await capture();
+    await skipDeal(dealId);
+
+    const again = await capture();
+    expect(again.reused).toBe(false);
+    expect(again.dealId).not.toBe(dealId);
+    expect(await db.deal.count()).toBe(2);
   });
 
   it("계정 안전: 어느 경로에서도 무신사 게이트웨이를 호출하지 않는다 (docs/06 §7)", async () => {
