@@ -25,6 +25,7 @@ import { parsePriceInput, recordManualBfPrice, type ManualPriceResult } from "@/
 import { parseTagInput } from "@/lib/deal-tags";
 import { updateProfile, type ProfileResult } from "@/lib/profile";
 import { markSoldOut, restoreDeal, type LinkHealthResult } from "@/lib/link-health";
+import { applyDedupe, planDedupe, type DedupePlan } from "@/lib/dedupe";
 
 /**
  * 딜 하나가 바뀌면 세 탭이 같이 바뀐다 — 홈(할 일 개수·최근), 딜(목록·시트), 설정(저장함 개수).
@@ -150,6 +151,18 @@ export async function restoreDealAction(dealId: string): Promise<LinkHealthResul
   const result = await restoreDeal(dealId);
   revalidateApp();
   revalidatePath("/hub");
+  return result;
+}
+
+/** 무엇을 닫을지 계산만 한다 — 이 액션은 DB를 바꾸지 않는다. */
+export async function dedupePreviewAction(): Promise<DedupePlan> {
+  return planDedupe();
+}
+
+export async function dedupeApplyAction(): Promise<{ closed: number }> {
+  // 계획은 서버가 다시 계산한다 — 클라이언트가 보낸 목록을 믿지 않는다.
+  const result = await applyDedupe();
+  revalidateApp();
   return result;
 }
 

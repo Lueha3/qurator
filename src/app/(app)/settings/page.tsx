@@ -4,6 +4,7 @@ import { getWatchLimits, isCrawlessMode } from "@/lib/policy";
 import { PageHeader } from "@/components/PageHeader";
 import { ManualPriceForm } from "@/components/ManualPriceForm";
 import { ProfileForm } from "@/components/ProfileForm";
+import { DedupeCard } from "@/components/DedupeCard";
 
 // 설정 — docs/08 §3.3. 매일 쓰지는 않지만 있어야 하는 것들을 한곳에 모았다.
 // (작년 BF 수동 입력은 원래 /watch 하단에 있었다 — 딜 탭이 목록 전용이 되면서 이리로 옮겼다.)
@@ -56,6 +57,16 @@ export default async function SettingsPage() {
               ? "자동 수집은 하지 않습니다 — 홈의 “오늘 기록할 상품”을 보고 다시 찍어 올리면 그때마다 기록됩니다. 자동으로 끝나지 않으니 그만 볼 상품은 딜 탭 저장함에서 빼주세요."
               : "하루 1회 가격을 기록합니다 (행사 기간에는 2회). 자동으로 끝나지 않으니 그만 볼 상품은 딜 탭 저장함에서 빼주세요."}
           </p>
+        </section>
+
+        <section className="rounded-2xl border border-line bg-panel p-4">
+          <h2 className="mb-1 text-sm font-semibold">중복 카드 정리</h2>
+          <p className="mb-3 text-xs text-muted">
+            예전에는 같은 상품을 다시 찍을 때마다 새 카드가 생겼습니다(지금은 기존 카드를 갱신합니다).
+            그때 쌓인 중복을 한 번에 닫습니다 — 지우지 않고 “기록 완료”로 옮기며, 큐레이터 링크가
+            붙은 카드는 건드리지 않습니다.
+          </p>
+          <DedupeCard />
         </section>
 
         <section className="rounded-2xl border border-line bg-panel p-4">
