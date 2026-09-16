@@ -91,6 +91,13 @@ DATABASE_URL="<transaction pooler url, 6543>" DIRECT_URL="<session pooler url, 5
    | `ANTHROPIC_API_KEY` | Vision 추출용. 없으면 캡처가 "읽지 못했습니다"로 떨어지고 [직접 입력]으로 진행 |
    | `PUBLIC_BASE_URL` | 배포된 Vercel 주소 (예: `https://qurator.vercel.app`) |
    | `APP_ACCESS_TOKEN` | 대시보드 접근 암호. 비면 웹 표면 전체 503(fail closed) |
+   | `VAPID_PUBLIC_KEY` | 아침 알림용. `npm run push:keys`로 한 쌍을 만든다. **공개키는 브라우저로 나간다**(그러라고 있는 값) |
+   | `VAPID_PRIVATE_KEY` | 같은 쌍의 개인키. 화면·문서·저장소 어디에도 적지 않는다(`APP_ACCESS_TOKEN`과 같은 취급) |
+   | `VAPID_SUBJECT` | `mailto:<연락 가능한 주소>`. 푸시 서비스가 장애 시 연락할 곳 |
+   | `CRON_SECRET` | Vercel Cron이 `Authorization: Bearer <값>`으로 붙여준다. 비면 크론 주소가 503 |
+
+   VAPID 키 셋이 없으면 아침 알림 기능만 조용히 꺼진다(설정 탭이 "키가 없습니다"라고 알린다).
+   **키를 바꾸면 기존 구독이 전부 무효**가 되어 폰에서 알림을 다시 켜야 한다.
 
 3. **마이그레이션은 빌드가 적용한다** (2026-09-15 추가).
    `build` 스크립트가 `prisma generate && prisma migrate deploy && next build`다.
@@ -102,7 +109,13 @@ DATABASE_URL="<transaction pooler url, 6543>" DIRECT_URL="<session pooler url, 5
    - 이미 적용된 마이그레이션은 건너뛴다(멱등). 프리뷰 배포도 같은 DB를 보므로,
      DB를 나누게 되면 이 스크립트를 다시 검토한다.
 
-4. 배포 후 `/api/capture` 라우트의 `maxDuration = 60`이 Vercel 플랜의 함수 실행시간 상한 안에
+4. **아침 알림 크론** (2026-09-16 추가). `vercel.json`이 `/api/cron/digest`를 매일
+   `0 23 * * *`(UTC) = **08:00 KST**에 부르게 한다. 스케줄은 UTC로 적는다 —
+   시간을 바꾸려면 이 한 줄만 고친다. Hobby 플랜은 크론이 하루 1회로 제한되는데, 우리가 원하는 것이
+   정확히 그것이다. 발송 여부·이유는 응답 JSON(`status`)과 감사 로그(`push.digest`)에 남으므로,
+   알림이 안 왔을 때 Vercel 크론 로그만 보고도 이유를 알 수 있다.
+
+5. 배포 후 `/api/capture` 라우트의 `maxDuration = 60`이 Vercel 플랜의 함수 실행시간 상한 안에
    있는지 확인한다 (Hobby 플랜은 기본 10초라 60초로 늘리려면 Pro가 필요할 수 있다 — Vercel 함수 설정 확인).
    Vision 추출이 20초까지 걸리므로 이 값이 잘리면 캡처가 중간에 끊긴다.
 

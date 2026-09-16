@@ -115,6 +115,12 @@ npm run dev                  # http://localhost:3000/?k=<APP_ACCESS_TOKEN 값>
 `ANTHROPIC_API_KEY`가 있어야 스크린샷을 읽는다(Vision). 없으면 캡처는 "읽지 못했습니다"로 떨어지고
 [직접 입력]으로 카드를 만들 수 있다 — 나머지 기능은 전부 그대로 동작한다.
 
+**아침 알림(선택)** — `npm run push:keys`로 VAPID 키 한 쌍을 만들어 `VAPID_PUBLIC_KEY`·
+`VAPID_PRIVATE_KEY`·`VAPID_SUBJECT`와 `CRON_SECRET`을 넣으면, 설정 탭에서 알림을 켤 수 있다.
+매일 08:00 KST에 **할 일이 있는 날에만** "기록할 상품 N개 · 정정 공지 N건" 한 통이 간다
+(상품명·가격·링크는 싣지 않는다). 키가 없으면 이 기능만 조용히 꺼진다.
+아이폰은 홈 화면에 추가한 뒤에만 동작한다. 자세한 것은 [docs/08 §4.0.5](docs/08-v2-plan.md).
+
 ```bash
 npm test              # 불변식 테스트 (고지·커미션URL·SSRF·robots·상태머신 E2E)
 npm run build         # 프로덕션 빌드

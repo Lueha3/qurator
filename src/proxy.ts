@@ -45,6 +45,19 @@ export function proxy(req: NextRequest) {
     );
   }
 
+  // Vercel Cron은 우리 쿠키도 x-app-token도 실을 수 없다 — 대신 Vercel이 크론 요청에
+  // `Authorization: Bearer <CRON_SECRET>`을 붙여준다. 그래서 크론 경로에 한해 그 헤더를
+  // 또 하나의 자격증명으로 인정한다. 경로를 공개(PUBLIC_PREFIXES)로 여는 것과는 다르다 —
+  // 토큰 없이는 여전히 못 들어온다. 못 맞추면 아래 일반 게이트로 떨어진다(현표가 앱에서
+  // 직접 열어볼 수 있게). 라우트 자신도 같은 검사를 한 번 더 한다.
+  if (pathname.startsWith("/api/cron/")) {
+    const cronSecret = process.env.CRON_SECRET;
+    const auth = req.headers.get("authorization");
+    if (cronSecret && auth && safeEqual(auth, `Bearer ${cronSecret}`)) {
+      return withNoIndex(NextResponse.next());
+    }
+  }
+
   // 헤더로 온 토큰은 리다이렉트도 쿠키도 없이 그 요청 하나만 통과시킨다.
   const viaHeader = req.headers.get(TOKEN_HEADER);
   if (viaHeader && safeEqual(viaHeader, expected)) {

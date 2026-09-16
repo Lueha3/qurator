@@ -14,6 +14,7 @@
     "db:copy": "tsx --env-file=.env scripts/copy-postgres-data.ts",
     "db:dedupe": "tsx --env-file=.env scripts/dedupe-deals.ts",
     "gateway": "tsx --env-file=.env scripts/gateway.ts",
+    "push:keys": "tsx scripts/vapid-keys.ts",
     "test": "vitest run",
     "health": "tsx --env-file=.env scripts/health-check.ts",
     "watch": "tsx --env-file=.env scripts/watch.ts"
@@ -28,13 +29,15 @@
     "next": "16.3.3",
     "prisma": "^6.12.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",

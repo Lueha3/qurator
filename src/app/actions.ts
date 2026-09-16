@@ -7,6 +7,7 @@
 // 상태 전이 자체는 src/lib/deal-flow.ts가 담당한다. 여기서는 호출·재검증(revalidatePath)만 한다.
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import {
   approveDeal,
   attachCuratorLink,
@@ -26,6 +27,12 @@ import { parseTagInput } from "@/lib/deal-tags";
 import { updateProfile, type ProfileResult } from "@/lib/profile";
 import { markSoldOut, restoreDeal, type LinkHealthResult } from "@/lib/link-health";
 import { applyDedupe, planDedupe, type DedupePlan } from "@/lib/dedupe";
+import {
+  removeSubscription,
+  saveSubscription,
+  sendTestPush,
+  type DigestRun,
+} from "@/lib/push";
 
 /**
  * 딜 하나가 바뀌면 세 탭이 같이 바뀐다 — 홈(할 일 개수·최근), 딜(목록·시트), 설정(저장함 개수).
@@ -190,4 +197,26 @@ export async function manualPriceAction(input: {
   });
   revalidateApp();
   return result;
+}
+
+// ── 아침 알림 (V2-G) ────────────────────────────────────────────────────
+// 구독 정보는 브라우저가 만들어 주고 우리는 저장만 한다. 클라이언트가 보낸 값이라
+// saveSubscription 안에서 형식을 다시 검증한다 — 임의의 주소가 들어오면 우리 서버가
+// 그리로 요청을 보내는 발판이 된다.
+
+export async function pushSubscribeAction(subscription: unknown): Promise<boolean> {
+  const ua = (await headers()).get("user-agent");
+  const ok = await saveSubscription(subscription, ua);
+  revalidatePath("/settings");
+  return ok;
+}
+
+export async function pushUnsubscribeAction(endpoint: string): Promise<boolean> {
+  const ok = await removeSubscription(endpoint);
+  revalidatePath("/settings");
+  return ok;
+}
+
+export async function pushTestAction(): Promise<DigestRun> {
+  return sendTestPush();
 }

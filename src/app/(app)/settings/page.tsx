@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { ManualPriceForm } from "@/components/ManualPriceForm";
 import { ProfileForm } from "@/components/ProfileForm";
 import { DedupeCard } from "@/components/DedupeCard";
+import { PushToggle } from "@/components/PushToggle";
+import { pushPublicKey } from "@/lib/push";
 
 // 설정 — docs/08 §3.3. 매일 쓰지는 않지만 있어야 하는 것들을 한곳에 모았다.
 // (작년 BF 수동 입력은 원래 /watch 하단에 있었다 — 딜 탭이 목록 전용이 되면서 이리로 옮겼다.)
@@ -12,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const now = new Date();
+  const vapidPublicKey = pushPublicKey();
   const [creator, activeWatches, limits, crawless, products] = await Promise.all([
     db.creator.findFirst(),
     countActiveWatches(now),
@@ -57,6 +60,15 @@ export default async function SettingsPage() {
               ? "자동 수집은 하지 않습니다 — 홈의 “오늘 기록할 상품”을 보고 다시 찍어 올리면 그때마다 기록됩니다. 자동으로 끝나지 않으니 그만 볼 상품은 딜 탭 저장함에서 빼주세요."
               : "하루 1회 가격을 기록합니다 (행사 기간에는 2회). 자동으로 끝나지 않으니 그만 볼 상품은 딜 탭 저장함에서 빼주세요."}
           </p>
+        </section>
+
+        <section className="rounded-2xl border border-line bg-panel p-4">
+          <h2 className="mb-1 text-sm font-semibold">아침 알림</h2>
+          <p className="mb-3 text-xs text-muted">
+            매일 아침 8시, <b>할 일이 있는 날에만</b> 한 통 옵니다 — “기록할 상품 3개 · 정정 공지 1건”.
+            상품명·가격·링크는 싣지 않습니다(잠금화면은 옆 사람도 봅니다).
+          </p>
+          <PushToggle publicKey={vapidPublicKey} />
         </section>
 
         <section className="rounded-2xl border border-line bg-panel p-4">

@@ -78,3 +78,56 @@ describe("접근 게이트", () => {
     expect(res.status).toBe(200);
   });
 });
+
+// 크론 경로 — V2-G. Vercel Cron은 우리 쿠키도 x-app-token도 실을 수 없어서
+// Bearer CRON_SECRET을 또 하나의 자격증명으로 받는다. **공개 경로가 아니다**:
+// 비밀이 틀리면 일반 게이트로 떨어져 401이어야 한다.
+describe("크론 게이트", () => {
+  const CRON = "cron-secret-0123456789";
+  const originalCron = process.env.CRON_SECRET;
+
+  beforeEach(() => {
+    process.env.CRON_SECRET = CRON;
+  });
+
+  afterEach(() => {
+    if (originalCron === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = originalCron;
+  });
+
+  it("Vercel이 붙인 Bearer 비밀은 통과한다", () => {
+    const res = proxy(
+      request("/api/cron/digest", { headers: { authorization: `Bearer ${CRON}` } })
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("set-cookie")).toBeNull(); // 크론에 세션을 주지 않는다
+  });
+
+  it("인증 없는 크론 호출은 401 — 누구나 부를 수 있으면 알림이 스팸이 된다", () => {
+    expect(proxy(request("/api/cron/digest")).status).toBe(401);
+  });
+
+  it("틀린 비밀은 401", () => {
+    expect(
+      proxy(request("/api/cron/digest", { headers: { authorization: "Bearer wrong-secret-here" } }))
+        .status
+    ).toBe(401);
+  });
+
+  it("CRON_SECRET이 없으면 크론 경로도 열리지 않는다", () => {
+    delete process.env.CRON_SECRET;
+    expect(
+      proxy(request("/api/cron/digest", { headers: { authorization: "Bearer " } })).status
+    ).toBe(401);
+  });
+
+  it("크론 비밀은 크론 경로에서만 통한다", () => {
+    const res = proxy(request("/deals", { headers: { authorization: `Bearer ${CRON}` } }));
+    expect(res.status).toBe(401);
+  });
+
+  it("앱 토큰으로도 크론 주소를 열 수 있다 (현표가 직접 확인)", () => {
+    const res = proxy(request("/api/cron/digest", { headers: { "x-app-token": TOKEN } }));
+    expect(res.status).toBe(200);
+  });
+});
