@@ -12,6 +12,7 @@
     "db:export": "tsx --env-file=.env scripts/export-data.ts",
     "db:import": "tsx --env-file=.env scripts/import-data.ts",
     "db:copy": "tsx --env-file=.env scripts/copy-postgres-data.ts",
+    "db:dedupe": "tsx --env-file=.env scripts/dedupe-deals.ts",
     "gateway": "tsx --env-file=.env scripts/gateway.ts",
     "test": "vitest run",
     "health": "tsx --env-file=.env scripts/health-check.ts",
