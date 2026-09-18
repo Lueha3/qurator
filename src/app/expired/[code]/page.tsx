@@ -42,14 +42,14 @@ export default async function ExpiredPage({ params }: { params: Promise<{ code: 
         <h1 className="text-xl font-bold">지금은 살 수 없는 상품이에요</h1>
         <p className="text-sm text-ink-soft">
           {link?.deal.product
-            ? `${link.deal.product.brandName} · ${link.deal.product.productName} 은(는) 품절되었거나 할인이 종료됐습니다.`
-            : "품절되었거나 할인이 종료된 링크입니다."}
+            ? `${link.deal.product.brandName} · ${link.deal.product.productName} 은(는) 품절됐거나 할인이 끝났어요.`
+            : "품절됐거나 할인이 끝난 링크예요."}
         </p>
       </header>
 
       {alternatives.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium text-ink-soft">지금 살아있는 다른 꿀템</h2>
+          <h2 className="text-sm font-medium text-ink-soft">지금 살 수 있는 다른 꿀템</h2>
           <p className="text-xs text-ink-soft">{DISCLOSURE.NOTION}</p>
           <ul className="flex flex-col gap-2">
             {alternatives.map((deal) => (

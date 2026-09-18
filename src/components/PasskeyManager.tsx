@@ -44,12 +44,12 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
 
   async function register() {
     if (typeof window === "undefined" || !window.PublicKeyCredential) {
-      return setProblem("이 브라우저는 패스키를 지원하지 않습니다.");
+      return setProblem("이 브라우저에서는 Face ID 로그인을 쓸 수 없어요.");
     }
     // 없는 기기에서 시도하면 응답 없이 매달려 "등록 중…" 버튼이 영원히 굳어버린다
     // (2026-09-18, 테스트 중 재현) — 시도 전에 먼저 확인한다.
     if (!(await hasAuthenticator())) {
-      return setProblem("이 기기에는 Face ID·Touch ID 같은 잠금 해제 수단이 없어 패스키를 쓸 수 없습니다.");
+      return setProblem("이 기기에는 Face ID·Touch ID 같은 잠금 해제 수단이 없어 쓸 수 없어요.");
     }
     setBusy(true);
     setNote(null);
@@ -57,7 +57,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
     try {
       const res = await fetch("/api/auth/passkey/register");
       if (!res.ok) {
-        setProblem("서버에 PUBLIC_BASE_URL이 설정되지 않아 등록할 수 없습니다.");
+        setProblem("서버 설정(PUBLIC_BASE_URL)이 아직 없어 등록할 수 없어요. 관리자에게 알려주세요.");
         return;
       }
 
@@ -77,11 +77,11 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
         body: JSON.stringify({ credential: attestation, label: name }),
       });
       if (!verified.ok) {
-        setProblem(`서버가 등록을 거부했습니다 (${await verified.text()}).`);
+        setProblem(`등록이 안 됐어요 (${await verified.text()}).`);
         return;
       }
       const { label } = await verified.json();
-      setNote(`${label} 등록 완료. 이제 주소만 치고 얼굴만 보면 열립니다.`);
+      setNote(`${label} 등록 완료! 이제 주소만 열고 얼굴만 보면 돼요.`);
       setName("");
       router.refresh();
     } catch (error) {
@@ -115,9 +115,9 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
                     router.refresh();
                   })
                 }
-                className="shrink-0 rounded-lg border border-line-strong px-2.5 py-1.5 text-danger transition-colors hover:border-danger disabled:opacity-50"
+                className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-danger transition-colors hover:border-danger disabled:opacity-50"
               >
-                삭제
+                지우기
               </button>
             </li>
           ))}
@@ -125,7 +125,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
       )}
 
       <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-ink-soft">이 기기 이름 (작업 기록에 남습니다)</span>
+        <span className="text-xs font-medium text-ink-soft">이 기기 이름</span>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -136,7 +136,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
       </label>
 
       <button type="button" onClick={register} disabled={busy} className={primaryBtnCls}>
-        {busy ? "등록 중…" : passkeys.length > 0 ? "이 기기도 등록하기" : "이 기기에 Face ID 등록"}
+        {busy ? "등록 중…" : passkeys.length > 0 ? "🔐 이 기기도 등록하기" : "🔐 이 기기에 Face ID 등록"}
       </button>
 
       {note && <p className="rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">{note}</p>}

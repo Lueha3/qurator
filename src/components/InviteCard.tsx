@@ -56,8 +56,8 @@ export function InviteCard({ invites }: { invites: InviteView[] }) {
       {fresh ? (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-ink-soft">
-            이 링크를 보내주세요. <b>30분 뒤 만료</b>되고 <b>한 번만</b> 쓸 수 있습니다. 이 화면을
-            벗어나면 다시 볼 수 없습니다.
+            이 링크를 보내주세요. <b>30분 뒤 만료</b>되고 <b>한 번만</b> 쓸 수 있어요. 이 화면을
+            벗어나면 다시 볼 수 없어요.
           </p>
           <code className="block break-all rounded-lg border border-line bg-paper p-3 font-mono text-xs">
             {fresh}
@@ -108,7 +108,7 @@ export function InviteCard({ invites }: { invites: InviteView[] }) {
             }
             className={primaryBtnCls}
           >
-            {pending ? "만드는 중…" : "등록 링크 만들기"}
+            {pending ? "만드는 중…" : "🔗 초대 링크 만들기"}
           </button>
         </div>
       )}

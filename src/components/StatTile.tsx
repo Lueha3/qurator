@@ -9,7 +9,7 @@ import Link from "next/link";
 function formatDelta(value: number, prev: number): { text: string; up: boolean } | null {
   if (value === 0 && prev === 0) return null;
   const diff = value - prev;
-  if (diff === 0) return { text: "지난 기간과 같음", up: false };
+  if (diff === 0) return { text: "변화 없음", up: false };
   return { text: `${diff > 0 ? "▲" : "▼"} ${Math.abs(diff).toLocaleString("ko-KR")}`, up: diff > 0 };
 }
 

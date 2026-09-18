@@ -61,14 +61,14 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
       const ok = await pushSubscribeAction(sub.toJSON());
       if (!ok) {
         await sub.unsubscribe();
-        setNote("구독 정보를 저장하지 못했습니다. 다시 시도해주세요.");
+        setNote("알림 설정을 저장하지 못했어요. 다시 눌러주세요.");
         setState("off");
         return;
       }
       setState("on");
-      setNote("켰습니다. 매일 아침 8시에 할 일이 있을 때만 한 통 옵니다.");
+      setNote("켰어요. 할 일이 있는 날 매일 아침 8시에 한 통 와요.");
     } catch {
-      setNote("알림을 켜지 못했습니다. 잠시 뒤 다시 시도해주세요.");
+      setNote("알림을 켜지 못했어요. 잠시 뒤 다시 눌러주세요.");
     } finally {
       setBusy(false);
     }
@@ -85,9 +85,9 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
         await sub.unsubscribe();
       }
       setState("off");
-      setNote("껐습니다.");
+      setNote("껐어요.");
     } catch {
-      setNote("알림을 끄지 못했습니다. 다시 시도해주세요.");
+      setNote("알림을 끄지 못했어요. 다시 눌러주세요.");
     } finally {
       setBusy(false);
     }
@@ -100,13 +100,13 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
       const run = await pushTestAction();
       setNote(
         run.status === "sent"
-          ? "보냈습니다 — 폰 알림을 확인해주세요."
+          ? "보냈어요. 폰 알림을 확인해주세요."
           : run.status === "no-subscription"
-            ? "구독된 기기가 없습니다. 먼저 알림을 켜주세요."
-            : "서버에 알림 키가 없어 보내지 못했습니다."
+            ? "켜진 기기가 없어요. 먼저 알림을 켜주세요."
+            : "서버에 알림 설정이 없어 못 보냈어요."
       );
     } catch {
-      setNote("보내지 못했습니다.");
+      setNote("보내지 못했어요.");
     } finally {
       setBusy(false);
     }
@@ -117,26 +117,24 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
   if (state === "no-keys")
     return (
       <p className="text-xs text-ink-soft">
-        서버에 알림 키(<code className="font-mono">VAPID_PUBLIC_KEY</code>)가 없습니다. Vercel 환경변수에
-        등록하면 이 자리에 스위치가 생깁니다.
+        서버에 알림 설정이 아직 없어요. 관리자에게 알려주세요 (알림 키 등록).
       </p>
     );
 
   if (state === "needs-install")
     return (
       <p className="text-xs text-ink-soft">
-        아이폰은 <b>홈 화면에 추가한 앱</b>에서만 알림을 켤 수 있습니다. 홈 화면 아이콘으로 이 앱을 연 뒤
-        설정 탭에 다시 오면 스위치가 보입니다.
+        아이폰은 <b>홈 화면에 추가한 앱</b>에서만 알림을 켤 수 있어요. 홈 화면 아이콘으로 열고 다시 와주세요.
       </p>
     );
 
   if (state === "unsupported")
-    return <p className="text-xs text-ink-soft">이 브라우저는 웹 알림을 지원하지 않습니다.</p>;
+    return <p className="text-xs text-ink-soft">이 브라우저에서는 알림을 켤 수 없어요.</p>;
 
   if (state === "denied")
     return (
       <p className="text-xs text-danger">
-        이 기기에서 알림이 차단되어 있습니다. 브라우저·OS 설정에서 이 앱의 알림을 허용한 뒤 다시 와주세요.
+        알림이 꺼져 있어요. 아이폰 설정에서 이 앱의 알림을 허용한 뒤 다시 와주세요.
       </p>
     );
 
@@ -154,7 +152,7 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
           </>
         ) : (
           <button type="button" disabled={busy} onClick={enable} className={`${primaryBtnCls} flex-1`}>
-            {busy ? "켜는 중…" : "아침 알림 켜기"}
+            {busy ? "켜는 중…" : "🔔 아침 알림 켜기"}
           </button>
         )}
       </div>

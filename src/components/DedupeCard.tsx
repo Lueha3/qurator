@@ -22,7 +22,7 @@ export function DedupeCard() {
       try {
         await work();
       } catch {
-        setError("서버 오류가 났습니다. 다시 시도해주세요.");
+        setError("잠깐 문제가 생겼어요. 다시 눌러주세요.");
       }
     });
   }
@@ -30,7 +30,7 @@ export function DedupeCard() {
   if (done !== null) {
     return (
       <p className="rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">
-        ✅ {done}장을 기록 완료로 옮겼습니다. 딜 탭의 “기록 완료” 필터에 그대로 있습니다.
+        ✅ {done}개를 보관으로 옮겼어요. 딜 탭의 “보관”에서 볼 수 있어요.
       </p>
     );
   }
@@ -44,18 +44,18 @@ export function DedupeCard() {
           onClick={() => run(async () => setPlan(await dedupePreviewAction()))}
           className={secondaryBtnCls}
         >
-          {pending ? "확인 중…" : "중복 카드 확인"}
+          {pending ? "확인 중…" : "🔍 중복 확인하기"}
         </button>
       ) : plan.closeCount === 0 && plan.manualCount === 0 ? (
-        <p className="text-sm text-ink-soft">정리할 중복이 없습니다.</p>
+        <p className="text-sm text-ink-soft">정리할 중복이 없어요.</p>
       ) : (
         <>
           <p className="text-sm">
-            상품 <b>{plan.groups.length}개</b>에서 <b>{plan.closeCount}장</b>을 닫습니다.
+            상품 <b>{plan.groups.length}개</b>에서 <b>{plan.closeCount}개</b>를 보관으로 옮겨요.
             {plan.manualCount > 0 && (
               <span className="text-ink-soft">
                 {" "}
-                링크가 붙은 {plan.manualCount}장은 그대로 둡니다.
+                링크가 붙은 {plan.manualCount}개는 그대로 둬요.
               </span>
             )}
           </p>
@@ -98,7 +98,7 @@ export function DedupeCard() {
               }
               className={`${primaryBtnCls} flex-1`}
             >
-              {pending ? "정리 중…" : `${plan.closeCount}장 정리하기`}
+              {pending ? "정리 중…" : `${plan.closeCount}개 정리하기`}
             </button>
           </div>
         </>

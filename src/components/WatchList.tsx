@@ -19,7 +19,7 @@ export function WatchList({ rows }: { rows: WatchRow[] }) {
   if (rows.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-ink-soft">
-        지켜보는 중인 상품이 없습니다. 딜 카드의 [📈 가격만 지켜보기]로 등록하세요.
+        지켜보는 상품이 없어요. 딜을 열고 [📈 가격만 지켜보기]를 눌러보세요.
       </p>
     );
   }
@@ -45,13 +45,13 @@ export function WatchList({ rows }: { rows: WatchRow[] }) {
                 try {
                   await unwatchAction(row.productId);
                 } catch {
-                  setError("해제하지 못했습니다. 다시 시도해주세요.");
+                  setError("그만두지 못했어요. 다시 눌러주세요.");
                 }
               });
             }}
             className={`${secondaryBtnCls} flex-none`}
           >
-            🚫 해제
+            그만 지켜보기
           </button>
         </li>
       ))}

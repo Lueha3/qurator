@@ -105,7 +105,7 @@ describe("성과 집계", () => {
     const stats = await loadStats(7);
     expect(stats.bySurface).toEqual([
       { label: "카톡 오픈채팅", value: 2 },
-      { label: "링크허브", value: 1 },
+      { label: "팔로워 페이지", value: 1 },
     ]);
     expect(stats.hubClicks).toBe(1);
   });

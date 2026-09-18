@@ -108,7 +108,7 @@ export default async function HubPage() {
 
       {deals.length === 0 ? (
         <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-soft">
-          지금은 살아있는 딜이 없어요. 곧 새 아이템이 올라옵니다.
+          지금은 살 수 있는 딜이 없어요. 곧 새 아이템이 올라와요.
         </p>
       ) : (
         ordered.map(([title, rows]) => (
@@ -193,9 +193,9 @@ export default async function HubPage() {
       )}
 
       <footer className="flex flex-col gap-1 pb-8 text-center text-[11px] text-ink-soft">
-        <span>품절되거나 할인이 끝난 상품은 목록에서 바로 내려갑니다.</span>
+        <span>품절되거나 할인이 끝난 상품은 목록에서 바로 내려가요.</span>
         {/* 배지가 과장으로 읽히지 않게, 근거의 범위를 말해둔다 */}
-        {hasLowestBadge && <span>‘최저가’는 제가 기록해 온 가격 범위 안에서의 최저가입니다.</span>}
+        {hasLowestBadge && <span>‘최저가’는 제가 기록해 온 가격 범위 안에서의 최저가예요.</span>}
       </footer>
     </main>
   );

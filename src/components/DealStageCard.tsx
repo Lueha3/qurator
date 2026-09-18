@@ -22,9 +22,9 @@ import { inputCls, primaryBtnCls, secondaryBtnCls } from "./form";
 import { STAGE_DOT, STAGE_LABEL } from "@/lib/deal-stage";
 import { BrandMark } from "./BrandMark";
 
-// 승인 카드 — docs/02 §6 "카드 1장의 상태 전이". 후보 → 링크 대기 → 발행 승인 → 승인/기록 완료가
-// 한 자리에서 일어난다. 버튼 문구·배치 규칙은 docs/06 §3.0 그대로다:
-//   주 동작(발행)은 한 줄을 독점하고, 나머지는 "올리지 않는다"는 점에서 같은 급이라 아래 줄에 묶는다.
+// 딜 시트 — docs/02 §6 "카드 1장의 상태 전이". 결정 전 → 링크 필요 → 문구 준비됨 → 올림/보관이
+// 한 자리에서 일어난다. 배치 규칙은 docs/06 §3.0 그대로: 주 동작이 한 줄을 독점하고, "올리지 않는" 것들은 아래 줄.
+// 문구는 2026-09-18 GrowthPilot 톤으로 다시 썼다(docs/08 §4.0.7) — 해요체, 한 문장에 한 뜻, 개발 용어 없음.
 
 const CURATOR_CENTER = "https://www.musinsa.com/curator";
 
@@ -34,7 +34,6 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
   const [notice, setNotice] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [editing, setEditing] = useState(false);
-  const [showGuide, setShowGuide] = useState(false);
   const [linkText, setLinkText] = useState("");
   const [hookText, setHookText] = useState("");
 
@@ -45,7 +44,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
       try {
         await work();
       } catch {
-        setError("서버 오류가 났습니다. 다시 시도해주세요.");
+        setError("잠깐 문제가 생겼어요. 다시 눌러주세요.");
       }
     });
   }
@@ -86,15 +85,15 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
       {deal.approvalStage === "CANDIDATE" && (
         <div className="flex flex-col gap-3">
           {deal.priceChangeNote && (
-            <pre className="whitespace-pre-wrap rounded-md bg-accent-soft px-3 py-2 font-sans text-sm text-accent">
+            <pre className="whitespace-pre-wrap rounded-xl bg-accent-soft px-3 py-2 font-sans text-sm text-accent">
               {deal.priceChangeNote}
             </pre>
           )}
           {deal.parseSource === "none" && (
-            <p className="text-sm text-danger">⚠️ 상품 정보를 읽지 못했습니다. [✏️ 정보 고치기]로 채워주세요.</p>
+            <p className="text-sm text-danger">⚠️ 상품 정보를 못 읽었어요. [✏️ 정보 고치기]로 채워주세요.</p>
           )}
           {deal.parseSource === "opengraph" && (
-            <p className="text-sm text-ink-soft">일부 정보만 읽었습니다 — 승인 전 확인해주세요.</p>
+            <p className="text-sm text-ink-soft">일부만 읽었어요. 올리기 전에 한 번 확인해주세요.</p>
           )}
           {canProceed && (
             <button
@@ -103,7 +102,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
               onClick={() => run(() => interestAction(deal.id))}
               className={primaryBtnCls}
             >
-              ✅ 이 상품 올릴게요
+              ✅ 올릴게요
             </button>
           )}
           <div className="flex gap-2">
@@ -116,8 +115,8 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
                   setNotice(
                     r.ok
                       ? r.alreadyActive
-                        ? "이미 지켜보는 중입니다."
-                        : `📈 가격 추적 시작 — 같은 상품을 다시 찍어 올리면 그때마다 변화가 기록됩니다. (지켜보는 중 ${r.activeCount}개)`
+                        ? "이미 지켜보고 있어요."
+                        : `📈 지켜보기 시작! 같은 상품을 다시 찍어 올리면 그때마다 가격 변화가 기록돼요. (지켜보는 중 ${r.activeCount}개)`
                       : `⚠️ ${r.reason}`
                   );
                 })
@@ -127,7 +126,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
               {deal.watchActive ? "📈 지켜보는 중" : "📈 가격만 지켜보기"}
             </button>
             <button type="button" disabled={pending} onClick={() => run(() => skipAction(deal.id))} className={secondaryBtnCls}>
-              ✔️ 기록 완료
+              📁 보관
             </button>
           </div>
         </div>
@@ -136,16 +135,16 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
       {deal.approvalStage === "AWAITING_LINK" && (
         <div className="flex flex-col gap-3">
           <p className="text-sm">
-            📎 <b>큐레이터 링크를 붙여넣어 주세요.</b>{" "}
-            <span className="text-ink-soft">큐레이터센터에서 링크를 만든 뒤 그대로 붙여넣으면 카드가 완성됩니다.</span>
+            🔗 <b>내 링크를 붙여넣어 주세요.</b>{" "}
+            <span className="text-ink-soft">큐레이터센터에서 이 상품의 링크를 만들어 그대로 붙여넣으면 카톡 문구가 완성돼요.</span>
           </p>
           <a
             href={curatorShopUrl ?? CURATOR_CENTER}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-lg border border-line px-3 py-2.5 text-center text-sm font-medium hover:border-accent"
+            className={`${secondaryBtnCls} text-center`}
           >
-            🔗 큐레이터센터 열기
+            큐레이터센터 열기 ↗
           </a>
           <textarea
             value={linkText}
@@ -170,11 +169,11 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
             }
             className={primaryBtnCls}
           >
-            {pending ? "카드 만드는 중…" : "링크 붙여넣기 → 카드 만들기"}
+            {pending ? "문구 만드는 중…" : "🔗 링크 붙이기"}
           </button>
           <div className="flex gap-2">
             <button type="button" disabled={pending} onClick={() => run(() => skipAction(deal.id))} className={secondaryBtnCls}>
-              ✔️ 기록 완료
+              📁 보관
             </button>
           </div>
         </div>
@@ -183,7 +182,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
       {deal.approvalStage === "READY_TO_PUBLISH" && (
         <div className="flex flex-col gap-3">
           {warnings.length > 0 && (
-            <ul className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+            <ul className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">
               {warnings.map((w) => (
                 <li key={w}>⚠️ {w}</li>
               ))}
@@ -195,13 +194,13 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
               {deal.hookSource === "ai" && <span className="ml-1 text-[11px] text-ink-soft">AI 초안</span>}
             </p>
           ) : (
-            <p className="text-sm text-ink-soft">훅 문구 없음 — 아래에서 넣을 수 있습니다.</p>
+            <p className="text-sm text-ink-soft">첫 줄 문구가 없어요. 아래에 넣을 수 있어요.</p>
           )}
           <div className="flex gap-2">
             <input
               value={hookText}
               onChange={(e) => setHookText(e.target.value)}
-              placeholder="새 훅 문구 (한 줄)"
+              placeholder="첫 줄 문구 (한 줄)"
               className={inputCls}
             />
             <button
@@ -214,22 +213,22 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
                   else setHookText("");
                 })
               }
-              className="shrink-0 rounded-lg border border-line px-3 text-sm font-medium hover:border-accent disabled:opacity-50"
+              className={`${secondaryBtnCls} flex-none`}
             >
-              ✏️ 훅 교체
+              바꾸기
             </button>
           </div>
 
           <p className="text-xs text-ink-soft">🔗 링크 {deal.linkCount}개</p>
 
           {kakao && (
-            <div className="rounded-lg border border-line">
+            <div className="rounded-xl border border-line">
               <div className="flex items-center justify-between border-b border-line px-3 py-1.5 text-xs text-ink-soft">
-                <span>카톡 오픈채팅 미리보기 — 보이는 그대로 나갑니다</span>
+                <span>카톡에 이렇게 나가요</span>
                 <span>
                   {kakao.charCount}자 ·{" "}
                   <span className={kakao.disclosureOk ? "text-accent" : "text-danger"}>
-                    {kakao.disclosureOk ? "고지 OK" : "고지 실패"}
+                    {kakao.disclosureOk ? "광고 표시 OK" : "광고 표시 빠짐"}
                   </span>
                 </span>
               </div>
@@ -246,19 +245,19 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
                 if (!r.ok) {
                   setError(
                     r.reason === "DISCLOSURE_FAILED"
-                      ? "⛔️ 고지문 검증에 실패한 카드는 발행할 수 없습니다."
-                      : "카드가 없습니다 — 링크를 먼저 붙여넣어주세요."
+                      ? "⛔️ 광고 표시가 빠진 문구는 올릴 수 없어요."
+                      : "링크를 먼저 붙여주세요."
                   );
                 }
               })
             }
             className={primaryBtnCls}
           >
-            🚀 승인 — 카톡 문구 받기
+            🚀 카톡 문구 받기
           </button>
           <div className="flex gap-2">
             <button type="button" disabled={pending} onClick={() => run(() => skipAction(deal.id))} className={secondaryBtnCls}>
-              ✔️ 기록 완료
+              📁 보관
             </button>
           </div>
         </div>
@@ -268,15 +267,14 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
         <div className="flex flex-col gap-3">
           {deal.soldOut ? (
             <p className="text-sm text-ink-soft">
-              🚫 <b className="text-ink">품절로 표시됨</b> — 링크허브에서 내려갔고, 이미 나간 링크는
-              안내 페이지로 갑니다.
+              🚫 <b className="text-ink">품절로 표시했어요.</b> 팔로워 페이지에서 내렸고, 이미 보낸 링크는 안내 페이지로 가요.
             </p>
           ) : (
-            <p className="text-sm">✅ <b>승인 완료</b> — 아래 문구를 카톡에 붙여넣으세요.</p>
+            <p className="text-sm">✅ <b>올렸어요!</b> 아래 문구를 복사해 카톡에 붙여넣으세요.</p>
           )}
           {kakao && <CopyPane text={kakao.bodyText} cardId={kakao.id} />}
           {others.length > 0 && (
-            <details className="rounded-lg border border-line">
+            <details className="rounded-xl border border-line">
               <summary className="cursor-pointer px-3 py-2 text-sm text-ink-soft">
                 다른 채널 문구 (스레드 · 인스타 고정댓글 · 노션)
               </summary>
@@ -302,19 +300,19 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
                     ? await restoreDealAction(deal.id)
                     : await markSoldOutAction(deal.id);
                   if (!r.ok) setError(r.reason);
-                  else if (!deal.soldOut) setNotice("허브에서 내렸습니다. 홈에서 정정 공지를 복사해 카톡에 올려주세요.");
+                  else if (!deal.soldOut) setNotice("팔로워 페이지에서 내렸어요. 홈에서 품절 안내를 복사해 카톡에 올려주세요.");
                 })
               }
               className={secondaryBtnCls}
             >
-              {deal.soldOut ? "↩️ 품절 표시 되돌리기" : "🚫 품절로 표시"}
+              {deal.soldOut ? "↩️ 품절 취소" : "🚫 품절됐어요"}
             </button>
           </div>
         </div>
       )}
 
       {deal.approvalStage === "SKIPPED" && (
-        <p className="text-sm text-ink-soft">✔️ 기록 완료 — 가격은 저장했고, 발행은 하지 않았습니다.</p>
+        <p className="text-sm text-ink-soft">📁 보관 중이에요. 가격만 기록해뒀어요.</p>
       )}
 
       {deal.approvalStage !== "APPROVED" && deal.approvalStage !== "SKIPPED" && (
@@ -322,26 +320,26 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
           <button type="button" onClick={() => setEditing((v) => !v)} className={secondaryBtnCls}>
             ✏️ 정보 고치기
           </button>
-          <button type="button" onClick={() => setShowGuide((v) => !v)} className={secondaryBtnCls}>
-            ❓ 버튼 설명
-          </button>
         </div>
       )}
 
       {editing && <DealEditForm deal={deal} onClose={() => setEditing(false)} />}
 
-      {showGuide && (
-        <div className="mt-3 rounded-lg bg-paper p-3 text-xs leading-relaxed text-ink-soft">
-          <p className="mb-1"><b className="text-ink">✅ 이 상품 올릴게요</b> — 발행 준비를 시작합니다. 큐레이터센터에서 링크를 만들어 붙여넣으면 카톡 문구가 완성됩니다. <i>바로 발행되지 않습니다 — 마지막에 승인 단계가 있습니다.</i></p>
-          <p className="mb-1"><b className="text-ink">📈 가격만 지켜보기</b> — 지금 올리진 않지만 가격 변화를 계속 보고 싶을 때. 나중에 같은 상품을 다시 찍어 올리면 “그때 얼마 → 지금 얼마”가 자동으로 비교됩니다.</p>
-          <p className="mb-1"><b className="text-ink">✔️ 기록 완료</b> — 이 카드를 닫습니다. <i>삭제가 아닙니다</i> — 스크린샷을 올린 순간 가격은 이미 저장됐으니, 발행만 하지 않고 끝내는 것입니다.</p>
-          <p className="mb-1"><b className="text-ink">✏️ 정보 고치기</b> — 브랜드·상품명·가격을 잘못 읽었을 때 바로잡습니다.</p>
-          <p>💡 <b className="text-ink">스크린샷을 올리는 것만으로 가격은 항상 기록됩니다.</b> 버튼은 “이 다음에 무엇을 할지”를 고르는 것입니다.</p>
-        </div>
+      {deal.approvalStage !== "APPROVED" && deal.approvalStage !== "SKIPPED" && (
+        <details className="mt-3 rounded-xl bg-paper text-xs leading-relaxed text-ink-soft">
+          <summary className="cursor-pointer px-3 py-2 font-medium">버튼이 뭐예요?</summary>
+          <div className="flex flex-col gap-1.5 px-3 pb-3">
+            <p><b className="text-ink">✅ 올릴게요</b> — 카톡에 올릴 준비를 시작해요. 링크를 붙이면 카톡 문구가 만들어져요. 바로 올라가지는 않아요.</p>
+            <p><b className="text-ink">📈 가격만 지켜보기</b> — 지금은 안 올리지만 가격은 계속 보고 싶을 때. 같은 상품을 다시 찍어 올리면 “그때 얼마 → 지금 얼마”가 자동으로 비교돼요.</p>
+            <p><b className="text-ink">📁 보관</b> — 이 딜을 접어요. 지우는 게 아니에요. 가격은 이미 기록됐고, 올리지만 않는 거예요.</p>
+            <p><b className="text-ink">✏️ 정보 고치기</b> — 브랜드·상품명·가격을 잘못 읽었을 때 바로잡아요.</p>
+            <p>💡 스크린샷을 올리는 것만으로 가격은 항상 기록돼요. 버튼은 “이 다음에 뭘 할지”를 고르는 거예요.</p>
+          </div>
+        </details>
       )}
 
-      {notice && <p className="mt-3 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">{notice}</p>}
-      {error && <p className="mt-3 rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+      {notice && <p className="mt-3 rounded-xl bg-accent-soft px-3 py-2 text-sm text-accent">{notice}</p>}
+      {error && <p className="mt-3 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
     </article>
   );
 }

@@ -53,7 +53,7 @@ export interface StatsSummary {
 }
 
 const SURFACE_LABEL: Record<string, string> = {
-  hub: "링크허브",
+  hub: "팔로워 페이지",
   kakao_open: "카톡 오픈채팅",
   threads: "스레드",
   instagram_comment: "인스타 고정댓글",

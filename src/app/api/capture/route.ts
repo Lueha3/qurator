@@ -23,17 +23,17 @@ export async function POST(req: NextRequest) {
   try {
     form = await req.formData();
   } catch {
-    return reply({ kind: "error", error: "잘못된 요청입니다." }, 400);
+    return reply({ kind: "error", error: "요청이 잘못됐어요. 다시 해주세요." }, 400);
   }
 
   const files = form.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
-  if (files.length === 0) return reply({ kind: "error", error: "스크린샷을 선택해주세요." }, 400);
+  if (files.length === 0) return reply({ kind: "error", error: "사진을 골라주세요." }, 400);
   if (files.length > MAX_CAPTURE_IMAGES) {
-    return reply({ kind: "error", error: `한 번에 최대 ${MAX_CAPTURE_IMAGES}장까지 올릴 수 있습니다.` }, 400);
+    return reply({ kind: "error", error: `한 번에 ${MAX_CAPTURE_IMAGES}장까지 올릴 수 있어요.` }, 400);
   }
   const total = files.reduce((n, f) => n + f.size, 0);
   if (total > MAX_TOTAL_BYTES) {
-    return reply({ kind: "error", error: "이미지 용량이 너무 큽니다. 장수를 줄여 다시 올려주세요." }, 413);
+    return reply({ kind: "error", error: "사진이 너무 커요. 장수를 줄여 다시 올려주세요." }, 413);
   }
 
   // 이미지 바이트는 이 요청의 메모리에만 존재한다 — 디스크·DB·로그에 쓰지 않는다 (docs/06 §4.3).

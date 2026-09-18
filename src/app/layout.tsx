@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "qurator",
-  description: "무신사 스크린샷을 올리면 가격을 기록하고 고지문 포함 채널별 완성 카드를 만드는 워크스페이스",
+  description: "무신사 화면을 찍어 올리면 가격을 기록하고 카톡에 올릴 문구를 만들어 주는 앱",
   // iOS는 manifest.ts의 display:standalone을 보지 않는다 — 홈 화면에서 앱처럼 열리려면 이쪽이 필요하다.
   appleWebApp: { capable: true, title: "qurator", statusBarStyle: "default" },
 };

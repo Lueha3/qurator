@@ -65,7 +65,7 @@ export function DealEditForm({ deal, onClose }: { deal: DealDTO; onClose: () => 
       <Field label="상품명">
         <input value={form.productName} onChange={(e) => set("productName", e.target.value)} placeholder="오버핏 맨투맨" className={inputCls} />
       </Field>
-      <Field label="상품 URL (큐레이터 링크 아님 — 정규 상품 주소)">
+      <Field label="상품 주소" hint="내 링크 말고, 상품 페이지 주소예요">
         <input
           type="url"
           value={form.productUrl}
@@ -104,15 +104,12 @@ export function DealEditForm({ deal, onClose }: { deal: DealDTO; onClose: () => 
           <input value={form.curatorNote} onChange={(e) => set("curatorNote", e.target.value)} placeholder="168/62 M 정사이즈" className={inputCls} />
         </Field>
       </div>
-      <Field label="훅 문구">
+      <Field label="첫 줄 문구">
         <input value={form.hookLine} onChange={(e) => set("hookLine", e.target.value)} placeholder="이 가격에 S부터 품절각" className={inputCls} />
       </Field>
-      <Field label={`링크허브 섹션 태그 (쉼표로 구분, 최대 ${MAX_TAGS}개)`}>
+      <Field label="팔로워 페이지 묶음" hint={`쉼표로 구분, 최대 ${MAX_TAGS}개. 비우면 “오늘의 꿀매”에 들어가요`}>
         <input value={form.tags} onChange={(e) => set("tags", e.target.value)} placeholder="가을 아우터, BF 픽" className={inputCls} />
       </Field>
-      <p className="-mt-2 text-xs text-ink-soft">
-        태그를 붙이면 링크허브에서 그 이름의 섹션으로 묶입니다. 비워두면 “오늘의 꿀매”에 들어갑니다.
-      </p>
 
       {error && <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
 

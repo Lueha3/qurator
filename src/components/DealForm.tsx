@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { ColorLinkInput, CreateDealInput, DealDTO } from "@/lib/api-types";
-import { Field, inputCls } from "./form";
+import { Field, inputCls, primaryBtnCls } from "./form";
 
 const EMPTY_FORM = {
   brand: "",
@@ -86,7 +86,7 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json.error ?? "카드 생성에 실패했습니다.");
+        setError(json.error ?? "만들지 못했어요.");
         return;
       }
       setForm(EMPTY_FORM);
@@ -95,7 +95,7 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
       router.refresh();
       onCreated?.(json.deal as DealDTO);
     } catch {
-      setError("서버에 연결할 수 없습니다.");
+      setError("서버에 연결할 수 없어요.");
     } finally {
       setSubmitting(false);
     }
@@ -133,7 +133,7 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
         />
       </Field>
 
-      <Field label="상품 URL *">
+      <Field label="상품 주소 *">
         <input
           required
           type="url"
@@ -227,12 +227,12 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
         </Field>
       </div>
 
-      <Field label="대표 큐레이터 링크">
+      <Field label="내 링크 (있으면)">
         <input
           type="url"
           value={form.defaultLinkUrl}
           onChange={(e) => set("defaultLinkUrl", e.target.value)}
-          placeholder="큐레이터센터에서 생성한 링크를 붙여넣기"
+          placeholder="큐레이터센터에서 만든 링크 붙여넣기"
           className={inputCls}
         />
       </Field>
@@ -261,7 +261,7 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
                 type="url"
                 value={cl.url}
                 onChange={(e) => updateColorLink(i, "url", e.target.value)}
-                placeholder="색상별 큐레이터 링크"
+                placeholder="색상별 내 링크"
                 className={inputCls}
               />
               <button
@@ -277,7 +277,7 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
         </div>
       </div>
 
-      <Field label="훅 문구 (비워두면 AI 초안)">
+      <Field label="첫 줄 문구" hint="비우면 AI가 초안을 써요">
         <textarea
           value={form.hookLine}
           onChange={(e) => set("hookLine", e.target.value)}
@@ -294,7 +294,7 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
           onChange={(e) => setUseAiHook(e.target.checked)}
           className="h-4 w-4 rounded border-line"
         />
-        훅이 비어있으면 AI 초안 시도 (실패해도 정상 진행됩니다)
+        첫 줄이 비어 있으면 AI 초안 쓰기
       </label>
 
       {error && (
@@ -304,9 +304,9 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-md bg-accent px-4 py-2.5 font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50"
+        className={primaryBtnCls}
       >
-        {submitting ? "카드 생성 중…" : "카드 생성"}
+        {submitting ? "만드는 중…" : "만들기"}
       </button>
     </form>
   );

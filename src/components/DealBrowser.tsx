@@ -32,24 +32,24 @@ export type DealFilter =
 
 const FILTERS: { key: DealFilter; label: string }[] = [
   { key: "all", label: "전체" },
-  { key: "candidate", label: "후보" },
-  { key: "awaiting", label: "링크 대기" },
-  { key: "ready", label: "승인 대기" },
-  { key: "saved", label: "저장함" },
-  { key: "approved", label: "승인 완료" },
-  { key: "skipped", label: "기록 완료" },
-  { key: "archived", label: "보관" },
+  { key: "candidate", label: "결정 전" },
+  { key: "awaiting", label: "링크 필요" },
+  { key: "ready", label: "문구 준비됨" },
+  { key: "saved", label: "지켜보는 중" },
+  { key: "approved", label: "올림" },
+  { key: "skipped", label: "보관" },
+  { key: "archived", label: "지난 딜" },
 ];
 
 const EMPTY_TEXT: Record<DealFilter, string> = {
-  all: "아직 딜이 없습니다. 오른쪽 아래 [📷 올리기]로 시작하세요.",
-  candidate: "후보가 없습니다. 스크린샷을 올리면 여기에 쌓입니다.",
-  awaiting: "큐레이터 링크를 기다리는 딜이 없습니다.",
-  ready: "승인을 기다리는 딜이 없습니다.",
-  saved: "저장함이 비어 있습니다. 딜 카드의 [📈 가격만 지켜보기]로 담아두세요.",
-  approved: "최근 30일 안에 승인한 딜이 없습니다.",
-  skipped: "기록만 하고 넘긴 딜이 없습니다.",
-  archived: `승인한 지 ${ARCHIVE_AFTER_DAYS}일이 지난 딜이 아직 없습니다.`,
+  all: "아직 딜이 없어요. 오른쪽 아래 [📷 올리기]로 시작해보세요.",
+  candidate: "결정할 딜이 없어요. 스크린샷을 올리면 여기에 쌓여요.",
+  awaiting: "링크가 필요한 딜이 없어요.",
+  ready: "카톡 문구를 받을 딜이 없어요.",
+  saved: "지켜보는 상품이 없어요. 딜을 열고 [📈 가격만 지켜보기]를 눌러보세요.",
+  approved: "최근 30일 안에 올린 딜이 없어요.",
+  skipped: "보관한 딜이 없어요.",
+  archived: `올린 지 ${ARCHIVE_AFTER_DAYS}일이 지난 딜은 아직 없어요.`,
 };
 
 /** 승인한 지 오래된 딜은 기본 목록에서 빠진다 — 삭제가 아니라 보관이다(허브 노출과는 무관). */
@@ -214,7 +214,7 @@ export function DealBrowser({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="브랜드 · 상품명 검색"
+          placeholder="브랜드나 상품명으로 찾기"
           aria-label="딜 검색"
           className={inputCls}
         />
@@ -223,13 +223,13 @@ export function DealBrowser({
           onClick={() => setManualOpen(true)}
           className="shrink-0 rounded-xl border border-line bg-surface px-3.5 py-3 text-sm font-semibold text-ink-soft"
         >
-          ✏️ 직접 입력
+          ✏️ 직접 만들기
         </button>
       </div>
 
       {visible.length === 0 ? (
         <p className={emptyCls}>
-          {query.trim() ? `“${query.trim()}”와 맞는 딜이 없습니다.` : EMPTY_TEXT[filter]}
+          {query.trim() ? `“${query.trim()}”에 맞는 딜이 없어요.` : EMPTY_TEXT[filter]}
         </p>
       ) : (
         groups.map((group) => (
@@ -274,7 +274,7 @@ export function DealBrowser({
       }}>
         <div className="max-h-[88dvh] overflow-y-auto rounded-t-3xl bg-paper p-4 sm:rounded-3xl">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">✏️ 직접 입력으로 카드 만들기</h2>
+            <h2 className="text-sm font-semibold">✏️ 직접 만들기</h2>
             <button
               type="button"
               onClick={() => setManualOpen(false)}
@@ -319,7 +319,7 @@ function DealRow({
             onClick={() => startTransition(async () => void (await unwatchAction(deal.productId)))}
             className="shrink-0 font-medium hover:text-danger disabled:opacity-50"
           >
-            🚫 저장함에서 빼기
+            그만 지켜보기
           </button>
         </div>
       )}

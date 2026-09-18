@@ -33,7 +33,7 @@ function estimateRows(text: string): number {
 export function CopyPane({
   text,
   cardId,
-  label = "📋 카톡용 문구 복사",
+  label = "📋 카톡 문구 복사",
 }: {
   text: string;
   /** 복사 사실을 발행 이력(Post)으로 남길 카드. 없으면 기록하지 않는다(정정문 등) */
@@ -92,12 +92,12 @@ export function CopyPane({
           state === "copied" ? "bg-accent text-accent-ink" : "bg-accent text-accent-ink active:opacity-90"
         }`}
       >
-        {state === "copied" ? "✓ 복사됨 — 카톡에 붙여넣으세요" : label}
+        {state === "copied" ? "✓ 복사했어요. 카톡에 붙여넣으세요" : label}
       </button>
 
       {state === "manual" && (
         <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
-          자동 복사가 막혀 있습니다. 아래 글을 길게 눌러 전체 선택 후 복사해 주세요.
+          자동 복사가 막혀 있어요. 아래 글을 길게 눌러 전체 선택한 뒤 복사해주세요.
         </p>
       )}
 

@@ -37,7 +37,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
 
   return (
     <>
-      <PageHeader title="딜" />
+      <PageHeader title="딜" subtitle="찍어 올린 순서대로 모여요. 눌러서 다음 할 일을 하세요." />
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-6 pt-2">
         <DealBrowser
           deals={deals}

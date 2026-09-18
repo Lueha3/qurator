@@ -18,7 +18,7 @@ interface RowProps {
   deal: DealDTO;
   /** 오른쪽 아래 작은 글자 — "14:49" 또는 "1시간 전". 서버가 정한 문자열을 그대로 받는다 */
   trailing?: string;
-  /** 저장함 필터에서는 저장함 표시가 중복이라 숨긴다 */
+  /** "지켜보는 중" 필터에서는 그 표시가 중복이라 숨긴다 */
   hideSavedTag?: boolean;
   href?: string;
   onOpen?: () => void;
@@ -41,9 +41,8 @@ export function DealListRow({ deal, trailing, hideSavedTag, href, onOpen }: RowP
             {STAGE_LABEL[deal.approvalStage]}
           </span>
           {deal.watchActive && !hideSavedTag && (
-            <span className="shrink-0 text-accent">· 저장함</span>
+            <span className="shrink-0 text-accent">· 지켜보는 중</span>
           )}
-          {deal.parseSource === "none" && <span className="shrink-0 text-danger">· 정보 없음</span>}
         </div>
 
         <div className={`mt-0.5 truncate text-[15px] font-semibold leading-snug ${done ? "text-ink-soft" : ""}`}>
@@ -52,7 +51,7 @@ export function DealListRow({ deal, trailing, hideSavedTag, href, onOpen }: RowP
 
         <div className="mt-1 flex items-baseline gap-1.5 text-sm">
           {price.missing ? (
-            <span className="text-xs font-medium text-danger">⚠️ 가격 미확인 — 정보 고치기 필요</span>
+            <span className="text-xs font-medium text-danger">⚠️ 가격을 못 읽었어요 — 눌러서 고쳐주세요</span>
           ) : (
             <>
               <span className={`font-semibold ${done ? "text-ink-soft" : ""}`}>{formatKRW(price.effective!)}</span>

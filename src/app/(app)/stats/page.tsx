@@ -20,7 +20,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
 
   return (
     <>
-      <PageHeader title="성과" />
+      <PageHeader title="성과" subtitle="링크가 얼마나 눌렸는지, 카톡에 몇 번 올렸는지 봐요." />
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 pb-6 pt-2">
         {/* 기간은 이 화면 전체에 걸린다 — 카드마다 따로 두지 않는다 */}
         <div className={`w-max ${segmentCls}`}>
@@ -37,35 +37,34 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
         </div>
 
         <section className="grid grid-cols-3 gap-2">
-          <StatTile label="클릭" value={stats.clicks.value} prev={stats.clicks.prev} />
-          <StatTile label="발행" value={stats.posts.value} prev={stats.posts.prev} />
-          <StatTile label="허브 방문" value={stats.hubVisits.value} prev={stats.hubVisits.prev} />
+          <StatTile label="링크 클릭" value={stats.clicks.value} prev={stats.clicks.prev} />
+          <StatTile label="카톡에 올림" value={stats.posts.value} prev={stats.posts.prev} />
+          <StatTile label="페이지 방문" value={stats.hubVisits.value} prev={stats.hubVisits.prev} />
         </section>
         <p className="-mt-4 text-xs text-ink-soft">
-          ▲▼는 {periodLabel} 변화입니다. 봇으로 분류된 클릭·방문은 빠진 숫자이고, 발행은 카드를 복사해
-          실제로 내보낸 횟수입니다.
+          ▲▼는 {periodLabel} 변화예요. 봇 클릭은 뺐고, “카톡에 올림”은 문구를 복사한 횟수예요.
         </p>
 
         <section className="card p-4">
-          <h2 className="mb-3 text-sm font-semibold">지면별 클릭</h2>
-          <MagnitudeBars rows={stats.bySurface} emptyText={`최근 ${days}일 동안 클릭이 없습니다.`} />
+          <h2 className="mb-3 text-sm font-semibold">어디서 눌렸나</h2>
+          <MagnitudeBars rows={stats.bySurface} emptyText={`최근 ${days}일 동안 눌린 링크가 없어요.`} />
         </section>
 
         <section className="card p-4">
           <h2 className="mb-1 text-sm font-semibold">많이 눌린 딜</h2>
-          <p className="mb-3 text-xs text-ink-soft">다음에 무엇을 더 올릴지는 이 목록이 알려줍니다.</p>
+          <p className="mb-3 text-xs text-ink-soft">다음에 뭘 더 올릴지 여기서 힌트를 얻어요.</p>
           <MagnitudeBars
             rows={stats.topDeals.map((d) => ({ label: `${d.brand} · ${d.productName}`, value: d.clicks }))}
-            emptyText={`최근 ${days}일 동안 눌린 딜이 없습니다.`}
+            emptyText={`최근 ${days}일 동안 눌린 딜이 없어요.`}
           />
         </section>
 
         <section className="card p-4">
-          <h2 className="mb-1 text-sm font-semibold">링크허브</h2>
+          <h2 className="mb-1 text-sm font-semibold">팔로워 페이지</h2>
           <p className="mb-3 text-xs text-ink-soft">
             {stats.hubCtr === null
-              ? "아직 방문 기록이 없습니다. 프로필 링크를 허브로 바꾸면 여기에 쌓입니다."
-              : `방문 ${stats.hubVisits.value.toLocaleString("ko-KR")}회 중 ${stats.hubClicks.toLocaleString("ko-KR")}회가 상품 링크로 이어졌습니다.`}
+              ? "아직 방문이 없어요. 프로필 링크를 팔로워 페이지로 바꾸면 여기에 쌓여요."
+              : `방문 ${stats.hubVisits.value.toLocaleString("ko-KR")}번 중 ${stats.hubClicks.toLocaleString("ko-KR")}번이 상품 링크로 이어졌어요.`}
           </p>
           {stats.hubCtr !== null && (
             <div className="flex items-baseline gap-2">
@@ -76,12 +75,12 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
         </section>
 
         <section className="card p-4">
-          <h2 className="mb-3 text-sm font-semibold">오늘의 카톡 페이스</h2>
+          <h2 className="mb-3 text-sm font-semibold">오늘 카톡에 올린 횟수</h2>
           <Meter
-            label="오픈채팅에 내보낸 카드"
+            label="오늘 올린 문구"
             value={stats.kakaoToday}
             limit={KAKAO_DAILY_LIMIT}
-            note="하루 3~5건이 권고 상한입니다. 막지는 않지만, 너무 잦으면 방 이탈이 늘어납니다."
+            note="하루 3~5개가 적당해요. 막지는 않지만, 너무 잦으면 방을 나가는 사람이 늘어요."
           />
         </section>
       </main>

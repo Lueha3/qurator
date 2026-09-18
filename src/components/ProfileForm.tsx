@@ -26,7 +26,7 @@ export function ProfileForm({
       const result = await updateProfileAction(form);
       setMessage(
         result.ok
-          ? { tone: "ok", text: "저장했습니다. 링크허브에 바로 반영됩니다." }
+          ? { tone: "ok", text: "저장했어요. 팔로워 페이지에 바로 반영돼요." }
           : { tone: "error", text: result.reason }
       );
     });
@@ -34,7 +34,7 @@ export function ProfileForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <Field label={`허브 한 줄 소개 (${form.bio.length}/${MAX_BIO_LENGTH})`}>
+      <Field label={`팔로워 페이지 한 줄 소개 (${form.bio.length}/${MAX_BIO_LENGTH})`}>
         <input
           value={form.bio}
           maxLength={MAX_BIO_LENGTH}
@@ -58,7 +58,7 @@ export function ProfileForm({
         </p>
       )}
       <button type="submit" disabled={pending} className={primaryBtnCls}>
-        {pending ? "저장 중…" : "프로필 저장"}
+        {pending ? "저장 중…" : "💾 프로필 저장"}
       </button>
     </form>
   );

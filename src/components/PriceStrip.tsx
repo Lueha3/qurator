@@ -35,7 +35,7 @@ function EventCell({ event }: { event: PriceEventDTO }) {
   const couponLine = event.couponPrice !== null && (
     <div className="text-xs font-normal text-ink-soft">
       쿠폰가 {formatKRW(event.couponPrice)}
-      {event.couponDiscountRate !== null && ` · 실할인 ${event.couponDiscountRate}%`}
+      {event.couponDiscountRate !== null && ` · 실제 할인 ${event.couponDiscountRate}%`}
     </div>
   );
 
@@ -43,7 +43,7 @@ function EventCell({ event }: { event: PriceEventDTO }) {
   if (event.realDiscountRate !== null) {
     return (
       <Cell label={label}>
-        {event.realDiscountRate}%<span className="ml-1.5 text-xs text-ink-soft">실할인</span>
+        {event.realDiscountRate}%<span className="ml-1.5 text-xs text-ink-soft">실제 할인</span>
         <div className="text-xs font-normal text-ink-soft">{formatKRW(event.salePrice)}</div>
         {couponLine}
       </Cell>
@@ -62,8 +62,8 @@ function EventCell({ event }: { event: PriceEventDTO }) {
       */}
       <div className="text-xs font-normal text-ink-soft">
         {event.manualOnly
-          ? "기록 이전 행사 — 실할인율 없음"
-          : `기준가 수집 ${event.baselineSampleSize}/3`}
+          ? "기록 전 행사라 실제 할인은 몰라요"
+          : `평소 가격 모으는 중 ${event.baselineSampleSize}/3`}
       </div>
       {couponLine}
     </Cell>
@@ -81,7 +81,7 @@ function FirstRecordCell({ history }: { history: PriceHistoryDTO }) {
       <Cell label="행사 기록" tone="muted">
         아직 없음
         <div className="text-xs font-normal text-ink-soft">
-          스냅샷 {history.snapshotCount}건 수집 중
+          기록 {history.snapshotCount}건 모으는 중
         </div>
       </Cell>
     );
@@ -118,7 +118,7 @@ export function PriceStrip({ history }: { history: PriceHistoryDTO }) {
 
       <Cell label="현재가" tone={history.currentSalePrice === null ? "muted" : "normal"}>
         {history.currentSalePrice === null ? (
-          "아직 스냅샷 없음"
+          "아직 기록 없음"
         ) : (
           <>
             {formatKRW(history.currentCouponPrice ?? history.currentSalePrice)}
@@ -126,7 +126,7 @@ export function PriceStrip({ history }: { history: PriceHistoryDTO }) {
               <span className="ml-1.5 text-xs text-ink-soft">쿠폰가</span>
             )}
             <div className="text-xs font-normal text-ink-soft">
-              {history.currentCapturedLabel} 기준 · 스냅샷 {history.snapshotCount}건
+              {history.currentCapturedLabel} 기준 · 기록 {history.snapshotCount}건
             </div>
           </>
         )}

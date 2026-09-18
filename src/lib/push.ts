@@ -170,9 +170,9 @@ export interface DigestPayload {
  */
 export function digestMessage(counts: DigestCounts): DigestPayload | null {
   const parts: string[] = [];
-  if (counts.reminders > 0) parts.push(`기록할 상품 ${counts.reminders}개`);
-  if (counts.corrections > 0) parts.push(`정정 공지 ${counts.corrections}건`);
-  if (counts.ready > 0) parts.push(`승인 대기 ${counts.ready}건`);
+  if (counts.reminders > 0) parts.push(`가격 기록할 상품 ${counts.reminders}개`);
+  if (counts.corrections > 0) parts.push(`품절 안내 ${counts.corrections}건`);
+  if (counts.ready > 0) parts.push(`문구 받을 딜 ${counts.ready}건`);
   if (parts.length === 0) return null;
 
   return {
@@ -320,7 +320,7 @@ export async function sendTestPush(): Promise<DigestRun> {
 
   const payload = digestMessage(counts) ?? {
     title: "qurator",
-    body: "지금은 할 일이 없습니다 — 알림은 잘 옵니다",
+    body: "지금은 할 일이 없어요. 알림은 잘 와요.",
     url: "/",
     tag: "qurator-digest",
   };

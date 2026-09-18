@@ -26,7 +26,7 @@ function loadImage(file: File): Promise<HTMLImageElement> {
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("이미지를 열 수 없습니다."));
+      reject(new Error("사진을 열 수 없어요. 다른 사진으로 해보세요."));
     };
     img.src = url;
   });
@@ -76,8 +76,15 @@ export function CaptureFab() {
 
     setToast(null);
     try {
-      setBusy("이미지 준비 중…");
-      const blobs = await Promise.all(files.map(downscale));
+      setBusy("사진 준비 중…");
+      let blobs: Blob[];
+      try {
+        blobs = await Promise.all(files.map(downscale));
+      } catch {
+        // 사진 자체를 못 연 것 — 네트워크 탓이 아니다. 잘못된 원인을 안내하지 않는다.
+        setToast({ tone: "error", message: "사진을 열 수 없어요. 다른 사진으로 해보세요." });
+        return;
+      }
 
       const form = new FormData();
       blobs.forEach((blob, i) => form.append("images", blob, `screenshot-${i + 1}.jpg`));
@@ -91,7 +98,7 @@ export function CaptureFab() {
           setToast({
             tone: "ok",
             // 같은 상품을 다시 찍은 경우 "새로 만들었다"고 하면 거짓말이다 — 카드는 원래 있던 것이다.
-            message: body.reused ? "이미 있던 카드에 가격을 기록했습니다." : "카드를 만들었습니다.",
+            message: body.reused ? "이미 있던 딜에 오늘 가격을 기록했어요." : "올렸어요! 딜을 열어볼게요.",
             detail: body.priceChangeNote,
           });
           // 방금 만든 카드를 딜 탭에서 곧바로 연다 — 캡처 다음 동작이 항상 이 카드 안에 있다.
@@ -101,20 +108,20 @@ export function CaptureFab() {
         case "not_product_page":
           setToast({
             tone: "error",
-            message: "상품 페이지 상단(브랜드·상품명·가격이 보이는 화면)을 찍어주세요.",
+            message: "상품 화면 맨 위(브랜드·상품명·가격이 보이는 곳)를 찍어주세요.",
           });
           break;
         case "vision_failed":
           setToast({
             tone: "error",
-            message: "스크린샷을 읽지 못했습니다. 딜 탭의 [직접 입력]으로 만들 수 있습니다.",
+            message: "사진을 읽지 못했어요. 딜 탭의 [✏️ 직접 만들기]로 만들 수 있어요.",
           });
           break;
         default:
           setToast({ tone: "error", message: body.error });
       }
     } catch {
-      setToast({ tone: "error", message: "업로드에 실패했습니다. 네트워크를 확인해주세요." });
+      setToast({ tone: "error", message: "올리지 못했어요. 인터넷 연결을 확인해주세요." });
     } finally {
       setBusy(null);
       // 같은 파일을 다시 골라도 change 이벤트가 나게 비운다.

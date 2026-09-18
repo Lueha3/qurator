@@ -14,7 +14,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "qurator",
     short_name: "qurator",
-    description: "무신사 스크린샷을 올리면 가격을 기록하고 채널별 완성 카드를 만드는 큐레이터 작업대",
+    description: "무신사 화면을 찍어 올리면 가격을 기록하고 카톡에 올릴 문구를 만들어 주는 앱",
     start_url: "/",
     display: "standalone",
     orientation: "portrait",
