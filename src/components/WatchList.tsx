@@ -27,7 +27,7 @@ export function WatchList({ rows }: { rows: WatchRow[] }) {
   return (
     <ul className="flex flex-col gap-2">
       {rows.map((row) => (
-        <li key={row.productId} className="flex items-center justify-between gap-3 rounded-lg border border-line bg-panel px-3 py-2.5">
+        <li key={row.productId} className="card flex items-center justify-between gap-3 px-3 py-2.5">
           <div className="min-w-0">
             <div className="truncate text-sm font-medium">
               {row.brand} · {row.productName}

@@ -17,7 +17,7 @@ export function DealCard({ card }: { card: CardDTO }) {
   const limit = CHANNEL_LIMIT[card.channel];
 
   return (
-    <div className="flex flex-col rounded-lg border border-line bg-panel">
+    <div className="flex flex-col overflow-hidden rounded-xl bg-background">
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
         <span className="text-sm font-medium">{CHANNEL_LABEL[card.channel]}</span>
         <div className="flex items-center gap-2">

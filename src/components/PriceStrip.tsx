@@ -18,7 +18,7 @@ function Cell({
   tone?: "normal" | "muted";
 }) {
   return (
-    <div className="flex-1 rounded-lg border border-line px-3 py-2">
+    <div className="flex-1 rounded-xl bg-background px-3 py-2">
       <div className="text-[11px] text-muted">{label}</div>
       <div className={`mt-0.5 text-sm ${tone === "muted" ? "text-muted" : "font-medium"}`}>
         {children}

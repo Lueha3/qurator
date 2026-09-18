@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { unwatchAction } from "@/app/actions";
 import type { DealDTO } from "@/lib/api-types";
-import { dealPriceLine } from "@/lib/deal-format";
-import { formatShortDateTime } from "@/lib/format";
+import { kstDayKey, kstDayLabel, kstTime } from "@/lib/format";
+import { DealListRow } from "./DealListRow";
 import { DealStageCard } from "./DealStageCard";
 import { DealForm } from "./DealForm";
 
@@ -13,6 +13,9 @@ import { DealForm } from "./DealForm";
 // 왜 목록과 카드를 분리했나: 카드(DealStageCard)는 딜 1건의 모든 것을 보여주도록 만들어져 있어서
 // 30건이 쌓이면 스크롤로 찾을 수 없다. 그래서 **찾기는 행에서, 하기는 시트에서** 한다.
 // 카드 자체는 한 글자도 바뀌지 않았다 — 놓이는 자리만 바뀌었다(docs/06 §3.0 버튼 규칙 유지).
+//
+// V3 (docs/08 §4.0.6): 줄마다 날짜를 찍는 대신 날짜로 묶는다. 같은 날 찍은 것이 한 카드 안에
+// 모이니 "오늘 뭘 올렸지"가 한눈에 보이고, 줄에는 시각만 남아 상품명이 주인공이 된다.
 
 const ARCHIVE_AFTER_DAYS = 30;
 
@@ -48,14 +51,6 @@ const EMPTY_TEXT: Record<DealFilter, string> = {
   archived: `승인한 지 ${ARCHIVE_AFTER_DAYS}일이 지난 딜이 아직 없습니다.`,
 };
 
-const STAGE_CHIP: Record<DealDTO["approvalStage"], string> = {
-  CANDIDATE: "후보",
-  AWAITING_LINK: "링크 대기",
-  READY_TO_PUBLISH: "승인 대기",
-  APPROVED: "승인 완료",
-  SKIPPED: "기록 완료",
-};
-
 /** 승인한 지 오래된 딜은 기본 목록에서 빠진다 — 삭제가 아니라 보관이다(허브 노출과는 무관). */
 function isArchived(deal: DealDTO, now: number): boolean {
   if (deal.approvalStage !== "APPROVED") return false;
@@ -83,16 +78,41 @@ function matches(deal: DealDTO, filter: DealFilter, now: number): boolean {
   }
 }
 
+interface DayGroup {
+  key: string;
+  label: string;
+  deals: DealDTO[];
+}
+
+/** 목록은 이미 최신순이므로 순서를 지키며 같은 날짜끼리 묶기만 한다 */
+function groupByDay(deals: DealDTO[], now: Date): DayGroup[] {
+  const groups: DayGroup[] = [];
+  for (const deal of deals) {
+    const date = new Date(deal.createdAt);
+    const key = kstDayKey(date);
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.deals.push(deal);
+    else groups.push({ key, label: kstDayLabel(date, now), deals: [deal] });
+  }
+  return groups;
+}
+
 export function DealBrowser({
   deals,
   curatorShopUrl,
   initialFilter,
   initialDealId,
+  nowIso,
 }: {
   deals: DealDTO[];
   curatorShopUrl: string | null;
   initialFilter: DealFilter;
   initialDealId: string | null;
+  /**
+   * 서버가 정한 기준 시각. 클라이언트가 Date.now()를 따로 부르면 "오늘/어제" 경계와 보관 판정이
+   * 서버 렌더와 달라져 하이드레이션이 깨질 수 있다 — 같은 순간을 그대로 넘겨받는다.
+   */
+  nowIso: string;
 }) {
   const [filter, setFilter] = useState<DealFilter>(initialFilter);
   const [query, setQuery] = useState("");
@@ -101,8 +121,8 @@ export function DealBrowser({
   const sheetRef = useRef<HTMLDialogElement>(null);
   const manualRef = useRef<HTMLDialogElement>(null);
 
-  // 상대 시각·보관 판정의 기준 시각. 렌더마다 Date.now()를 부르면 하이드레이션이 흔들린다.
-  const [now] = useState(() => Date.now());
+  const nowDate = useMemo(() => new Date(nowIso), [nowIso]);
+  const now = nowDate.getTime();
 
   const counts = useMemo(() => {
     const map = {} as Record<DealFilter, number>;
@@ -118,6 +138,8 @@ export function DealBrowser({
       return `${deal.brand} ${deal.productName} ${deal.styleCode ?? ""}`.toLowerCase().includes(q);
     });
   }, [deals, filter, query, now]);
+
+  const groups = useMemo(() => groupByDay(visible, nowDate), [visible, nowDate]);
 
   const openDeal = openId ? (deals.find((d) => d.id === openId) ?? null) : null;
 
@@ -160,8 +182,11 @@ export function DealBrowser({
     syncUrl(filter, null);
   }
 
+  const showRelease = filter === "saved";
+
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
+      {/* 칩: 활성은 진한 바탕. 테두리 대신 면으로 구분한다 — 여덟 개가 한 줄에 서면 선이 소란스럽다 */}
       <div className="-mx-4 overflow-x-auto px-4 no-scrollbar">
         <div className="flex w-max gap-1.5">
           {FILTERS.map((f) => {
@@ -172,14 +197,14 @@ export function DealBrowser({
                 type="button"
                 onClick={() => selectFilter(f.key)}
                 aria-pressed={active}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                  active
-                    ? "border-honey bg-honey-soft font-medium text-honey"
-                    : "border-line bg-panel text-muted"
+                className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${
+                  active ? "bg-foreground font-semibold text-background" : "bg-panel text-muted shadow-[var(--shadow-card)]"
                 }`}
               >
                 {f.label}
-                {counts[f.key] > 0 && <span className="ml-1 text-xs opacity-70">{counts[f.key]}</span>}
+                {counts[f.key] > 0 && (
+                  <span className={`ml-1 tabular-nums ${active ? "opacity-70" : "opacity-60"}`}>{counts[f.key]}</span>
+                )}
               </button>
             );
           })}
@@ -192,45 +217,51 @@ export function DealBrowser({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="브랜드 · 상품명 검색"
           aria-label="딜 검색"
-          className="w-full rounded-lg border border-line bg-panel px-3 py-2 text-[16px] outline-none focus:border-honey sm:text-sm"
+          className="w-full rounded-xl border border-line-strong bg-panel px-3.5 py-2.5 text-[16px] outline-none focus:border-honey sm:text-sm"
         />
         <button
           type="button"
           onClick={() => setManualOpen(true)}
-          className="shrink-0 rounded-lg border border-line bg-panel px-3 py-2 text-sm font-medium text-muted hover:border-honey"
+          className="shrink-0 rounded-xl bg-panel px-3.5 py-2.5 text-sm font-medium text-muted shadow-[var(--shadow-card)]"
         >
           ✏️ 직접 입력
         </button>
       </div>
 
       {visible.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line p-8 text-center text-sm text-muted">
+        <p className="rounded-2xl border border-dashed border-line-strong/50 p-8 text-center text-sm text-muted">
           {query.trim() ? `“${query.trim()}”와 맞는 딜이 없습니다.` : EMPTY_TEXT[filter]}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {visible.map((deal) => (
-            <DealRow
-              key={deal.id}
-              deal={deal}
-              showRelease={filter === "saved"}
-              onOpen={() => openSheet(deal.id)}
-            />
-          ))}
-        </ul>
+        groups.map((group) => (
+          <section key={group.key} className="flex flex-col gap-2">
+            <h3 className="px-1 text-[13px] font-medium text-muted">{group.label}</h3>
+            <ul className="card divide-y divide-line">
+              {group.deals.map((deal) => (
+                <DealRow
+                  key={deal.id}
+                  deal={deal}
+                  time={kstTime(new Date(deal.createdAt))}
+                  showRelease={showRelease}
+                  onOpen={() => openSheet(deal.id)}
+                />
+              ))}
+            </ul>
+          </section>
+        ))
       )}
 
       <dialog ref={sheetRef} className="sheet" onClose={closeSheet} onClick={(e) => {
         // backdrop(=dialog 자신) 클릭으로 닫는다. 내용 영역 클릭은 여기까지 올라오지 않는다.
         if (e.target === sheetRef.current) closeSheet();
       }}>
-        <div className="max-h-[88dvh] overflow-y-auto rounded-t-2xl border-t border-line bg-background p-4 sm:rounded-2xl sm:border">
+        <div className="max-h-[88dvh] overflow-y-auto rounded-t-3xl bg-background p-4 sm:rounded-3xl">
           <div className="mb-3 flex items-center justify-between">
-            <span className="h-1 w-10 rounded-full bg-line sm:hidden" aria-hidden />
+            <span className="h-1 w-10 rounded-full bg-line-strong/50 sm:hidden" aria-hidden />
             <button
               type="button"
               onClick={closeSheet}
-              className="ml-auto rounded-lg border border-line bg-panel px-3 py-1.5 text-sm text-muted"
+              className="ml-auto rounded-lg bg-panel px-3 py-1.5 text-sm text-muted shadow-[var(--shadow-card)]"
             >
               닫기
             </button>
@@ -242,13 +273,13 @@ export function DealBrowser({
       <dialog ref={manualRef} className="sheet" onClose={() => setManualOpen(false)} onClick={(e) => {
         if (e.target === manualRef.current) setManualOpen(false);
       }}>
-        <div className="max-h-[88dvh] overflow-y-auto rounded-t-2xl border-t border-line bg-background p-4 sm:rounded-2xl sm:border">
+        <div className="max-h-[88dvh] overflow-y-auto rounded-t-3xl bg-background p-4 sm:rounded-3xl">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold">✏️ 직접 입력으로 카드 만들기</h2>
             <button
               type="button"
               onClick={() => setManualOpen(false)}
-              className="rounded-lg border border-line bg-panel px-3 py-1.5 text-sm text-muted"
+              className="rounded-lg bg-panel px-3 py-1.5 text-sm text-muted shadow-[var(--shadow-card)]"
             >
               닫기
             </button>
@@ -262,53 +293,32 @@ export function DealBrowser({
 
 function DealRow({
   deal,
+  time,
   showRelease,
   onOpen,
 }: {
   deal: DealDTO;
+  time: string;
   showRelease: boolean;
   onOpen: () => void;
 }) {
   const [pending, startTransition] = useTransition();
 
   return (
-    <li className="rounded-xl border border-line bg-panel">
-      <button type="button" onClick={onOpen} className="flex w-full items-start gap-3 px-3.5 py-3 text-left">
-        <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-center gap-1.5">
-            <span className="rounded-full border border-line px-1.5 py-0.5 text-[11px] text-muted">
-              {STAGE_CHIP[deal.approvalStage]}
-            </span>
-            {deal.parseSource === "none" && <span className="text-[11px] text-danger">정보 없음</span>}
-            {/* 저장함 표시는 글자로 한다 — 이모지는 기기마다 그림이 달라 줄 높이가 흔들린다 */}
-            {deal.watchActive && !showRelease && (
-              <span className="rounded-full bg-honey-soft px-1.5 py-0.5 text-[11px] text-honey">저장함</span>
-            )}
-          </div>
-          <div className="truncate text-sm font-medium">
-            {deal.brand} · {deal.productName}
-          </div>
-          <div className="truncate text-sm text-muted">{dealPriceLine(deal)}</div>
-          {showRelease && (
-            <div className="mt-0.5 text-xs text-muted">
-              {deal.priceHistory?.currentCapturedLabel
-                ? `마지막 기록 ${deal.priceHistory.currentCapturedLabel}`
-                : "아직 기록 없음"}
-            </div>
-          )}
-        </div>
-        <time className="shrink-0 font-mono text-[11px] text-muted">
-          {formatShortDateTime(new Date(deal.createdAt))}
-        </time>
-      </button>
-
+    <li>
+      <DealListRow deal={deal} trailing={time} hideSavedTag={showRelease} onOpen={onOpen} />
       {showRelease && (
-        <div className="border-t border-line px-3.5 py-2">
+        <div className="flex items-center justify-between gap-3 px-3.5 pb-3 pl-[66px] text-xs text-muted">
+          <span>
+            {deal.priceHistory?.currentCapturedLabel
+              ? `마지막 기록 ${deal.priceHistory.currentCapturedLabel}`
+              : "아직 기록 없음"}
+          </span>
           <button
             type="button"
             disabled={pending}
             onClick={() => startTransition(async () => void (await unwatchAction(deal.productId)))}
-            className="text-xs font-medium text-muted hover:text-danger disabled:opacity-50"
+            className="shrink-0 font-medium hover:text-danger disabled:opacity-50"
           >
             🚫 저장함에서 빼기
           </button>

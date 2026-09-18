@@ -6,6 +6,7 @@ import { formatKRW } from "@/lib/format";
 import { classifyUserAgent } from "@/lib/shortlink";
 import { parseTags } from "@/lib/deal-tags";
 import { buildHubBadges, type HubBadge } from "@/lib/hub-badge";
+import { BrandMark } from "@/components/BrandMark";
 
 // 링크허브 — 링크트리 대체 (docs/02-architecture.md §10.4, docs/08 §3.3 허브 v2).
 //
@@ -95,7 +96,7 @@ export default async function HubPage() {
   return (
     <main className="mx-auto flex max-w-lg flex-col gap-5 p-5">
       <header className="flex flex-col items-center gap-1 pt-4 text-center">
-        <h1 className="text-xl font-semibold">꿀매각 아이템</h1>
+        <h1 className="text-[22px] font-semibold tracking-tight">꿀매각 아이템</h1>
         <p className="text-sm text-muted">@{creator?.handle ?? "maison_jenflox"}</p>
         {creator?.bio && <p className="mt-1 text-sm">{creator.bio}</p>}
       </header>
@@ -112,8 +113,8 @@ export default async function HubPage() {
       ) : (
         ordered.map(([title, rows]) => (
           <section key={title} className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium text-muted">{title}</h2>
-            <ul className="flex flex-col gap-2">
+            <h2 className="px-1 text-[13px] font-medium text-muted">{title}</h2>
+            <ul className="card divide-y divide-line">
               {rows.map((deal) => {
                 // 쿠폰이 만료됐으면 쿠폰 적용가와 쿠폰 문구를 쓰지 않는다 —
                 // 이미 못 받는 할인을 광고하면 소비자 오인 표시가 된다.
@@ -134,35 +135,43 @@ export default async function HubPage() {
                     <a
                       href={`/l/${deal.shortLinks[0].code}`}
                       rel="nofollow noopener"
-                      className="flex flex-col gap-1 rounded-lg border border-line bg-panel px-4 py-3 transition-colors hover:border-honey"
+                      className="flex items-start gap-3 px-3.5 py-3 transition-colors active:bg-background"
                     >
-                      <span className="flex items-start gap-2">
-                        <span className="flex-1 text-sm font-medium">
-                          {deal.product.brandName} · {deal.product.productName}
+                      <BrandMark brand={deal.product.brandName} />
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="flex items-center gap-1.5 text-[11px] leading-4 text-muted">
+                          <span className="truncate">{deal.product.brandName}</span>
+                          {badge && (
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE_CLASS[badge.kind]}`}
+                            >
+                              {badge.label}
+                            </span>
+                          )}
                         </span>
-                        {badge && (
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE_CLASS[badge.kind]}`}
-                          >
-                            {badge.label}
-                          </span>
-                        )}
+                        <span className="mt-0.5 text-[15px] font-semibold leading-snug">{deal.product.productName}</span>
+                        <span className="mt-1 flex items-baseline gap-1.5 text-sm">
+                          {effective > 0 ? (
+                            <>
+                              <span className="font-semibold">{formatKRW(effective)}</span>
+                              {/* 공백을 취소선 밖에 둔다 — 안에 넣으면 취소선이 공백까지 덮어 두 숫자가 붙어 보인다 */}
+                              {discounted && (
+                                <span className="text-xs text-muted line-through">{formatKRW(deal.product.listPrice)}</span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted">가격은 링크에서 확인</span>
+                          )}
+                          {couponLive && deal.couponDesc && (
+                            <span className="text-xs text-muted">· 쿠폰 {deal.couponDesc}</span>
+                          )}
+                        </span>
                       </span>
-                      <span className="text-xs text-muted">
-                        {effective > 0 ? (
-                          <>
-                            {/* 공백을 취소선 밖에 둔다 — 안에 넣으면 취소선이 공백까지 덮어 두 숫자가 붙어 보인다 */}
-                            {discounted && (
-                              <span className="mr-1 line-through">{formatKRW(deal.product.listPrice)}</span>
-                            )}
-                            <span className="font-medium text-honey">{formatKRW(effective)}</span>
-                            {deal.discountRate != null && ` (${deal.discountRate}%)`}
-                          </>
-                        ) : (
-                          "가격은 링크에서 확인"
-                        )}
-                        {couponLive && deal.couponDesc && ` · 쿠폰 ${deal.couponDesc}`}
-                      </span>
+                      {discounted && deal.discountRate != null && deal.discountRate > 0 && (
+                        <span className="shrink-0 rounded-md bg-honey px-1.5 py-0.5 text-[11px] font-bold leading-4 text-accent-ink">
+                          {deal.discountRate}%
+                        </span>
+                      )}
                     </a>
                   </li>
                 );
@@ -176,7 +185,7 @@ export default async function HubPage() {
         <a
           href={creator.curatorShopUrl}
           rel="nofollow noopener"
-          className="rounded-lg border border-line px-4 py-3 text-center text-sm hover:border-honey"
+          className="card px-4 py-3 text-center text-sm font-medium"
         >
           큐레이션 샵 전체 보기
         </a>

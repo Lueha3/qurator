@@ -61,3 +61,48 @@ export function formatEndsAt(endsAt: Date): string {
   const minute = get("minute");
   return `${month}/${day}(${weekday}) ${hour}:${minute}`;
 }
+
+// ── 딜 목록의 날짜 그룹 (V3) ─────────────────────────────────────────────
+// 줄마다 날짜를 찍는 대신 "오늘 / 어제 / 9월 16일 (수)" 헤더로 묶는다.
+// 전부 KST 고정·숫자/짧은 요일만 써서 서버(Node ICU)와 브라우저가 같은 문자열을 낸다 —
+// 2026-09-18 실측: 12시간제 오전/오후만 갈리고("AM"↔"오전") 이 조합은 일치한다.
+
+const KST_DAY_KEY = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const KST_DAY_LABEL = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  month: "long",
+  day: "numeric",
+  weekday: "short",
+});
+const KST_TIME = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** 같은 KST 날짜면 같은 키. 그룹핑·"오늘/어제" 판정에 쓴다 */
+export function kstDayKey(date: Date): string {
+  return KST_DAY_KEY.format(date);
+}
+
+/** "오늘" · "어제" · "9월 16일 (수)". now는 서버가 정한 기준 시각을 그대로 받는다(하이드레이션 안전) */
+export function kstDayLabel(date: Date, now: Date): string {
+  const key = kstDayKey(date);
+  if (key === kstDayKey(now)) return "오늘";
+  if (key === kstDayKey(new Date(now.getTime() - 86_400_000))) return "어제";
+  // "9월 16일 (수)" — Intl은 "9월 16일 (수)"를 그대로 내지 않으므로 조각으로 조립한다
+  const parts = KST_DAY_LABEL.formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("month")} ${get("day")} (${get("weekday")})`;
+}
+
+/** "14:49" */
+export function kstTime(date: Date): string {
+  return KST_TIME.format(date);
+}

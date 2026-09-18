@@ -57,7 +57,7 @@ export default async function ExpiredPage({ params }: { params: Promise<{ code: 
                 <a
                   href={`/l/${deal.shortLinks[0].code}`}
                   rel="nofollow noopener"
-                  className="block rounded-lg border border-line bg-panel px-4 py-3 hover:border-honey"
+                  className="card block px-4 py-3"
                 >
                   <span className="text-sm font-medium">
                     {deal.product.brandName} · {deal.product.productName}

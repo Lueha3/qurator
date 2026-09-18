@@ -38,12 +38,13 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   return (
     <>
       <PageHeader title="딜" />
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-4">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-6 pt-2">
         <DealBrowser
           deals={deals}
           curatorShopUrl={creator?.curatorShopUrl ?? null}
           initialFilter={parseFilter(params.f)}
           initialDealId={initialDealId}
+          nowIso={now.toISOString()}
         />
       </main>
     </>

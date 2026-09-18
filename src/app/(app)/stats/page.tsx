@@ -20,7 +20,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
   return (
     <>
       <PageHeader title="성과" />
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-4">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 pb-6 pt-2">
         {/* 기간은 이 화면 전체에 걸린다 — 카드마다 따로 두지 않는다 */}
         <div className="flex gap-1.5">
           {PERIODS.map((p) => (
@@ -28,8 +28,8 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
               key={p}
               href={p === 7 ? "/stats" : `/stats?p=${p}`}
               aria-current={p === days ? "page" : undefined}
-              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                p === days ? "border-honey bg-honey-soft font-medium text-honey" : "border-line bg-panel text-muted"
+              className={`rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${
+                p === days ? "bg-foreground font-semibold text-background" : "bg-panel text-muted shadow-[var(--shadow-card)]"
               }`}
             >
               최근 {p}일
@@ -47,12 +47,12 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
           실제로 내보낸 횟수입니다.
         </p>
 
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="card p-4">
           <h2 className="mb-3 text-sm font-semibold">지면별 클릭</h2>
           <MagnitudeBars rows={stats.bySurface} emptyText={`최근 ${days}일 동안 클릭이 없습니다.`} />
         </section>
 
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="card p-4">
           <h2 className="mb-1 text-sm font-semibold">많이 눌린 딜</h2>
           <p className="mb-3 text-xs text-muted">다음에 무엇을 더 올릴지는 이 목록이 알려줍니다.</p>
           <MagnitudeBars
@@ -61,7 +61,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
           />
         </section>
 
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="card p-4">
           <h2 className="mb-1 text-sm font-semibold">링크허브</h2>
           <p className="mb-3 text-xs text-muted">
             {stats.hubCtr === null
@@ -76,7 +76,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
           )}
         </section>
 
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="card p-4">
           <h2 className="mb-3 text-sm font-semibold">오늘의 카톡 페이스</h2>
           <Meter
             label="오픈채팅에 내보낸 카드"

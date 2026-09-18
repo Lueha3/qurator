@@ -31,18 +31,21 @@ export function StatTile({
 
   const body = (
     <>
-      <div className="text-xs text-muted">{label}</div>
+      <div className="text-[11px] font-medium text-muted">{label}</div>
       {/* 큰 숫자에는 tabular-nums를 쓰지 않는다 — 자릿폭이 같아져 121 같은 값이 헐거워 보인다 */}
-      <div className="mt-0.5 text-2xl font-semibold">{value.toLocaleString("ko-KR")}</div>
-      {delta && (
-        <div className={`mt-0.5 text-[11px] ${delta.up ? "text-ok" : "text-muted"}`}>{delta.text}</div>
-      )}
+      <div className="mt-1 text-[22px] font-semibold leading-none tracking-tight">
+        {value.toLocaleString("ko-KR")}
+      </div>
+      <div className={`mt-1.5 text-[11px] leading-4 ${delta?.up ? "text-ok" : "text-muted"}`}>
+        {delta?.text ?? " "}
+      </div>
     </>
   );
 
-  if (!href) return <div className="rounded-2xl border border-line bg-panel px-3 py-3">{body}</div>;
+  const cls = "card px-3.5 py-3";
+  if (!href) return <div className={cls}>{body}</div>;
   return (
-    <Link href={href} className="rounded-2xl border border-line bg-panel px-3 py-3 transition-colors hover:border-honey">
+    <Link href={href} className={`${cls} transition-transform active:scale-[0.98]`}>
       {body}
     </Link>
   );

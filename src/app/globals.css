@@ -4,9 +4,13 @@
   색 토큰 — 값은 눈이 아니라 대비 계산으로 골랐다 (docs/08 §3.5.1).
   모든 글자 조합이 WCAG AA(본문 4.5:1), 입력 테두리 같은 UI 경계가 3:1을 넘는다.
   이전 값(honey #c77800, muted #8a8171)은 본문 크기에서 3.4~3.9:1이라 기준 미달이었다.
+
+  V3 (2026-09-18, docs/08 §4.0.6): 면은 선이 아니라 그림자로 나눈다. 배경을 한 단계 눌러
+  흰 카드가 떠 보이게 했고(#faf9f7 → #f3f0ea), 상태색 4종과 브랜드 모노그램 8색을 더했다.
+  전부 다시 계산했다 — 라이트·다크 모든 글자 조합이 AA를 넘는다.
 */
 :root {
-  --background: #faf9f7;
+  --background: #f3f0ea;
   --foreground: #1a1714;
   --panel: #ffffff;
   /** 장식용 구분선 — 카드 경계. 글자가 아니므로 대비 기준이 없다 */
@@ -20,9 +24,40 @@
   --accent-ink: #ffffff;
   --ok: #1f6145;
   --danger: #a1362a;
+
+  /** 카드 그림자. 카드는 이것 하나로 뜬다 — 테두리를 두르지 않는다 */
+  --shadow-card: 0 1px 2px rgb(26 23 20 / 0.05), 0 2px 8px rgb(26 23 20 / 0.06);
+
+  /**
+   * 상태색 — 후보(무채)·링크 대기(앰버)·승인 대기(허니, 지금 할 일)·승인(초록).
+   * 점으로만 쓰므로 3:1(UI 경계)이 기준이고, 전부 넘는다. 기록 완료(SKIPPED)는 색이 없다 —
+   * 끝난 일에 색을 쓰면 정작 해야 할 일의 색이 묻힌다.
+   */
+  --stage-candidate: #968c7e;
+  --stage-awaiting: #c47c1a;
+  --stage-ready: #9a5a00;
+  --stage-approved: #1f6145;
+
+  /**
+   * 브랜드 모노그램 8색 — 사진 없이 줄마다 시각적 앵커를 주기 위한 것(BrandMark.tsx).
+   * 채도를 낮춘 따뜻한 계열로 묶어 한 화면에 여러 색이 있어도 소란스럽지 않게 했다.
+   * 글자/바탕 대비는 전부 6.4:1 이상.
+   */
+  --mark-0-bg: #f3ddd4; --mark-0-ink: #7a3420;
+  --mark-1-bg: #dfe9de; --mark-1-ink: #2f5236;
+  --mark-2-bg: #dbe6f0; --mark-2-ink: #254a6a;
+  --mark-3-bg: #eadcee; --mark-3-ink: #573263;
+  --mark-4-bg: #f5e8c8; --mark-4-ink: #6b4c05;
+  --mark-5-bg: #e5e9d3; --mark-5-ink: #455119;
+  --mark-6-bg: #f5dce3; --mark-6-ink: #752a42;
+  --mark-7-bg: #e0e3e8; --mark-7-ink: #374050;
 }
 
 @theme inline {
+  --color-stage-candidate: var(--stage-candidate);
+  --color-stage-awaiting: var(--stage-awaiting);
+  --color-stage-ready: var(--stage-ready);
+  --color-stage-approved: var(--stage-approved);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-panel: var(--panel);
@@ -59,7 +94,36 @@
     --accent-ink: #231a0b;
     --ok: #7fc7a4;
     --danger: #ef8b76;
+
+    /* 다크에서 그림자는 보이지 않는다 — 대신 카드를 배경보다 한 단계 밝게 하고 1px 링을 두른다 */
+    --panel: #221d17;
+    --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.05);
+
+    --stage-candidate: #7d7364;
+    --stage-awaiting: #e0a04a;
+    --stage-ready: #f2ae3f;
+    --stage-approved: #7fc7a4;
+
+    --mark-0-bg: #4a2a20; --mark-0-ink: #f2c4b5;
+    --mark-1-bg: #23342a; --mark-1-ink: #b7d4bd;
+    --mark-2-bg: #1f3140; --mark-2-ink: #a9c9e3;
+    --mark-3-bg: #37283c; --mark-3-ink: #d3b8dc;
+    --mark-4-bg: #463914; --mark-4-ink: #eacb7a;
+    --mark-5-bg: #333a1a; --mark-5-ink: #c9d39a;
+    --mark-6-bg: #46242e; --mark-6-ink: #ecb4c3;
+    --mark-7-bg: #2a2f37; --mark-7-ink: #b9c0cb;
   }
+}
+
+/*
+  카드 — V3의 기본 면. 테두리 없이 그림자로 뜬다.
+  이전(V2-H까지)에는 "면은 선으로 나눈다"였는데, 1px 선을 두른 흰 상자가 화면 가득이면
+  서식(form)처럼 읽힌다. 선은 이제 입력칸(어디에 쓰는지 알아야 하므로 3:1)에만 남는다.
+*/
+.card {
+  background: var(--panel);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-card);
 }
 
 body {
@@ -105,7 +169,7 @@ dialog.sheet::backdrop {
   display: none;
 }
 
-/* 떠 있는 것(FAB·시트)에만 쓰는 단 하나의 그림자. 카드에는 쓰지 않는다 — 면은 선으로 나눈다 */
+/* 떠 있는 것(FAB·시트·토스트)의 그림자. 카드(.card)보다 훨씬 깊다 — 층이 다르다는 뜻이다 */
 .elevated {
   box-shadow:
     0 1px 2px rgb(26 23 20 / 0.08),

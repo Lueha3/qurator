@@ -19,18 +19,12 @@ import { DealCard } from "./DealCard";
 import { DealEditForm } from "./DealEditForm";
 import { PriceStrip } from "./PriceStrip";
 import { inputCls, primaryBtnCls, secondaryBtnCls } from "./form";
+import { STAGE_DOT, STAGE_LABEL } from "@/lib/deal-stage";
+import { BrandMark } from "./BrandMark";
 
 // 승인 카드 — docs/02 §6 "카드 1장의 상태 전이". 후보 → 링크 대기 → 발행 승인 → 승인/기록 완료가
 // 한 자리에서 일어난다. 버튼 문구·배치 규칙은 docs/06 §3.0 그대로다:
 //   주 동작(발행)은 한 줄을 독점하고, 나머지는 "올리지 않는다"는 점에서 같은 급이라 아래 줄에 묶는다.
-
-const STAGE_LABEL: Record<DealDTO["approvalStage"], string> = {
-  CANDIDATE: "후보",
-  AWAITING_LINK: "링크 대기",
-  READY_TO_PUBLISH: "승인 대기",
-  APPROVED: "승인 완료",
-  SKIPPED: "기록 완료",
-};
 
 const CURATOR_CENTER = "https://www.musinsa.com/curator";
 
@@ -61,26 +55,30 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
   const canProceed = deal.parseSource !== "none";
 
   return (
-    <article className="rounded-2xl border border-line bg-panel p-4">
-      <header className="mb-2 flex items-start justify-between gap-2">
-        <div>
-          <span className="mb-1 inline-block rounded-full border border-line px-2 py-0.5 text-[11px] text-muted">
-            {STAGE_LABEL[deal.approvalStage]}
-          </span>
-          <h3 className="text-base font-semibold">
-            {deal.brand} · {deal.productName}
-            {deal.styleCode ? (
-              <span className="whitespace-nowrap text-muted"> · {deal.styleCode}</span>
-            ) : null}
+    <article className="card p-4">
+      <header className="mb-3 flex items-start gap-3">
+        <BrandMark brand={deal.brand} size="lg" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 text-[11px] leading-4 text-muted">
+            <span className="truncate">{deal.brand}</span>
+            <span aria-hidden>·</span>
+            <span className="flex shrink-0 items-center gap-1">
+              {STAGE_DOT[deal.approvalStage] && (
+                <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${STAGE_DOT[deal.approvalStage]}`} />
+              )}
+              {STAGE_LABEL[deal.approvalStage]}
+            </span>
+            <time className="ml-auto shrink-0 tabular-nums">{formatShortDateTime(new Date(deal.createdAt))}</time>
+          </div>
+          <h3 className="mt-0.5 text-[17px] font-semibold leading-snug tracking-tight">
+            {deal.productName}
+            {deal.styleCode ? <span className="whitespace-nowrap text-sm font-normal text-muted"> · {deal.styleCode}</span> : null}
           </h3>
-          <p className="text-sm">
+          <p className="mt-0.5 text-sm">
             {dealPriceLine(deal)}
             {deal.couponDesc ? <span className="text-muted"> · 쿠폰 {deal.couponDesc}</span> : null}
           </p>
         </div>
-        <time className="shrink-0 font-mono text-[11px] text-muted">
-          {formatShortDateTime(new Date(deal.createdAt))}
-        </time>
       </header>
 
       {deal.priceHistory && <PriceStrip history={deal.priceHistory} />}

@@ -32,11 +32,11 @@ export default async function SettingsPage() {
   return (
     <>
       <PageHeader title="설정" />
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 py-5">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 pb-6 pt-2">
         {/* 설정이 틀리면 카톡 링크가 조용히 잘못 나간다 — 맨 위에서 알린다 */}
         <BaseUrlWarning />
 
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="card p-4">
           <div className="mb-3 flex items-baseline justify-between gap-3">
             <h2 className="text-sm font-semibold">프로필</h2>
             <span className="truncate text-sm text-muted">@{creator?.handle ?? "(없음)"}</span>
@@ -44,7 +44,7 @@ export default async function SettingsPage() {
           <ProfileForm bio={creator?.bio ?? null} curatorShopUrl={creator?.curatorShopUrl ?? null} />
         </section>
 
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="card p-4">
           <h2 className="mb-1 text-sm font-semibold">팔로워가 보는 지면</h2>
           <p className="mb-3 text-xs text-muted">
             프로필 링크를 링크허브로 바꿔두면, 품절·마감된 딜은 자동으로 사라집니다(수동 편집 0).
@@ -60,7 +60,7 @@ export default async function SettingsPage() {
           </a>
         </section>
 
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="card p-4">
           <h2 className="mb-1 text-sm font-semibold">
             저장함 <span className="font-normal text-muted">({activeWatches}/{limits.itemsMax})</span>
           </h2>
@@ -71,7 +71,7 @@ export default async function SettingsPage() {
           </p>
         </section>
 
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="card p-4">
           <h2 className="mb-1 text-sm font-semibold">Face ID 로그인</h2>
           <p className="mb-3 text-xs text-muted">
             등록해두면 주소만 치고 얼굴만 보면 열립니다 — <code className="font-mono">?k=</code> 주소를
@@ -92,7 +92,7 @@ export default async function SettingsPage() {
           </p>
         </section>
 
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="card p-4">
           <h2 className="mb-1 text-sm font-semibold">다른 사람 기기 등록하기</h2>
           <p className="mb-3 text-xs text-muted">
             30분짜리 <b>1회용 링크</b>를 만들어 보내면, 받는 사람이 자기 폰에 Face ID를 등록하고 바로
@@ -108,7 +108,7 @@ export default async function SettingsPage() {
           />
         </section>
 
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="card p-4">
           <h2 className="mb-1 text-sm font-semibold">아침 알림</h2>
           <p className="mb-3 text-xs text-muted">
             매일 아침 8시, <b>할 일이 있는 날에만</b> 한 통 옵니다 — “기록할 상품 3개 · 정정 공지 1건”.
@@ -117,7 +117,7 @@ export default async function SettingsPage() {
           <PushToggle publicKey={vapidPublicKey} />
         </section>
 
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="card p-4">
           <h2 className="mb-1 text-sm font-semibold">중복 카드 정리</h2>
           <p className="mb-3 text-xs text-muted">
             예전에는 같은 상품을 다시 찍을 때마다 새 카드가 생겼습니다(지금은 기존 카드를 갱신합니다).
@@ -127,7 +127,7 @@ export default async function SettingsPage() {
           <DedupeCard />
         </section>
 
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="card p-4">
           <h2 className="mb-1 text-sm font-semibold">작년 BF 가격 수동 입력</h2>
           <p className="mb-3 text-xs text-muted">
             자동으로는 복원할 수 없는 2025 블프 가격을 기록해 두면 올해 BF 카드에 “작년 vs 올해”가 나옵니다.
@@ -137,7 +137,7 @@ export default async function SettingsPage() {
           />
         </section>
 
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="card p-4">
           <h2 className="mb-1 text-sm font-semibold">폰에서 앱처럼 쓰기</h2>
           <p className="text-xs text-muted">
             아이폰 Safari에서 이 주소를 연 뒤 <b>공유 → 홈 화면에 추가</b>를 누르면 주소창 없이 앱처럼 열립니다.
