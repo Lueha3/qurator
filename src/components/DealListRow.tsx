@@ -40,6 +40,7 @@ export function DealListRow({ deal, trailing, hideSavedTag, href, onOpen }: RowP
             {dot && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${dot}`} />}
             {STAGE_LABEL[deal.approvalStage]}
           </span>
+          {deal.soldOut && <span className="shrink-0 text-danger">· 품절</span>}
           {deal.watchActive && !hideSavedTag && (
             <span className="shrink-0 text-accent">· 지켜보는 중</span>
           )}

@@ -9,7 +9,7 @@ import type { DealDTO } from "./api-types";
  * 사실 필드가 비었다는 것을 사람이 반드시 보게 한다.
  */
 export function dealPriceLine(d: DealDTO): string {
-  if (!d.listPrice && !d.salePrice && !d.finalPrice) return "⚠️ 가격을 못 읽었어요 — 아래 ✏️ 정보 고치기로 채워주세요";
+  if (!d.listPrice && !d.salePrice && !d.finalPrice) return "⚠️ 가격을 못 읽었어요 — 아래 ‘정보 고치기’로 채워주세요";
   const effective = d.finalPrice ?? d.salePrice ?? d.listPrice;
   if (d.salePrice != null && d.listPrice > 0 && d.salePrice < d.listPrice) {
     const pct = d.discountRate != null ? ` (${d.discountRate}%)` : "";

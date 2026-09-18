@@ -170,9 +170,9 @@ export interface DigestPayload {
  */
 export function digestMessage(counts: DigestCounts): DigestPayload | null {
   const parts: string[] = [];
-  if (counts.reminders > 0) parts.push(`가격 기록할 상품 ${counts.reminders}개`);
+  if (counts.reminders > 0) parts.push(`다시 찍어 올릴 상품 ${counts.reminders}개`);
   if (counts.corrections > 0) parts.push(`품절 안내 ${counts.corrections}건`);
-  if (counts.ready > 0) parts.push(`문구 받을 딜 ${counts.ready}건`);
+  if (counts.ready > 0) parts.push(`문구 확정할 딜 ${counts.ready}건`);
   if (parts.length === 0) return null;
 
   return {

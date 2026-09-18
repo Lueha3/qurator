@@ -258,8 +258,8 @@ export function buildPriceChangeNote(analysis: PriceAnalysis | undefined): strin
           : null;
       lines.push(
         prevRate !== null
-          ? `정가 ${formatKRW(listPrice)} 기준 할인 ${prevRate}% → ${nowRate}%`
-          : `정가 ${formatKRW(listPrice)} 기준 할인 ${nowRate}%`
+          ? `정가 ${formatKRW(listPrice)} 대비 할인 ${prevRate}% → ${nowRate}%`
+          : `정가 ${formatKRW(listPrice)} 대비 할인 ${nowRate}%`
       );
     }
   }

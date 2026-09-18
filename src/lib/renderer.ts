@@ -127,7 +127,7 @@ export function renderCard(channel: Channel, facts: DealFacts): RenderResult {
   if (facts.endsAt && facts.endsAt.getTime() < Date.now()) {
     return {
       ok: false,
-      error: { code: "EXPIRED", message: "마감 시각이 이미 지났어요. ✏️ 정보 고치기에서 바꿔주세요." },
+      error: { code: "EXPIRED", message: "마감 시각이 이미 지났어요. ‘정보 고치기’에서 바꿔주세요." },
     };
   }
 

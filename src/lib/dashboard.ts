@@ -4,10 +4,8 @@
 import { db } from "./db";
 import { formatKRW } from "./format";
 
-/** 카톡에 붙여넣을 정정 공지. 원문과 같은 고지 원칙을 따른다. */
-export function correctionText(brand: string, productName: string): string {
-  return `[품절 안내] ${brand} ${productName} 은(는) 품절되었습니다. 링크를 눌러도 구매할 수 없어요. 새 아이템으로 다시 찾아뵙겠습니다!`;
-}
+import { correctionText } from "./correction";
+export { correctionText };
 
 export interface DeadLinkAlert {
   dealId: string;

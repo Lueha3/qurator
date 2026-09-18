@@ -55,7 +55,7 @@ export default async function SettingsPage() {
         <section className="card p-4">
           <h3 className="mb-1 text-sm font-semibold">🛍️ 팔로워 페이지</h3>
           <p className="mb-3 text-xs text-ink-soft">
-            프로필 링크를 이 페이지로 바꿔두면, 품절되거나 끝난 딜은 저절로 사라져요.
+            인스타나 오픈채팅 프로필 링크를 이 페이지 주소로 두세요. 품절되거나 끝난 딜은 알아서 내려가요.
           </p>
           {/* 공개 페이지라 프리페치로 열리지 않게 순수 <a>로 둔다 */}
           <a
@@ -93,15 +93,15 @@ export default async function SettingsPage() {
             }))}
           />
           <p className="mt-2 text-xs text-ink-soft">
-            전부 지워도 잠기지 않아요. 관리자에게 비상구 주소가 있어요.
+            이 폰 것을 지우면 다음엔 Face ID로 못 들어와요. 그래도 관리자가 다시 열어줄 수 있어요.
           </p>
         </section>
 
         <section className="card p-4">
-          <h3 className="mb-1 text-sm font-semibold">📨 다른 폰 초대하기</h3>
+          <h3 className="mb-1 text-sm font-semibold">📱 다른 폰도 등록하기</h3>
           <p className="mb-3 text-xs text-ink-soft">
-            <b>30분 동안 한 번만</b> 쓸 수 있는 링크를 만들어 보내면, 받는 사람이 자기 폰에 Face ID를 등록하고
-            바로 들어와요. 접속 암호는 넘어가지 않아요. 카톡 안에서 말고 <b>Safari에서 열라고</b> 알려주세요.
+            <b>30분 안에 한 번만</b> 쓸 수 있는 등록 링크를 만들어 보내면, 받는 사람이 자기 폰에 Face ID를 등록하고
+            바로 들어와요. 접속 암호는 넘어가지 않아요. 받는 사람은 링크를 길게 눌러 <b>‘Safari에서 열기’</b>를 골라야 해요.
           </p>
           <InviteCard
             invites={invites.map((invite) => ({
@@ -116,41 +116,15 @@ export default async function SettingsPage() {
           <h3 className="mb-1 text-sm font-semibold">📱 폰에서 앱처럼 쓰기</h3>
           <p className="text-xs text-ink-soft">
             아이폰 Safari에서 이 주소를 연 뒤 <b>공유 → 홈 화면에 추가</b>를 누르면 주소창 없이 앱처럼 열려요.
-            홈 화면 앱과 Safari는 로그인을 따로 기억하니, 둘 다 쓰려면 각각 한 번씩 Face ID로 열어주세요.
+            홈 화면 앱과 Safari는 로그인을 따로 기억해요. 둘 다 쓰려면 각각 한 번 Face ID로 들어와 주세요.
           </p>
 
-          {/* 단축어를 쓰면 앱을 여는 탭과 사진첩에서 고르는 탭이 둘 다 사라진다 (docs/06 §4.5) */}
-          <details className="mt-3 rounded-xl border border-line">
-            <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
-              ⚡️ 단축어로 공유 시트에서 바로 올리기
-            </summary>
-            <div className="flex flex-col gap-2 px-3 pb-3 text-xs leading-relaxed text-ink-soft">
-              <p>무신사 앱에서 스크린샷 → 공유 → 단축어 선택. 이 앱을 열 필요가 없어요.</p>
-              <ol className="flex list-decimal flex-col gap-1 pl-4">
-                <li>단축어 앱 → 새 단축어 → 이름 “꿀매 올리기”</li>
-                <li>
-                  <b>이미지 크기 조절</b> 추가 — 입력 <code className="font-mono">단축어 입력</code>, 가장 긴 변{" "}
-                  <b>1600</b>px <span className="text-danger">(빼지 마세요 — 원본은 업로드 상한에 걸려요)</span>
-                </li>
-                <li>
-                  <b>URL 내용 가져오기</b> 추가 — URL <code className="font-mono">{"<이 앱 주소>"}/api/capture</code>, 방식{" "}
-                  <b>POST</b>
-                </li>
-                <li>
-                  헤더 <code className="font-mono">x-app-token</code> = 관리자에게 받은 접속 암호
-                </li>
-                <li>
-                  본문 <b>양식</b> → 필드 이름 <code className="font-mono">images</code>, 종류 <b>파일</b>, 값{" "}
-                  <b>크기 조절된 이미지</b>
-                </li>
-                <li>단축어 설정(ⓘ) → “공유 시트에 표시” 켜고 입력 종류는 이미지만</li>
-              </ol>
-              <p>
-                올린 딜은 다음에 이 앱을 열 때 딜 탭 맨 위에 있어요. 한 상품을 위·아래로 나눠 찍었다면 사진 앱에서{" "}
-                <b>두 장을 함께 선택해</b> 공유하세요.
-              </p>
-            </div>
-          </details>
+          {/* 단축어 레시피는 docs/06 §4.5에 있다. 화면에 두면 "접속 암호를 받아 넣어라"는 문장이 되어
+              docs/03 §7.2(마스터 토큰은 비개발자에게 넘기지 않는다)와 부딪힌다 — 관리자가 대신 설치한다. */}
+          <p className="mt-2 text-xs text-ink-soft">
+            관리자에게 한 번 부탁하면 <b>단축어</b>를 만들어 줘요. 그다음부터는 무신사에서 스크린샷 → 공유 → ‘꿀매 올리기’로
+            끝이에요.
+          </p>
         </section>
 
         <GroupTitle>가끔 필요한 것</GroupTitle>
@@ -161,7 +135,7 @@ export default async function SettingsPage() {
           </h3>
           <p className="text-xs text-ink-soft">
             {crawless
-              ? "자동으로 가격을 가져오지는 않아요. 홈의 “다시 찍을 상품”을 보고 다시 찍어 올리면 그때마다 기록돼요. 그만 볼 상품은 딜 탭 “지켜보는 중”에서 빼주세요."
+              ? "자동으로 가격을 가져오지는 않아요. 홈의 “다시 찍어 올릴 상품”을 보고 다시 찍어 올리면 그때마다 기록돼요. 그만 볼 상품은 딜 탭 “지켜보는 중”에서 빼주세요."
               : "하루 1회 가격을 기록해요 (행사 기간에는 2회). 그만 볼 상품은 딜 탭 “지켜보는 중”에서 빼주세요."}
           </p>
         </section>

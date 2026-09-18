@@ -155,14 +155,14 @@ describe("알림 문구", () => {
 
   it("있는 숫자만 나열한다", () => {
     expect(digestMessage({ reminders: 3, corrections: 0, ready: 2 })?.body).toBe(
-      "가격 기록할 상품 3개 · 문구 받을 딜 2건"
+      "다시 찍어 올릴 상품 3개 · 문구 확정할 딜 2건"
     );
     expect(digestMessage({ reminders: 0, corrections: 1, ready: 0 })?.body).toBe("품절 안내 1건");
   });
 
   it("상품명·가격·링크를 싣지 않는다 — 잠금화면은 옆 사람도 본다", () => {
     const payload = digestMessage({ reminders: 2, corrections: 1, ready: 1 });
-    expect(payload?.body).toBe("가격 기록할 상품 2개 · 품절 안내 1건 · 문구 받을 딜 1건");
+    expect(payload?.body).toBe("다시 찍어 올릴 상품 2개 · 품절 안내 1건 · 문구 확정할 딜 1건");
     expect(payload?.url).toBe("/"); // 딥링크도 홈 하나뿐이다
     expect(JSON.stringify(payload)).not.toMatch(/musinsa|http/i);
   });

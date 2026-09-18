@@ -30,7 +30,7 @@ export function InviteCard({ invites }: { invites: InviteView[] }) {
           {invites.map((invite) => (
             <li key={invite.id} className="flex items-center justify-between gap-3 text-xs">
               <span className="min-w-0">
-                <b className="text-sm font-medium">{invite.note ?? "이름 없음"}</b>
+                <b className="text-sm font-medium">{invite.note ?? "이름 없는 등록 링크"}</b>
                 <span className="block text-ink-soft">
                   {formatExpiry(invite.expiresAt)}까지 · 아직 사용 안 함
                 </span>
@@ -46,7 +46,7 @@ export function InviteCard({ invites }: { invites: InviteView[] }) {
                 }
                 className="shrink-0 rounded-lg border border-line-strong px-2.5 py-1.5 text-danger transition-colors hover:border-danger disabled:opacity-50"
               >
-                취소
+                지우기
               </button>
             </li>
           ))}
@@ -56,8 +56,8 @@ export function InviteCard({ invites }: { invites: InviteView[] }) {
       {fresh ? (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-ink-soft">
-            이 링크를 보내주세요. <b>30분 뒤 만료</b>되고 <b>한 번만</b> 쓸 수 있어요. 이 화면을
-            벗어나면 다시 볼 수 없어요.
+            카톡으로 보내도 돼요. 받는 사람은 링크를 길게 눌러 <b>‘Safari에서 열기’</b>를 골라야 해요.
+            <b>30분 안에 한 번만</b> 쓸 수 있고, 지금 복사하지 않으면 다시 볼 수 없어요.
           </p>
           <code className="block break-all rounded-lg border border-line bg-paper p-3 font-mono text-xs">
             {fresh}
@@ -108,7 +108,7 @@ export function InviteCard({ invites }: { invites: InviteView[] }) {
             }
             className={primaryBtnCls}
           >
-            {pending ? "만드는 중…" : "🔗 초대 링크 만들기"}
+            {pending ? "만드는 중…" : "🔗 등록 링크 만들기"}
           </button>
         </div>
       )}

@@ -247,7 +247,7 @@ export async function attachCuratorLink(dealId: string, text: string): Promise<A
   const expected = deal.product.musinsaGoodsNo;
   if (expected && parsed.link.goodsNo && parsed.link.goodsNo !== expected) {
     warnings.push(
-      `이 링크는 다른 상품 것 같아요 (링크 #${parsed.link.goodsNo}, 이 딜 #${expected}). 확인해주세요.`
+      "이 링크는 다른 상품 링크 같아요. 큐레이터센터에서 이 상품 링크를 다시 만들어 붙여주세요."
     );
   } else if (!expected && parsed.link.goodsNo) {
     // 스크린샷으로 생성된 상품(docs/06 §4.2)은 musinsaGoodsNo가 없다. 처음 받는 정규 링크로
@@ -261,7 +261,7 @@ export async function attachCuratorLink(dealId: string, text: string): Promise<A
     if (collision && collision.id !== deal.productId) {
       // 같은 상품이 이미 다른 경로로 등록돼 있다 — 두 Product를 자동으로 합치지 않는다.
       warnings.push(
-        `이 링크의 상품(#${parsed.link.goodsNo})은 이미 다른 딜에 있어요. 중복일 수 있어요.`
+        "이 상품은 이미 다른 딜에 있어요. 딜 탭에서 같은 상품을 찾아 거기서 이어서 하세요."
       );
     } else {
       const canonical = canonicalizeMusinsaUrl(parsed.link.rawUrl);
@@ -518,7 +518,7 @@ export async function updateDealFacts(
       if (collision && collision.id !== deal.productId) {
         return {
           ok: false,
-          reason: `#${goodsNo} 상품은 이미 다른 딜에 있어요. 중복일 수 있어요.`,
+          reason: "이 상품은 이미 다른 딜에 있어요. 딜 탭에서 같은 상품을 찾아 거기서 이어서 하세요.",
         };
       }
       productData.musinsaGoodsNo = goodsNo;

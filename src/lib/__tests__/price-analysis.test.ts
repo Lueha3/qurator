@@ -324,7 +324,7 @@ describe("buildPriceChangeNote — 재촬영 시 '지난번 vs 지금' 한 줄",
     );
     const note = buildPriceChangeNote(analysis);
     // 40%(=1-48000/89000) → 52%(=1-42900/89000)
-    expect(note).toContain("정가 89,000원 기준 할인 46% → 52%");
+    expect(note).toContain("정가 89,000원 대비 할인 46% → 52%");
   });
 
   it("정가가 이번에만 읽혔으면(직전엔 못 읽음) 전후 비교 없이 지금 값만 보여준다", () => {
@@ -336,7 +336,7 @@ describe("buildPriceChangeNote — 재촬영 시 '지난번 vs 지금' 한 줄",
       now
     );
     const note = buildPriceChangeNote(analysis);
-    expect(note).toContain("정가 89,000원 기준 할인 52%");
+    expect(note).toContain("정가 89,000원 대비 할인 52%");
     expect(note).not.toContain("→ 52%"); // 지어낸 "전" 수치가 없어야 한다
   });
 
@@ -349,7 +349,7 @@ describe("buildPriceChangeNote — 재촬영 시 '지난번 vs 지금' 한 줄",
       now
     );
     const note = buildPriceChangeNote(analysis);
-    expect(note).toContain("정가 89,000원 기준 할인 52%");
+    expect(note).toContain("정가 89,000원 대비 할인 52%");
     expect(note).not.toMatch(/할인율 \d+% → /);
   });
 

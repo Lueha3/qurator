@@ -27,8 +27,14 @@ function Cell({
   );
 }
 
+/** "BF2025" 같은 코드값을 사람 말로 — 검수에서 셀 제목이 코드 그대로라고 짚었다 */
+function eventLabel(tag: string): string {
+  const m = /^BF(\d{4})$/.exec(tag);
+  return m ? `${m[1]} 블프` : tag;
+}
+
 function EventCell({ event }: { event: PriceEventDTO }) {
-  const label = event.manualOnly ? `${event.eventTag} (직접 입력)` : event.eventTag;
+  const label = event.manualOnly ? `${eventLabel(event.eventTag)} · 직접 적음` : eventLabel(event.eventTag);
 
   // 쿠폰가 라인은 두 분기(실할인 있음/없음) 모두에서 조건이 같아 한 번만 만든다 —
   // "작년 vs 올해"를 나란히 볼 때 쿠폰가 유무로 줄 수가 흔들리면 비교가 깨진다.
@@ -62,8 +68,8 @@ function EventCell({ event }: { event: PriceEventDTO }) {
       */}
       <div className="text-xs font-normal text-ink-soft">
         {event.manualOnly
-          ? "기록 시작 전 행사라 비교는 없어요"
-          : `평소 가격 모으는 중 ${event.baselineSampleSize}/3`}
+          ? "직접 적은 값이라 평소 가격 비교는 없어요"
+          : `가격 ${event.baselineSampleSize}번 기록 · ${Math.max(1, 3 - event.baselineSampleSize)}번 더 찍으면 평소 가격이 나와요`}
       </div>
       {couponLine}
     </Cell>

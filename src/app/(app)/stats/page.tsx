@@ -16,7 +16,6 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
   const raw = Array.isArray(params.p) ? params.p[0] : params.p;
   const days: StatsPeriod = raw === "30" ? 30 : 7;
   const stats = await loadStats(days);
-  const periodLabel = `직전 ${days}일 대비`;
 
   return (
     <>
@@ -38,16 +37,16 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
 
         <section className="grid grid-cols-3 gap-2">
           <StatTile label="링크 클릭" value={stats.clicks.value} prev={stats.clicks.prev} />
-          <StatTile label="카톡에 올림" value={stats.posts.value} prev={stats.posts.prev} />
-          <StatTile label="페이지 방문" value={stats.hubVisits.value} prev={stats.hubVisits.prev} />
+          <StatTile label="문구 복사" value={stats.posts.value} prev={stats.posts.prev} />
+          <StatTile label="팔로워 방문" value={stats.hubVisits.value} prev={stats.hubVisits.prev} />
         </section>
         <p className="-mt-4 text-xs text-ink-soft">
-          ▲▼는 {periodLabel} 변화예요. 봇 클릭은 뺐고, “카톡에 올림”은 문구를 복사한 횟수예요.
+          ▲▼는 그 전 {days}일과 비교한 거예요. 봇 클릭은 뺐고 사람이 누른 것만 셌어요. “문구 복사”는 복사 버튼을 누른 횟수예요.
         </p>
 
         <section className="card p-4">
           <h2 className="mb-3 text-sm font-semibold">어디서 눌렸나</h2>
-          <MagnitudeBars rows={stats.bySurface} emptyText={`최근 ${days}일 동안 눌린 링크가 없어요.`} />
+          <MagnitudeBars rows={stats.bySurface} emptyText="아직 눌린 링크가 없어요. 카톡에 올리면 여기에 쌓여요." />
         </section>
 
         <section className="card p-4">
@@ -75,12 +74,12 @@ export default async function StatsPage({ searchParams }: PageProps<"/stats">) {
         </section>
 
         <section className="card p-4">
-          <h2 className="mb-3 text-sm font-semibold">오늘 카톡에 올린 횟수</h2>
+          <h2 className="mb-3 text-sm font-semibold">오늘 카톡 문구 복사 횟수</h2>
           <Meter
             label="오늘 올린 문구"
             value={stats.kakaoToday}
             limit={KAKAO_DAILY_LIMIT}
-            note="하루 3~5개가 적당해요. 막지는 않지만, 너무 잦으면 방을 나가는 사람이 늘어요."
+            note="하루 3~5번이 적당해요. 너무 자주 올리면 방을 나가는 사람이 늘어요."
           />
         </section>
       </main>

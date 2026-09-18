@@ -44,7 +44,7 @@ export default async function HomePage() {
     })
   ).filter((item) => item.count > 0);
   if (reminders.length > 0) {
-    todo.push({ key: "reshoot", href: "/deals?f=saved", dot: "bg-stage-awaiting", label: "다시 찍을 상품", count: reminders.length });
+    todo.push({ key: "reshoot", href: "/deals?f=saved", dot: "bg-stage-awaiting", label: "다시 찍어 올릴 상품", count: reminders.length });
   }
   if (deadLinks.length > 0) {
     todo.push({ key: "soldout", href: "#soldout", dot: "bg-danger", label: "품절 안내 올리기", count: deadLinks.length });
@@ -67,7 +67,7 @@ export default async function HomePage() {
           <>
             {todo.length > 0 && (
               <section className="flex flex-col gap-2">
-                <h2 className="text-[13px] font-medium text-ink-soft">오늘 할 일</h2>
+                <h2 className="text-[13px] font-medium text-ink-soft">오늘 할 일 <span className="text-ink-faint">· 거의 끝난 것부터</span></h2>
                 <div className="card divide-y divide-line">
                   {todo.map((item) => (
                     <Link
@@ -87,16 +87,18 @@ export default async function HomePage() {
 
             {deadLinks.length > 0 && (
               <section id="soldout" className="flex flex-col gap-2 scroll-mt-20">
-                <h2 className="text-[13px] font-medium text-danger">품절됐어요 — 카톡에 품절 안내를 올려주세요</h2>
+                <h2 className="text-[13px] font-medium text-danger">
+                  {deadLinks.every((a) => a.health === "SOLDOUT") ? "품절됐어요" : "링크가 막혔어요"} — 카톡에 안내를 올려주세요
+                </h2>
                 {deadLinks.map((alert) => (
                   <div key={alert.dealId} className="card border-l-[3px] border-danger p-4">
                     <p className="text-[15px] font-semibold">{alert.productName}</p>
                     <p className="text-xs text-ink-soft">
                       {alert.brand}
-                      {alert.confirmedAt && ` · ${formatRelativeFromNow(alert.confirmedAt, now)}`} {HEALTH_LABEL[alert.health]} 표시
+                      {alert.confirmedAt && ` · ${formatRelativeFromNow(alert.confirmedAt, now)}`} {HEALTH_LABEL[alert.health]}로 표시함
                     </p>
                     <p className="mb-3 mt-1 text-xs text-ink-soft">
-                      팔로워 페이지에서는 내렸어요. 이미 보낸 링크는 안내 페이지로 가요.
+                      팔로워 페이지에서는 내렸어요. 이미 보낸 링크를 누르면 ‘지금은 살 수 없는 상품이에요’ 화면이 떠요.
                     </p>
                     <CopyPane text={alert.correction} label="📋 품절 안내 복사" />
                   </div>
@@ -115,8 +117,8 @@ export default async function HomePage() {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <StatTile label="링크 클릭" value={stats.clicks.value} prev={stats.clicks.prev} href="/stats" />
-                <StatTile label="카톡에 올림" value={stats.posts.value} prev={stats.posts.prev} href="/stats" />
-                <StatTile label="페이지 방문" value={stats.hubVisits.value} prev={stats.hubVisits.prev} href="/stats" />
+                <StatTile label="문구 복사" value={stats.posts.value} prev={stats.posts.prev} href="/stats" />
+                <StatTile label="팔로워 방문" value={stats.hubVisits.value} prev={stats.hubVisits.prev} href="/stats" />
               </div>
             </section>
 

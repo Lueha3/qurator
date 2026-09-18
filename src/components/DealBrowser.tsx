@@ -32,24 +32,24 @@ export type DealFilter =
 
 const FILTERS: { key: DealFilter; label: string }[] = [
   { key: "all", label: "전체" },
-  { key: "candidate", label: "결정 전" },
-  { key: "awaiting", label: "링크 필요" },
-  { key: "ready", label: "문구 준비됨" },
+  { key: "candidate", label: "올릴지 정하기" },
+  { key: "awaiting", label: "링크 붙이기" },
+  { key: "ready", label: "문구 확정하기" },
   { key: "saved", label: "지켜보는 중" },
-  { key: "approved", label: "올림" },
+  { key: "approved", label: "확정됨" },
   { key: "skipped", label: "안 올림" },
   { key: "archived", label: "지난 딜" },
 ];
 
 const EMPTY_TEXT: Record<DealFilter, string> = {
   all: "아직 딜이 없어요. 오른쪽 아래 📷 올리기를 눌러 시작해보세요.",
-  candidate: "결정할 딜이 없어요. 스크린샷을 올리면 여기에 쌓여요.",
-  awaiting: "링크가 필요한 딜이 없어요.",
-  ready: "카톡 문구를 받을 딜이 없어요.",
+  candidate: "올릴지 정할 딜이 없어요. 스크린샷을 올리면 여기에 쌓여요.",
+  awaiting: "링크를 붙일 딜이 없어요.",
+  ready: "문구를 확정할 딜이 없어요.",
   saved: "지켜보는 상품이 없어요. 딜을 열고 📈 가격만 지켜보기를 눌러보세요.",
-  approved: "최근 30일 안에 올린 딜이 없어요.",
+  approved: "최근 30일 안에 확정한 딜이 없어요.",
   skipped: "안 올리기로 한 딜이 없어요.",
-  archived: `올린 지 ${ARCHIVE_AFTER_DAYS}일이 지난 딜은 아직 없어요.`,
+  archived: `확정한 지 ${ARCHIVE_AFTER_DAYS}일이 지난 딜은 아직 없어요.`,
 };
 
 /** 승인한 지 오래된 딜은 기본 목록에서 빠진다 — 삭제가 아니라 보관이다(허브 노출과는 무관). */

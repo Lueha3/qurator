@@ -91,6 +91,12 @@ export function CaptureFab() {
 
       setBusy(files.length > 1 ? `${files.length}장 읽는 중…` : "읽는 중…");
       const res = await fetch("/api/capture", { method: "POST", body: form });
+      if (res.status === 401) {
+        // 세션이 풀린 것 — "올리지 못했어요"로 뭉뚱그리면 원인을 모른다. 로그인 화면으로 보내고 돌아오게 한다.
+        setToast({ tone: "error", message: "로그인이 풀렸어요. Face ID로 다시 들어와 주세요." });
+        router.push(`/login?next=${encodeURIComponent(pathname)}`);
+        return;
+      }
       const body = (await res.json()) as CaptureResponse;
 
       switch (body.kind) {
@@ -121,7 +127,7 @@ export function CaptureFab() {
           setToast({ tone: "error", message: body.error });
       }
     } catch {
-      setToast({ tone: "error", message: "올리지 못했어요. 인터넷 연결을 확인해주세요." });
+      setToast({ tone: "error", message: "올리지 못했어요. 인터넷 연결을 확인하고 잠시 뒤 다시 해보세요." });
     } finally {
       setBusy(null);
       // 같은 파일을 다시 골라도 change 이벤트가 나게 비운다.

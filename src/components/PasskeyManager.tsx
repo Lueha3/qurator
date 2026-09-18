@@ -136,8 +136,9 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
       </label>
 
       <button type="button" onClick={register} disabled={busy} className={primaryBtnCls}>
-        {busy ? "등록 중…" : passkeys.length > 0 ? "🔐 이 기기도 등록하기" : "🔐 이 기기에 Face ID 등록"}
+        {busy ? "등록 중…" : passkeys.length > 0 ? "🔐 이 폰도 등록하기" : "🔐 이 기기에 Face ID 등록"}
       </button>
+      {passkeys.length > 0 && <p className="text-xs text-ink-faint">이미 등록한 폰이면 누르지 않아도 돼요.</p>}
 
       {note && <p className="rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">{note}</p>}
       {problem && (

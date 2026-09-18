@@ -65,16 +65,16 @@ export function DedupeCard() {
               <li key={group.keep.dealId} className="text-xs">
                 <div className="truncate font-medium">{group.productLabel}</div>
                 <div className="text-ink-soft">
-                  남김: {group.keep.stageLabel} ({group.keep.when})
+                  남겨요 · {group.keep.stageLabel} · {group.keep.when}
                 </div>
                 {group.close.map((card) => (
                   <div key={card.dealId} className="text-ink-soft">
-                    닫음: {card.stageLabel} ({card.when})
+                    안 올림으로 옮겨요 · {card.stageLabel} · {card.when}
                   </div>
                 ))}
                 {group.manual.map((card) => (
                   <div key={card.dealId} className="text-accent">
-                    그대로 둠: {card.stageLabel} ({card.when}) — 링크 {card.links}개
+                    그대로 둬요 · 링크 {card.links}개 붙어 있음
                   </div>
                 ))}
               </li>

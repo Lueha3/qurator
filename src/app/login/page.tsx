@@ -25,7 +25,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
         <p className="mt-2 text-sm leading-relaxed text-ink-soft">
           {code
             ? "한 번만 등록해두면, 다음부터는 Face ID로 바로 들어와요."
-            : "처음이면 관리자에게 받은 등록 링크로 먼저 등록해주세요. 홈 화면 앱과 Safari는 각각 한 번씩 열어야 해요."}
+            : "처음이면 관리자에게 받은 등록 링크로 먼저 등록해주세요. 홈 화면 앱은 처음 한 번만 다시 들어와요."}
         </p>
 
         <div className="mt-6">
