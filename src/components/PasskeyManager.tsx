@@ -6,6 +6,7 @@ import { startRegistration } from "@simplewebauthn/browser";
 import { deletePasskeyAction } from "@/app/actions";
 import { ACTOR_NAME_MAX } from "@/lib/session";
 import { inputCls, primaryBtnCls } from "./form";
+import { passkeyErrorMessage, rpIdMismatch } from "./passkey-error";
 
 export interface PasskeyView {
   id: string;
@@ -23,22 +24,33 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [note, setNote] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pending, startTransition] = useTransition();
 
   async function register() {
     if (typeof window === "undefined" || !window.PublicKeyCredential) {
-      return setNote("이 브라우저는 패스키를 지원하지 않습니다.");
+      return setProblem("이 브라우저는 패스키를 지원하지 않습니다.");
     }
     setBusy(true);
     setNote(null);
+    setProblem(null);
     try {
       const res = await fetch("/api/auth/passkey/register");
       if (!res.ok) {
-        setNote("서버 설정(PUBLIC_BASE_URL)이 없어 등록할 수 없습니다.");
+        setProblem("서버에 PUBLIC_BASE_URL이 설정되지 않아 등록할 수 없습니다.");
         return;
       }
-      const attestation = await startRegistration({ optionsJSON: await res.json() });
+
+      const options = await res.json();
+      // 브라우저에 넘기기 전에 도메인부터 대조한다 — 여기서 걸리면 원인이 분명하다.
+      const mismatch = rpIdMismatch(options);
+      if (mismatch) {
+        setProblem(mismatch);
+        return;
+      }
+
+      const attestation = await startRegistration({ optionsJSON: options });
 
       const verified = await fetch("/api/auth/passkey/register", {
         method: "POST",
@@ -46,16 +58,15 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
         body: JSON.stringify({ credential: attestation, label: name }),
       });
       if (!verified.ok) {
-        setNote("등록하지 못했습니다. 다시 시도해주세요.");
+        setProblem(`서버가 등록을 거부했습니다 (${await verified.text()}).`);
         return;
       }
       const { label } = await verified.json();
       setNote(`${label} 등록 완료. 이제 주소만 치고 얼굴만 보면 열립니다.`);
       setName("");
       router.refresh();
-    } catch {
-      // 사람이 Face ID를 취소한 경우도 여기로 온다 — 실패라고 겁주지 않는다.
-      setNote(null);
+    } catch (error) {
+      setProblem(passkeyErrorMessage(error, "등록"));
     } finally {
       setBusy(false);
     }
@@ -109,6 +120,11 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
       </button>
 
       {note && <p className="rounded-md bg-ok/10 px-3 py-2 text-sm text-ok">{note}</p>}
+      {problem && (
+        <p className="rounded-md bg-danger/10 px-3 py-2 text-sm leading-relaxed text-danger">
+          {problem}
+        </p>
+      )}
     </div>
   );
 }

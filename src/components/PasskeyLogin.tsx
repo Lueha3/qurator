@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import { ACTOR_NAME_MAX } from "@/lib/session";
 import { inputCls, primaryBtnCls } from "./form";
+import { passkeyErrorMessage, rpIdMismatch } from "./passkey-error";
 
 // 로그인 화면 — docs/03 §7.1·§7.2.
 //
@@ -20,6 +21,7 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
   const router = useRouter();
   const [state, setState] = useState<State>("idle");
   const [name, setName] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
 
   function supported(): boolean {
     return typeof window !== "undefined" && !!window.PublicKeyCredential;
@@ -28,12 +30,20 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
   async function login() {
     if (!supported()) return setState("unsupported");
     setState("working");
+    setProblem(null);
     try {
       const res = await fetch("/api/auth/passkey/login");
       if (res.status === 404) return setState("none");
       if (!res.ok) return setState("failed");
 
-      const assertion = await startAuthentication({ optionsJSON: await res.json() });
+      const options = await res.json();
+      const mismatch = rpIdMismatch(options);
+      if (mismatch) {
+        setProblem(mismatch);
+        return setState("idle");
+      }
+
+      const assertion = await startAuthentication({ optionsJSON: options });
       const verified = await fetch("/api/auth/passkey/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -42,8 +52,10 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
       if (!verified.ok) return setState("failed");
 
       enter();
-    } catch {
-      setState("idle"); // Face ID 취소도 여기로 온다 — 실패라고 겁주지 않는다
+    } catch (error) {
+      // 실패를 삼키지 않는다 — 아무 일도 안 일어나는 화면이 가장 나쁘다.
+      setProblem(passkeyErrorMessage(error, "로그인"));
+      setState("idle");
     }
   }
 
@@ -51,12 +63,20 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
     if (!invite) return;
     if (!supported()) return setState("unsupported");
     setState("working");
+    setProblem(null);
     try {
       const res = await fetch(`/api/auth/passkey/invite?code=${encodeURIComponent(invite)}`);
       if (res.status === 403) return setState("bad-invite");
       if (!res.ok) return setState("failed");
 
-      const credential = await startRegistration({ optionsJSON: await res.json() });
+      const options = await res.json();
+      const mismatch = rpIdMismatch(options);
+      if (mismatch) {
+        setProblem(mismatch);
+        return setState("idle");
+      }
+
+      const credential = await startRegistration({ optionsJSON: options });
       const verified = await fetch("/api/auth/passkey/invite", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -66,7 +86,8 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
       if (!verified.ok) return setState("failed");
 
       enter();
-    } catch {
+    } catch (error) {
+      setProblem(passkeyErrorMessage(error, "등록"));
       setState("idle");
     }
   }
@@ -98,6 +119,7 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
           {state === "working" ? "등록 중…" : "🔐 이 기기에 Face ID 등록"}
         </button>
         <Note state={state} invite />
+        <Problem text={problem} />
       </div>
     );
   }
@@ -108,7 +130,15 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
         {state === "working" ? "확인 중…" : "🔓 Face ID로 열기"}
       </button>
       <Note state={state} />
+      <Problem text={problem} />
     </div>
+  );
+}
+
+function Problem({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <p className="rounded-md bg-danger/10 px-3 py-2 text-sm leading-relaxed text-danger">{text}</p>
   );
 }
 
