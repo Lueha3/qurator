@@ -70,22 +70,80 @@ export function proxy(req: NextRequest) {
     const url = req.nextUrl.clone();
     url.searchParams.delete("k"); // 토큰이 주소창·리퍼러에 남지 않게 즉시 제거
     const res = NextResponse.redirect(url);
-    res.cookies.set(COOKIE_NAME, expected, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: req.nextUrl.protocol === "https:",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    });
+    setSessionCookie(res, req, expected);
     return withNoIndex(res);
   }
 
   const cookie = req.cookies.get(COOKIE_NAME)?.value;
   if (cookie && safeEqual(cookie, expected)) {
-    return withNoIndex(NextResponse.next());
+    // 쓸 때마다 만료 시계를 되감는다(슬라이딩 만료). 고정 만료였을 때는 잘 쓰고 있는데도
+    // 어느 날 갑자기 "unauthorized" 흰 화면을 만나게 된다 — 로그인이 필요한 순간이
+    // 하필 급할 때 온다는 뜻이다. 계속 쓰는 한 다시 로그인할 일이 없어야 한다.
+    const res = NextResponse.next();
+    setSessionCookie(res, req, expected);
+    return withNoIndex(res);
   }
 
-  return withNoIndex(new NextResponse("unauthorized", { status: 401 }));
+  return withNoIndex(unauthorizedPage());
+}
+
+/** 세션 쿠키 수명. 슬라이딩이라 이 기간은 "마지막으로 앱을 연 뒤" 방치할 수 있는 시간이다. */
+const SESSION_MAX_AGE = 60 * 60 * 24 * 90;
+
+function setSessionCookie(res: NextResponse, req: NextRequest, token: string): void {
+  res.cookies.set(COOKIE_NAME, token, {
+    httpOnly: true, // 스크립트가 못 읽는다 — 쿠키 값이 곧 토큰이라 이게 중요하다
+    sameSite: "lax",
+    secure: req.nextUrl.protocol === "https:",
+    path: "/",
+    maxAge: SESSION_MAX_AGE,
+  });
+}
+
+/**
+ * 막을 때도 **다음에 뭘 해야 하는지는 알려준다.** 예전에는 흰 화면에 "unauthorized" 한 줄이라,
+ * 막혔다는 것만 알 뿐 되돌아갈 길이 안 보였다.
+ *
+ * 토큰은 여기 적지 않는다(적으면 이 페이지가 곧 토큰 유출 경로가 된다). 어디서 찾는지만 말한다.
+ */
+function unauthorizedPage(): NextResponse {
+  const html = `<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>로그인이 필요합니다</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin:0; min-height:100dvh; display:flex; align-items:center; justify-content:center;
+    padding:24px; background:#faf9f7; color:#1a1714;
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",Pretendard,"Noto Sans KR",sans-serif; }
+  main { max-width:30rem; }
+  h1 { font-size:1.125rem; margin:0 0 .75rem; }
+  p, li { font-size:.875rem; line-height:1.7; color:#6d6355; margin:0 0 .75rem; }
+  ol { padding-left:1.25rem; margin:0; }
+  b { color:#1a1714; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; background:#f0ece5;
+    padding:.1em .35em; border-radius:.25em; color:#1a1714; }
+  @media (prefers-color-scheme: dark) {
+    body { background:#16130f; color:#efe9df; }
+    p, li { color:#a99e8d; } b { color:#efe9df; }
+    code { background:#2a251e; color:#efe9df; }
+  }
+</style></head>
+<body><main>
+  <h1>🔒 로그인이 필요합니다</h1>
+  <p>이 주소는 커미션 링크가 들어 있는 작업 화면이라 아무나 열 수 없습니다.</p>
+  <ol>
+    <li><b>홈 화면에 추가한 앱 아이콘</b>으로 열어보세요. 가장 빠릅니다.</li>
+    <li>그래도 이 화면이면 <code>?k=</code> 주소로 <b>한 번만</b> 열면 됩니다. 그 뒤로는
+      주소만 쳐도 들어와집니다(90일, 쓸 때마다 갱신).</li>
+  </ol>
+  <p><b>Safari에서 방금 이 화면을 보셨다면</b> 그게 정상입니다 — 아이폰은 홈 화면 앱과 Safari가
+    로그인을 따로 기억합니다. 두 곳에서 다 쓰시려면 각각 한 번씩 <code>?k=</code>로 열어주세요.</p>
+</main></body></html>`;
+  return new NextResponse(html, {
+    status: 401,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
 }
 
 /** 길이가 달라도 조기 반환하지 않도록 상수시간에 가깝게 비교한다. */

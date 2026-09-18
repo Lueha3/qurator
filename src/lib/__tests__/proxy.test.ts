@@ -77,6 +77,28 @@ describe("접근 게이트", () => {
     const res = proxy(request("/deals", { headers: { cookie: `qurator_session=${TOKEN}` } }));
     expect(res.status).toBe(200);
   });
+
+  it("쓸 때마다 쿠키 만료 시계를 되감는다 — 잘 쓰는 중에 갑자기 로그아웃되지 않게", () => {
+    const res = proxy(request("/deals", { headers: { cookie: `qurator_session=${TOKEN}` } }));
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("qurator_session");
+    expect(setCookie).toContain(`Max-Age=${60 * 60 * 24 * 90}`);
+    expect(setCookie).toContain("HttpOnly"); // 쿠키 값이 곧 토큰이다 — 스크립트가 못 읽어야 한다
+  });
+
+  it("막을 때도 다음에 뭘 해야 하는지 알려준다", async () => {
+    const res = proxy(request("/deals"));
+    expect(res.status).toBe(401);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    const body = await res.text();
+    expect(body).toContain("홈 화면");
+    expect(body).toContain("?k=");
+  });
+
+  it("막힌 화면에 토큰이 들어 있지 않다 — 안내가 유출 경로가 되면 안 된다", async () => {
+    const body = await proxy(request("/deals")).text();
+    expect(body).not.toContain(TOKEN);
+  });
 });
 
 // 크론 경로 — V2-G. Vercel Cron은 우리 쿠키도 x-app-token도 실을 수 없어서

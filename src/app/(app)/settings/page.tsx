@@ -95,7 +95,12 @@ export default async function SettingsPage() {
           <h2 className="mb-1 text-sm font-semibold">폰에서 앱처럼 쓰기</h2>
           <p className="text-xs text-muted">
             아이폰 Safari에서 이 주소를 연 뒤 <b>공유 → 홈 화면에 추가</b>를 누르면 주소창 없이 앱처럼 열립니다.
-            쿠키가 만료되면 <code className="font-mono">?k=</code> 주소로 한 번만 다시 열어주세요.
+            로그인은 90일이고 쓸 때마다 갱신되니, 계속 쓰시는 한 다시 하실 일이 없습니다.
+          </p>
+          <p className="mt-2 text-xs text-muted">
+            아이폰은 <b>홈 화면 앱과 Safari가 로그인을 따로 기억합니다.</b> 홈 화면 아이콘으로 쓰시다가
+            Safari 주소창에 주소를 치면 막히는 것이 정상입니다 — 두 곳에서 다 쓰시려면 각각 한 번씩{" "}
+            <code className="font-mono">?k=</code> 주소로 열어주세요.
           </p>
 
           {/* 단축어를 쓰면 앱을 여는 탭과 사진첩에서 고르는 탭이 둘 다 사라진다 (docs/06 §4.5) */}
