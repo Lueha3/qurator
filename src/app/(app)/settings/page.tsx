@@ -8,7 +8,8 @@ import { DedupeCard } from "@/components/DedupeCard";
 import { PushToggle } from "@/components/PushToggle";
 import { pushPublicKey } from "@/lib/push";
 import { PasskeyManager } from "@/components/PasskeyManager";
-import { listPasskeys } from "@/lib/passkey";
+import { listLiveInvites, listPasskeys } from "@/lib/passkey";
+import { InviteCard } from "@/components/InviteCard";
 
 // 설정 — docs/08 §3.3. 매일 쓰지는 않지만 있어야 하는 것들을 한곳에 모았다.
 // (작년 BF 수동 입력은 원래 /watch 하단에 있었다 — 딜 탭이 목록 전용이 되면서 이리로 옮겼다.)
@@ -17,13 +18,14 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const now = new Date();
   const vapidPublicKey = pushPublicKey();
-  const [creator, activeWatches, limits, crawless, products, passkeys] = await Promise.all([
+  const [creator, activeWatches, limits, crawless, products, passkeys, invites] = await Promise.all([
     db.creator.findFirst(),
     countActiveWatches(now),
     getWatchLimits(),
     isCrawlessMode(),
     db.product.findMany({ orderBy: { capturedAt: "desc" }, take: 200 }),
     listPasskeys(),
+    listLiveInvites(),
   ]);
 
   return (
@@ -84,6 +86,22 @@ export default async function SettingsPage() {
             전부 지워도 앱에서 잠기지 않습니다 — <code className="font-mono">?k=</code> 주소가 비상구로
             늘 살아 있습니다.
           </p>
+        </section>
+
+        <section className="rounded-2xl border border-line bg-panel p-4">
+          <h2 className="mb-1 text-sm font-semibold">다른 사람 기기 등록하기</h2>
+          <p className="mb-3 text-xs text-muted">
+            30분짜리 <b>1회용 링크</b>를 만들어 보내면, 받는 사람이 자기 폰에 Face ID를 등록하고 바로
+            들어옵니다. <b>접속 암호(<code className="font-mono">?k=</code> 토큰)는 넘어가지 않습니다</b> —
+            그 링크로는 등록만 됩니다.
+          </p>
+          <InviteCard
+            invites={invites.map((invite) => ({
+              id: invite.id,
+              note: invite.note,
+              expiresAt: invite.expiresAt.toISOString(),
+            }))}
+          />
         </section>
 
         <section className="rounded-2xl border border-line bg-panel p-4">

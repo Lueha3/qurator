@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { startRegistration } from "@simplewebauthn/browser";
 import { deletePasskeyAction } from "@/app/actions";
-import { primaryBtnCls } from "./form";
+import { ACTOR_NAME_MAX } from "@/lib/session";
+import { inputCls, primaryBtnCls } from "./form";
 
 export interface PasskeyView {
   id: string;
@@ -20,6 +21,7 @@ export interface PasskeyView {
 
 export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
   const router = useRouter();
+  const [name, setName] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -41,7 +43,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
       const verified = await fetch("/api/auth/passkey/register", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(attestation),
+        body: JSON.stringify({ credential: attestation, label: name }),
       });
       if (!verified.ok) {
         setNote("등록하지 못했습니다. 다시 시도해주세요.");
@@ -49,6 +51,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
       }
       const { label } = await verified.json();
       setNote(`${label} 등록 완료. 이제 주소만 치고 얼굴만 보면 열립니다.`);
+      setName("");
       router.refresh();
     } catch {
       // 사람이 Face ID를 취소한 경우도 여기로 온다 — 실패라고 겁주지 않는다.
@@ -89,6 +92,17 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
           ))}
         </ul>
       )}
+
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-muted">이 기기 이름 (작업 기록에 남습니다)</span>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={ACTOR_NAME_MAX}
+          placeholder="예: 내 맥"
+          className={inputCls}
+        />
+      </label>
 
       <button type="button" onClick={register} disabled={busy} className={primaryBtnCls}>
         {busy ? "등록 중…" : passkeys.length > 0 ? "이 기기도 등록하기" : "이 기기에 Face ID 등록"}

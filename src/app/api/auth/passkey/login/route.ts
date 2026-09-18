@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticationOptions, verifyAuthentication } from "@/lib/passkey";
 import { setSessionCookie } from "@/lib/session";
+import { setActorCookie } from "@/lib/actor";
 
 // 패스키 로그인 — docs/03 §7.1. **게이트 앞에 열려 있는 경로다**(proxy.ts PUBLIC_PATHS).
 // 로그인하기 전에 닿아야 하기 때문이다.
@@ -39,7 +40,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const secure = req.nextUrl.protocol === "https:";
   const res = NextResponse.json({ ok: true });
-  setSessionCookie(res, token, req.nextUrl.protocol === "https:");
+  setSessionCookie(res, token, secure);
+  // 이 세션이 누구인지 이름표를 함께 심는다 — 이후 작업 기록에 이 이름이 남는다(docs/03 §7.2).
+  if (result.label) setActorCookie(res, result.label, secure);
   return res;
 }

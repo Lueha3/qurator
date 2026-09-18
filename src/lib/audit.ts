@@ -8,6 +8,7 @@
 
 import { createHash } from "node:crypto";
 import { db } from "./db";
+import { currentActor } from "./actor";
 import type { Actor } from "@prisma/client";
 
 interface AuditEntry {
@@ -24,8 +25,13 @@ interface AuditEntry {
 
 export async function audit(entry: AuditEntry): Promise<void> {
   try {
+    // 누가 했는지는 호출부가 넘기지 않는다 — 넘기게 하면 넘기는 것을 잊은 곳이 생기고,
+    // 그 한 곳이 하필 "누가 했지"가 궁금한 작업이 된다. 요청 쿠키에서 직접 읽는다.
+    const actorName = await currentActor();
+
     await db.auditLog.create({
       data: {
+        actorName,
         actor: entry.actor,
         action: entry.action,
         channel: entry.channel,

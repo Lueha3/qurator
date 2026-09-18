@@ -346,6 +346,12 @@ model AuditLog {
   responseCode    Int? // 외부 API 응답 코드
   responseId      String? // 플랫폼이 반환한 게시물 ID
   detail          String? // 사람이 읽을 요약
+  /**
+   * **누가** 했는지 — docs/03 §7.2. 쓰는 손이 둘이 되면서(협업자 + 현표) `actor: HUMAN`만으로는
+   * "누가 승인했지"를 답할 수 없게 됐다. 패스키로 로그인했을 때만 채워진다(그 이름이 곧 기기 이름).
+   * `?k=` 토큰 세션은 누구인지 알 방법이 없으므로 null이다 — 모르면 모른다고 둔다.
+   */
+  actorName       String?
 
   @@index([ts])
   @@index([approvalRef])
@@ -542,4 +548,24 @@ model AuthChallenge {
 
   @@index([expiresAt])
   @@map("auth_challenges")
+}
+
+// ── passkey_invites ─────────────────────────────────────────────────────
+// 1회용 등록 초대 — docs/03 §7.2.
+//
+// 패스키 등록은 게이트 뒤라 원래는 `?k=<APP_ACCESS_TOKEN>`을 한 번 써야 한다. 그런데 그건
+// **영구 비밀번호를 통째로 넘기는 것**이다. 협업자에게 등록만 시키려고 마스터 토큰을 주는 건
+// 과하다 — 그래서 "패스키 등록 딱 한 번"만 되는 짧은 코드를 따로 낸다.
+//
+// 이 코드는 게이트를 여는 유일한 열쇠이므로: 32바이트 난수, 10분, **1회용**.
+model PasskeyInvite {
+  id        String    @id @default(uuid())
+  code      String    @unique // 32바이트 난수 base64url
+  note      String? // "현표" 같은 누구에게 보냈는지
+  expiresAt DateTime
+  usedAt    DateTime? // 쓰이면 채워진다. null이 아니면 두 번 쓸 수 없다
+  createdAt DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@map("passkey_invites")
 }

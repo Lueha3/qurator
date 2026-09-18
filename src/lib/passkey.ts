@@ -18,8 +18,10 @@ import type {
   AuthenticationResponseJSON,
   RegistrationResponseJSON,
 } from "@simplewebauthn/server";
+import { randomBytes } from "node:crypto";
 import { db } from "./db";
 import { audit } from "./audit";
+import { cleanDeviceName } from "./actor";
 
 /** 챌린지 수명. 사람이 Face ID를 보는 시간은 몇 초라, 길게 둘 이유가 없다. */
 const CHALLENGE_TTL_MS = 3 * 60 * 1000;
@@ -129,7 +131,7 @@ export interface VerifyResult {
 export async function verifyRegistration(
   response: RegistrationResponseJSON,
   label: string
-): Promise<VerifyResult> {
+): Promise<VerifyResult & { label?: string }> {
   const rp = relyingParty();
   if (!rp) return { ok: false, reason: "not-configured" };
 
@@ -166,7 +168,7 @@ export async function verifyRegistration(
   });
 
   await audit({ actor: "HUMAN", action: "passkey.registered", detail: `${label} 등록` });
-  return { ok: true };
+  return { ok: true, label };
 }
 
 export async function deletePasskey(id: string): Promise<boolean> {
@@ -196,7 +198,7 @@ export async function authenticationOptions() {
 
 export async function verifyAuthentication(
   response: AuthenticationResponseJSON
-): Promise<VerifyResult> {
+): Promise<VerifyResult & { label?: string }> {
   const rp = relyingParty();
   if (!rp) return { ok: false, reason: "not-configured" };
 
@@ -237,7 +239,7 @@ export async function verifyAuthentication(
     action: "passkey.login",
     detail: `${stored.label ?? "기기"}에서 Face ID로 로그인`,
   });
-  return { ok: true };
+  return { ok: true, label: stored.label ?? "기기" };
 }
 
 // ── 잡동사니 ────────────────────────────────────────────────────────────
@@ -278,4 +280,79 @@ export function deviceLabel(userAgent: string | null): string {
   if (/Macintosh/i.test(ua)) return "맥";
   if (/Windows/i.test(ua)) return "PC";
   return "기기";
+}
+
+// ── 1회용 등록 초대 ─────────────────────────────────────────────────────
+// docs/03 §7.2. 실사용자(현표)에게 패스키를 등록시키려고 마스터 토큰을 통째로 넘기지 않기 위한 길.
+// 이 코드는 **게이트를 여는 열쇠**이므로 취급이 토큰과 같아야 한다: 높은 엔트로피, 짧은 수명, 1회용.
+
+/** 초대 수명. 카톡으로 보내고 그 자리에서 누르는 시간이면 충분하다. */
+const INVITE_TTL_MS = 30 * 60 * 1000;
+
+export interface Invite {
+  code: string;
+  expiresAt: Date;
+}
+
+export async function createInvite(note: string | null): Promise<Invite> {
+  // 만료된 것은 이때 같이 치운다 — 청소 전용 크론을 하나 더 두지 않으려고.
+  await db.passkeyInvite.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+
+  const code = randomBytes(32).toString("base64url"); // 추측으로는 못 맞춘다
+  const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
+  await db.passkeyInvite.create({ data: { code, note, expiresAt } });
+  await audit({
+    actor: "HUMAN",
+    action: "passkey.invited",
+    detail: note ? `${note}에게 등록 초대` : "등록 초대 발급",
+  });
+  return { code, expiresAt };
+}
+
+/** 아직 살아 있는 초대인가. **소비하지 않는다** — 등록에 성공했을 때만 쓴다. */
+export async function inviteIsLive(code: unknown): Promise<boolean> {
+  if (typeof code !== "string" || code.length < 32 || code.length > 100) return false;
+  const found = await db.passkeyInvite.findFirst({
+    where: { code, usedAt: null, expiresAt: { gt: new Date() } },
+    select: { id: true },
+  });
+  return found !== null;
+}
+
+/**
+ * 초대를 쓰면서 닫는다. 갱신된 행 수로 판정하므로 동시에 두 번 들어와도 한쪽만 1을 받는다 —
+ * 링크 하나로 두 기기가 등록되는 일이 없다.
+ */
+export async function consumeInvite(code: string): Promise<boolean> {
+  const { count } = await db.passkeyInvite.updateMany({
+    where: { code, usedAt: null, expiresAt: { gt: new Date() } },
+    data: { usedAt: new Date() },
+  });
+  return count > 0;
+}
+
+export interface InviteRow {
+  id: string;
+  note: string | null;
+  expiresAt: Date;
+  usedAt: Date | null;
+}
+
+/** 살아 있는 초대만. 코드 자체는 **절대 다시 내보내지 않는다** — 발급 순간에만 화면에 뜬다. */
+export async function listLiveInvites(): Promise<InviteRow[]> {
+  return db.passkeyInvite.findMany({
+    where: { usedAt: null, expiresAt: { gt: new Date() } },
+    select: { id: true, note: true, expiresAt: true, usedAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function revokeInvite(id: string): Promise<boolean> {
+  const { count } = await db.passkeyInvite.deleteMany({ where: { id } });
+  return count > 0;
+}
+
+/** 등록 화면이 부르는 이름 정리 — 사람이 지은 이름이 있으면 그것, 없으면 UA 추정값. */
+export function resolveLabel(provided: unknown, userAgent: string | null): string {
+  return cleanDeviceName(provided) ?? deviceLabel(userAgent);
 }

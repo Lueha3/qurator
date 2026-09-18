@@ -7,6 +7,12 @@ import type { NextResponse } from "next/server";
 
 export const SESSION_COOKIE = "qurator_session";
 
+/**
+ * 기기 이름 길이 상한. 로그인 화면(클라이언트 컴포넌트)도 이 값을 쓰므로 순수 모듈인 여기에 둔다 —
+ * actor.ts는 node:crypto·next/headers를 쓰기 때문에 클라이언트에서 import할 수 없다.
+ */
+export const ACTOR_NAME_MAX = 24;
+
 /** 쿠키 수명. 슬라이딩이라 이 값은 "마지막으로 앱을 연 뒤" 방치할 수 있는 시간이다. */
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 90;
 

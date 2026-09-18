@@ -27,7 +27,7 @@ import { parseTagInput } from "@/lib/deal-tags";
 import { updateProfile, type ProfileResult } from "@/lib/profile";
 import { markSoldOut, restoreDeal, type LinkHealthResult } from "@/lib/link-health";
 import { applyDedupe, planDedupe, type DedupePlan } from "@/lib/dedupe";
-import { deletePasskey } from "@/lib/passkey";
+import { createInvite, deletePasskey, revokeInvite } from "@/lib/passkey";
 import {
   removeSubscription,
   saveSubscription,
@@ -224,6 +224,25 @@ export async function pushTestAction(): Promise<DigestRun> {
 
 export async function deletePasskeyAction(id: string): Promise<boolean> {
   const ok = await deletePasskey(id);
+  revalidatePath("/settings");
+  return ok;
+}
+
+// ── 패스키 초대 (V2 협업) ───────────────────────────────────────────────
+// 실사용자(현표)에게 마스터 토큰을 넘기지 않고 패스키만 등록시키는 길 — docs/03 §7.2.
+
+export async function createInviteAction(note: string): Promise<{ url: string; expiresAt: string }> {
+  const invite = await createInvite(note.trim() || null);
+  const base = process.env.PUBLIC_BASE_URL ?? "";
+  revalidatePath("/settings");
+  return {
+    url: `${base}/login?invite=${encodeURIComponent(invite.code)}`,
+    expiresAt: invite.expiresAt.toISOString(),
+  };
+}
+
+export async function revokeInviteAction(id: string): Promise<boolean> {
+  const ok = await revokeInvite(id);
   revalidatePath("/settings");
   return ok;
 }

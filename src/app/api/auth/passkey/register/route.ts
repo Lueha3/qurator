@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deviceLabel, registrationOptions, verifyRegistration } from "@/lib/passkey";
+import { registrationOptions, resolveLabel, verifyRegistration } from "@/lib/passkey";
+import { setActorCookie } from "@/lib/actor";
 
 // 패스키 등록 — **게이트 뒤에 있다**(공개 경로가 아니다).
 // 이미 로그인한 사람만 등록할 수 있어야 한다. 아니면 아무나 자기 얼굴을 등록해
@@ -24,13 +25,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "bad-request" }, { status: 400 });
   }
 
-  const label = deviceLabel(req.headers.get("user-agent"));
+  const { credential, label: provided } = body as { credential?: unknown; label?: unknown };
+  const label = resolveLabel(provided, req.headers.get("user-agent"));
+
   const result = await verifyRegistration(
-    body as Parameters<typeof verifyRegistration>[0],
+    credential as Parameters<typeof verifyRegistration>[0],
     label
   );
   if (!result.ok) {
     return NextResponse.json({ error: result.reason ?? "failed" }, { status: 400 });
   }
-  return NextResponse.json({ ok: true, label });
+
+  // 방금 등록한 기기가 곧 지금 앉아 있는 사람이다 — 이름표를 바로 심어준다.
+  const res = NextResponse.json({ ok: true, label });
+  setActorCookie(res, label, req.nextUrl.protocol === "https:");
+  return res;
 }

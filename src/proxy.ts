@@ -32,7 +32,11 @@ const PUBLIC_PREFIXES = ["/l/", "/expired/", "/hub"];
  * 서명이라 열려 있어도 열쇠가 되지 않는다. prefix가 아니라 완전 일치인 이유는
  * `/login`으로 시작하는 다른 경로까지 딸려 열리는 것을 막기 위해서다.
  */
-const PUBLIC_PATHS = new Set(["/login", "/api/auth/passkey/login"]);
+const PUBLIC_PATHS = new Set([
+  "/login",
+  "/api/auth/passkey/login",
+  "/api/auth/passkey/invite", // 1회용 초대 코드가 곧 자격증명이다 — 라우트가 직접 검사한다
+]);
 
 export function proxy(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;

@@ -2,32 +2,38 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { startAuthentication } from "@simplewebauthn/browser";
-import { primaryBtnCls } from "./form";
+import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
+import { ACTOR_NAME_MAX } from "@/lib/session";
+import { inputCls, primaryBtnCls } from "./form";
 
-// Face ID 로그인 버튼 — docs/03 §7.1.
+// 로그인 화면 — docs/03 §7.1·§7.2.
 //
-// 이 화면은 게이트 앞(공개)이라, 여기서 보이는 것은 버튼 하나뿐이어야 한다.
-// 등록된 패스키가 있는지조차 눌러보기 전에는 말하지 않는다.
+// 이 화면은 게이트 앞(공개)이라 보이는 것이 버튼 하나뿐이어야 한다. 등록된 패스키가 있는지조차
+// 눌러보기 전에는 말하지 않고, 실패 이유도 뭉뚱그린다.
+//
+// `?invite=<코드>`가 붙어 있으면 **등록 화면**이 된다 — 실사용자(현표)가 마스터 토큰 없이
+// 자기 폰을 등록하는 길이다.
 
-type State = "idle" | "working" | "unsupported" | "none" | "failed";
+type State = "idle" | "working" | "unsupported" | "none" | "failed" | "bad-invite";
 
-export function PasskeyLogin() {
+export function PasskeyLogin({ invite }: { invite?: string }) {
   const router = useRouter();
   const [state, setState] = useState<State>("idle");
+  const [name, setName] = useState("");
+
+  function supported(): boolean {
+    return typeof window !== "undefined" && !!window.PublicKeyCredential;
+  }
 
   async function login() {
-    if (typeof window === "undefined" || !window.PublicKeyCredential) {
-      return setState("unsupported");
-    }
+    if (!supported()) return setState("unsupported");
     setState("working");
     try {
       const res = await fetch("/api/auth/passkey/login");
-      if (res.status === 404) return setState("none"); // 아직 등록된 패스키가 없다
+      if (res.status === 404) return setState("none");
       if (!res.ok) return setState("failed");
 
       const assertion = await startAuthentication({ optionsJSON: await res.json() });
-
       const verified = await fetch("/api/auth/passkey/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -35,13 +41,65 @@ export function PasskeyLogin() {
       });
       if (!verified.ok) return setState("failed");
 
-      // 쿠키가 심어졌다. refresh를 함께 불러 로그인 전에 캐시된 화면이 남지 않게 한다.
-      router.replace("/");
-      router.refresh();
+      enter();
     } catch {
-      // 사람이 Face ID를 취소한 경우도 여기로 온다 — 실패라고 겁주지 않는다.
+      setState("idle"); // Face ID 취소도 여기로 온다 — 실패라고 겁주지 않는다
+    }
+  }
+
+  async function registerWithInvite() {
+    if (!invite) return;
+    if (!supported()) return setState("unsupported");
+    setState("working");
+    try {
+      const res = await fetch(`/api/auth/passkey/invite?code=${encodeURIComponent(invite)}`);
+      if (res.status === 403) return setState("bad-invite");
+      if (!res.ok) return setState("failed");
+
+      const credential = await startRegistration({ optionsJSON: await res.json() });
+      const verified = await fetch("/api/auth/passkey/invite", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: invite, credential, label: name }),
+      });
+      if (verified.status === 403) return setState("bad-invite");
+      if (!verified.ok) return setState("failed");
+
+      enter();
+    } catch {
       setState("idle");
     }
+  }
+
+  function enter() {
+    router.replace("/");
+    router.refresh();
+  }
+
+  if (invite) {
+    return (
+      <div className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted">이 기기 이름 (기록에 남습니다)</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={ACTOR_NAME_MAX}
+            placeholder="예: 현표 아이폰"
+            className={inputCls}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={registerWithInvite}
+          disabled={state === "working"}
+          className={primaryBtnCls}
+        >
+          {state === "working" ? "등록 중…" : "🔐 이 기기에 Face ID 등록"}
+        </button>
+        <Note state={state} invite />
+      </div>
+    );
   }
 
   return (
@@ -49,21 +107,31 @@ export function PasskeyLogin() {
       <button type="button" onClick={login} disabled={state === "working"} className={primaryBtnCls}>
         {state === "working" ? "확인 중…" : "🔓 Face ID로 열기"}
       </button>
-
-      {state === "none" && (
-        <p className="text-xs text-muted">
-          이 앱에 등록된 패스키가 없습니다. <code className="font-mono">?k=</code> 주소로 한 번 들어간 뒤
-          설정 탭에서 <b>Face ID 등록</b>을 먼저 해주세요.
-        </p>
-      )}
-      {state === "unsupported" && (
-        <p className="text-xs text-muted">이 브라우저는 패스키를 지원하지 않습니다.</p>
-      )}
-      {state === "failed" && (
-        <p className="text-xs text-danger">
-          로그인하지 못했습니다. 다시 시도하거나 <code className="font-mono">?k=</code> 주소로 열어주세요.
-        </p>
-      )}
+      <Note state={state} />
     </div>
   );
+}
+
+function Note({ state, invite }: { state: State; invite?: boolean }) {
+  if (state === "none")
+    return (
+      <p className="text-xs text-muted">
+        이 앱에 등록된 패스키가 없습니다. 앱을 관리하는 분께 <b>등록 초대 링크</b>를 요청해주세요.
+      </p>
+    );
+  if (state === "unsupported")
+    return <p className="text-xs text-muted">이 브라우저는 패스키를 지원하지 않습니다.</p>;
+  if (state === "bad-invite")
+    return (
+      <p className="text-xs text-danger">
+        이 초대 링크는 만료되었거나 이미 사용되었습니다. 새 링크를 요청해주세요.
+      </p>
+    );
+  if (state === "failed")
+    return (
+      <p className="text-xs text-danger">
+        {invite ? "등록하지" : "로그인하지"} 못했습니다. 다시 시도해주세요.
+      </p>
+    );
+  return null;
 }
