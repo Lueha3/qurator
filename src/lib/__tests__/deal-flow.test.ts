@@ -22,6 +22,7 @@ const {
   captureFromScreenshots,
   markInterested,
   skipDeal,
+  reopenDeal,
   attachCuratorLink,
   replaceHook,
   approveDeal,
@@ -440,6 +441,28 @@ describe("기록 완료", () => {
     expect((await db.deal.findUniqueOrThrow({ where: { id: dealId } })).approvalStage).toBe("SKIPPED");
     expect(await db.auditLog.findFirst({ where: { action: "deal.skipped" } })).toBeTruthy();
     expect(await db.priceSnapshot.count()).toBe(1);
+  });
+
+  it("다시 열면 후보로 돌아오고 감사 로그에 남는다 — 같은 상품을 다시 찍지 않아도 된다", async () => {
+    const { dealId } = await capture();
+    await skipDeal(dealId);
+
+    const result = await reopenDeal(dealId);
+    expect(result.ok).toBe(true);
+    expect((await db.deal.findUniqueOrThrow({ where: { id: dealId } })).approvalStage).toBe("CANDIDATE");
+    expect(await db.auditLog.count({ where: { action: "deal.reopened", approvalRef: dealId } })).toBe(1);
+    // 딜이 늘지 않는다 — 다시 찍어 올리는 우회로의 부작용(중복 카드)이 이 기능의 이유다
+    expect(await db.deal.count()).toBe(1);
+  });
+
+  it("안 올림이 아닌 딜은 되돌리지 않는다 — 이미 나간 카드와 앱 상태가 어긋나면 안 된다", async () => {
+    const { dealId } = await capture();
+    const before = (await db.deal.findUniqueOrThrow({ where: { id: dealId } })).approvalStage;
+
+    const result = await reopenDeal(dealId);
+    expect(result.ok).toBe(false);
+    expect((await db.deal.findUniqueOrThrow({ where: { id: dealId } })).approvalStage).toBe(before);
+    expect(await db.auditLog.count({ where: { action: "deal.reopened" } })).toBe(0);
   });
 });
 

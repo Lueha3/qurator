@@ -220,10 +220,33 @@ export async function markInterested(dealId: string): Promise<void> {
   await setStage(dealId, "AWAITING_LINK");
 }
 
-/** "기록 완료" — 삭제가 아니다. 가격은 캡처 시점에 이미 저장됐고, 발행만 하지 않는 것이다. */
+/** "안 올릴게요" — 삭제가 아니다. 가격은 캡처 시점에 이미 저장됐고, 발행만 하지 않는 것이다. */
 export async function skipDeal(dealId: string): Promise<void> {
   await setStage(dealId, "SKIPPED");
   await audit({ actor: "HUMAN", action: "deal.skipped", approvalRef: dealId });
+}
+
+/**
+ * "다시 열기" — 안 올리기로 했던 딜을 되살린다(SKIPPED → CANDIDATE). 2026-09-18 추가.
+ *
+ * 왜 필요한가: 화면은 "지우는 게 아니에요"라고 말하는데 되돌릴 길이 없어서, 잘못 눌렀으면 같은 상품을
+ * 다시 찍어 올려야 했다. 그러면 딜이 하나 더 생기고(중복 정리 대상), 그 사이 가격이 그대로면 기록도
+ * 의미가 없다. 되살리는 편이 데이터가 깨끗하다.
+ *
+ * **발행된 딜은 되돌리지 않는다.** 이 함수는 SKIPPED에서만 동작한다 — APPROVED를 후보로 되돌리면
+ * 이미 나간 카톡 문구·팔로워 페이지와 앱의 상태가 어긋난다(품절 표시는 그쪽의 되돌리기다).
+ * 링크가 이미 붙어 있던 딜이면 링크 대기가 아니라 후보로 보낸다: 그때 판단이 끝났다는 보장이 없고,
+ * 후보 카드가 "올릴게요"로 다시 링크 단계로 갈 길을 이미 갖고 있다.
+ */
+export async function reopenDeal(dealId: string): Promise<{ ok: boolean; reason?: string }> {
+  const deal = await db.deal.findUnique({ where: { id: dealId }, select: { approvalStage: true } });
+  if (!deal) return { ok: false, reason: "이 딜을 찾을 수 없어요. 화면을 새로고침해 주세요." };
+  if (deal.approvalStage !== "SKIPPED") {
+    return { ok: false, reason: "이미 열려 있는 딜이에요." };
+  }
+  await setStage(dealId, "CANDIDATE");
+  await audit({ actor: "HUMAN", action: "deal.reopened", approvalRef: dealId });
+  return { ok: true };
 }
 
 // ── 3. 큐레이터 링크 → 카드 렌더 ─────────────────────────────────────────

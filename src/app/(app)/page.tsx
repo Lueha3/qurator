@@ -22,7 +22,13 @@ import { emptyCls } from "@/components/form";
 // 할 일 카드의 줄은 그 블록으로 앵커된다.
 export const dynamic = "force-dynamic";
 
-const HEALTH_LABEL = { SOLDOUT: "품절", DEAD: "상품 페이지 없음", COUPON_EXPIRED: "쿠폰 만료" } as const;
+const HEALTH_LABEL = { SOLDOUT: "품절", DEAD: "상품 페이지 없음", COUPON_EXPIRED: "쿠폰 종료" } as const;
+/** 안내문이 사유별로 다르므로 복사 버튼 이름도 그 사유를 말한다 (docs/08 §4.0.7) */
+const NOTICE_LABEL = {
+  SOLDOUT: "📋 품절 안내 복사",
+  DEAD: "📋 판매 종료 안내 복사",
+  COUPON_EXPIRED: "📋 쿠폰 종료 안내 복사",
+} as const;
 
 export default async function HomePage() {
   const now = new Date();
@@ -47,7 +53,7 @@ export default async function HomePage() {
     todo.push({ key: "reshoot", href: "/deals?f=saved", dot: "bg-stage-awaiting", label: "다시 찍어 올릴 상품", count: reminders.length });
   }
   if (deadLinks.length > 0) {
-    todo.push({ key: "soldout", href: "#soldout", dot: "bg-danger", label: "품절 안내 올리기", count: deadLinks.length });
+    todo.push({ key: "soldout", href: "#soldout", dot: "bg-danger", label: deadLinks.every((a) => a.health === "SOLDOUT") ? "품절 안내 올리기" : "안내 올리기", count: deadLinks.length });
   }
 
   const recent = deals.slice(0, 5);
@@ -100,7 +106,7 @@ export default async function HomePage() {
                     <p className="mb-3 mt-1 text-xs text-ink-soft">
                       팔로워 페이지에서는 내렸어요. 이미 보낸 링크를 누르면 ‘지금은 살 수 없는 상품이에요’ 화면이 떠요.
                     </p>
-                    <CopyPane text={alert.correction} label="📋 품절 안내 복사" />
+                    <CopyPane text={alert.correction} label={NOTICE_LABEL[alert.health]} />
                   </div>
                 ))}
               </section>

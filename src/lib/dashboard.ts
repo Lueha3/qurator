@@ -6,6 +6,7 @@ import { formatKRW } from "./format";
 
 import { correctionText } from "./correction";
 export { correctionText };
+export type { DeadReason } from "./correction";
 
 export interface DeadLinkAlert {
   dealId: string;
@@ -14,7 +15,7 @@ export interface DeadLinkAlert {
   /** "89,000원" 같은 표시용 문자열. 가격을 모르면 null */
   priceLabel: string | null;
   health: "SOLDOUT" | "DEAD" | "COUPON_EXPIRED";
-  /** 카톡 오픈채팅에 붙여넣을 정정 공지 — 카톡은 이미 나간 메시지를 수정할 수 없다 */
+  /** 카톡 오픈채팅에 붙여넣을 안내문 — 카톡은 이미 나간 메시지를 수정할 수 없다. 사유별로 문장이 다르다 */
   correction: string;
   confirmedAt: Date | null;
 }
@@ -44,13 +45,14 @@ export async function loadDeadLinkAlerts(): Promise<DeadLinkAlert[]> {
   return deals.map((deal) => {
     const link = deal.curatorLinks[0];
     const price = deal.finalPrice ?? deal.salePrice ?? deal.product.listPrice;
+    const health = link.health as DeadLinkAlert["health"];
     return {
       dealId: deal.id,
       brand: deal.product.brandName,
       productName: deal.product.productName,
       priceLabel: price > 0 ? formatKRW(price) : null,
-      health: link.health as DeadLinkAlert["health"],
-      correction: correctionText(deal.product.brandName, deal.product.productName),
+      health,
+      correction: correctionText(deal.product.brandName, deal.product.productName, health),
       confirmedAt: link.healthCheckedAt,
     };
   });

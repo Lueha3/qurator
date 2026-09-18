@@ -13,6 +13,7 @@ import {
   attachCuratorLink,
   markInterested,
   replaceHook,
+  reopenDeal,
   skipDeal,
   updateDealFacts,
   type ApproveResult,
@@ -53,6 +54,12 @@ export async function interestAction(dealId: string): Promise<void> {
 export async function skipAction(dealId: string): Promise<void> {
   await skipDeal(dealId);
   revalidateApp();
+}
+
+export async function reopenAction(dealId: string): Promise<{ ok: boolean; reason?: string }> {
+  const result = await reopenDeal(dealId);
+  revalidateApp();
+  return result;
 }
 
 export async function attachLinkAction(dealId: string, text: string): Promise<AttachLinkResult> {

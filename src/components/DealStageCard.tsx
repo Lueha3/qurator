@@ -6,6 +6,7 @@ import {
   attachLinkAction,
   interestAction,
   markSoldOutAction,
+  reopenAction,
   replaceHookAction,
   restoreDealAction,
   skipAction,
@@ -315,7 +316,22 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
       )}
 
       {deal.approvalStage === "SKIPPED" && (
-        <p className="text-sm text-ink-soft">안 올리기로 한 딜이에요. 가격은 기록해뒀어요. 되돌리려면 같은 상품을 다시 찍어 올려주세요.</p>
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-ink-soft">안 올리기로 한 딜이에요. 가격은 기록해뒀어요.</p>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              run(async () => {
+                const r = await reopenAction(deal.id);
+                if (!r.ok) setError(r.reason ?? "다시 열지 못했어요.");
+              })
+            }
+            className={secondaryBtnCls}
+          >
+            ↩️ 다시 열기
+          </button>
+        </div>
       )}
 
       {deal.approvalStage !== "APPROVED" && deal.approvalStage !== "SKIPPED" && (
@@ -338,7 +354,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
           <div className="flex flex-col gap-1.5 px-3 pb-3">
             <p><b className="text-ink">✅ 올릴게요</b> — 카톡에 올릴 준비를 시작해요. 링크를 붙이면 문구가 만들어지고, 마지막에 한 번 더 확인해요.</p>
             <p><b className="text-ink">가격만 지켜보기</b> — 지금은 안 올리지만 가격은 계속 보고 싶을 때. 같은 상품을 다시 찍어 올리면 “그때 얼마 → 지금 얼마”가 자동으로 비교돼요.</p>
-            <p><b className="text-ink">안 올릴게요</b> — 이 딜을 닫아요. 지우는 게 아니에요. 가격은 이미 기록돼 있고, 되돌리려면 같은 상품을 다시 찍어 올려야 해요.</p>
+            <p><b className="text-ink">안 올릴게요</b> — 이 딜을 닫아요. 지우는 게 아니에요. 가격은 이미 기록돼 있고, 잘못 눌렀으면 그 딜에서 ‘다시 열기’를 누르면 돼요.</p>
             <p><b className="text-ink">정보 고치기</b> — 브랜드·상품명·가격을 잘못 읽었을 때 바로잡아요.</p>
           </div>
         </details>
