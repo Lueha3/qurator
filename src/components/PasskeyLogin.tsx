@@ -6,6 +6,7 @@ import { startAuthentication, startRegistration } from "@simplewebauthn/browser"
 import { ACTOR_NAME_MAX } from "@/lib/session";
 import { inputCls, primaryBtnCls } from "./form";
 import { passkeyErrorMessage, rpIdMismatch } from "./passkey-error";
+import { InAppBrowserNotice } from "./InAppBrowserNotice";
 
 // 로그인 화면 — docs/03 §7.1·§7.2.
 //
@@ -15,7 +16,7 @@ import { passkeyErrorMessage, rpIdMismatch } from "./passkey-error";
 // `?invite=<코드>`가 붙어 있으면 **등록 화면**이 된다 — 실사용자(현표)가 마스터 토큰 없이
 // 자기 폰을 등록하는 길이다.
 
-type State = "idle" | "working" | "unsupported" | "none" | "failed" | "bad-invite";
+type State = "idle" | "working" | "unsupported" | "no-authenticator" | "none" | "failed" | "bad-invite";
 
 export function PasskeyLogin({ invite }: { invite?: string }) {
   const router = useRouter();
@@ -27,8 +28,27 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
     return typeof window !== "undefined" && !!window.PublicKeyCredential;
   }
 
+  /**
+   * Face ID/Touch ID 같은 "이 기기 안" 인증 수단이 실제로 있는가. 이걸 건너뛰고 바로
+   * 시도하면, 없는 기기에서는 브라우저가 응답 없이 매달려 "확인 중…" 버튼이 영원히
+   * 굳어버린다(2026-09-18, 테스트 중 재현 — 실기기 Face ID는 반드시 승인·취소로 끝나지만,
+   * 인증기 자체가 없으면 그 결론이 오지 않는다). 이 API가 없는 구형 브라우저는 과잉 차단하지
+   * 않고 그냥 시도한다.
+   */
+  async function hasAuthenticator(): Promise<boolean> {
+    if (typeof window.PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable !== "function") {
+      return true;
+    }
+    try {
+      return await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    } catch {
+      return true;
+    }
+  }
+
   async function login() {
     if (!supported()) return setState("unsupported");
+    if (!(await hasAuthenticator())) return setState("no-authenticator");
     setState("working");
     setProblem(null);
     try {
@@ -62,6 +82,7 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
   async function registerWithInvite() {
     if (!invite) return;
     if (!supported()) return setState("unsupported");
+    if (!(await hasAuthenticator())) return setState("no-authenticator");
     setState("working");
     setProblem(null);
     try {
@@ -100,6 +121,7 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
   if (invite) {
     return (
       <div className="flex flex-col gap-3">
+        <InAppBrowserNotice />
         <label className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-muted">이 기기 이름 (기록에 남습니다)</span>
           <input
@@ -126,6 +148,7 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
 
   return (
     <div className="flex flex-col gap-3">
+      <InAppBrowserNotice />
       <button type="button" onClick={login} disabled={state === "working"} className={primaryBtnCls}>
         {state === "working" ? "확인 중…" : "🔓 Face ID로 열기"}
       </button>
@@ -151,6 +174,12 @@ function Note({ state, invite }: { state: State; invite?: boolean }) {
     );
   if (state === "unsupported")
     return <p className="text-xs text-muted">이 브라우저는 패스키를 지원하지 않습니다.</p>;
+  if (state === "no-authenticator")
+    return (
+      <p className="text-xs text-muted">
+        이 기기에는 Face ID·Touch ID 같은 잠금 해제 수단이 없어 패스키를 쓸 수 없습니다.
+      </p>
+    );
   if (state === "bad-invite")
     return (
       <p className="text-xs text-danger">

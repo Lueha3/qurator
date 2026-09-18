@@ -41,6 +41,17 @@ export function passkeyErrorMessage(error: unknown, action: "등록" | "로그�
       return `${action}하지 못했습니다 (${e.cause?.name ?? "알 수 없는 오류"}). 다시 시도해주세요.`;
   }
 
+  // SimpleWebAuthn이 알려진 코드로 못 묶은 순수 NotAllowedError. 취소일 수도 있지만,
+  // 인앱 브라우저(카톡 등)가 Face ID 접근 자체를 거부한 경우도 똑같이 이 이름으로 온다 —
+  // 화면에서 detectInAppBrowser()로 먼저 걸러지지 않았다면(모르는 앱이라서) 여기서 짚어준다.
+  if (e.name === "NotAllowedError" && !e.code) {
+    return (
+      `${action}이 거부됐습니다. 카카오톡·인스타그램처럼 앱 안에서 뜨는 브라우저라면 ` +
+      `Face ID를 쓸 수 없습니다 — 더보기(⋯) 메뉴에서 "Safari로 열기"를 선택해 다시 시도해주세요. ` +
+      `직접 취소하셨다면 무시하셔도 됩니다.`
+    );
+  }
+
   // 라이브러리를 거치지 않은 오류(네트워크 등)도 이름만은 보여준다 —
   // "아무 일도 안 일어남"보다 무엇이든 단서가 있는 편이 낫다.
   const label = e.code ?? e.name ?? "알 수 없는 오류";

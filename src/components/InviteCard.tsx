@@ -116,6 +116,14 @@ export function InviteCard({ invites }: { invites: InviteView[] }) {
   );
 }
 
+/**
+ * 24시간제로 고정한다(hour12: false). `hour: "numeric"`(12시간제)를 썼을 때 서버(Node)는
+ * 오전/오후를 "AM"/"PM"으로 내놓는데 브라우저는 "오전"/"오후"로 내놓아서 — 같은 로캘·같은
+ * 시각인데 서버가 그린 HTML과 클라이언트가 그린 문자열이 달라 **하이드레이션이 깨졌다**
+ * (2026-09-18, 실사용 중 발견 — 설정 탭이 React #418로 통째로 다시 그려지면서 방금 만든
+ * 초대 링크가 화면에서 사라지는 사고로 나타났다). 24시간제는 오전/오후 표기 자체가 없어
+ * 이 발산이 생기지 않는다(Node·Chromium 둘 다 "05:00").
+ */
 function formatExpiry(iso: string): string {
-  return new Date(iso).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
 }

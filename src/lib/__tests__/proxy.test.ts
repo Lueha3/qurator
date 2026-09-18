@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { proxy } from "../../proxy";
+import { config, proxy } from "../../proxy";
 
 // 웹 표면 전체의 자물쇠다. 여기가 뚫리면 커미션 링크가 통째로 공개된다 —
 // 그래서 "열리는 경우"보다 **"열리지 않아야 하는 경우"**를 더 많이 본다.
@@ -151,5 +151,19 @@ describe("크론 게이트", () => {
   it("앱 토큰으로도 크론 주소를 열 수 있다 (현표가 직접 확인)", () => {
     const res = proxy(request("/api/cron/digest", { headers: { "x-app-token": TOKEN } }));
     expect(res.status).toBe(200);
+  });
+});
+
+// 로그인 화면(/login)은 게이트 앞이다. 그런데 <head>의 매니페스트·아이콘 링크는 브라우저가
+// **어느 페이지에서든** 자동으로 요청한다 — 이 파일들이 게이트 뒤에 있으면 로그인 화면
+// 자체가 401 리소스를 참조하게 된다(2026-09-18, 실사용 중 콘솔 에러로 발견).
+// matcher 제외는 Next.js가 라우팅 단계에서 적용하므로 proxy() 호출로는 재현되지 않는다 —
+// 여기서는 설정 자체가 되돌려지지 않는지를 지킨다.
+describe("정적 자산은 게이트를 타지 않는다", () => {
+  it("매니페스트·아이콘이 matcher에서 빠져 있다", () => {
+    const pattern = config.matcher[0];
+    for (const asset of ["apple-icon.png", "icon.png", "manifest.webmanifest"]) {
+      expect(pattern).toContain(asset);
+    }
   });
 });

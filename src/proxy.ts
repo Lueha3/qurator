@@ -168,6 +168,11 @@ function withNoIndex(res: NextResponse): NextResponse {
 }
 
 export const config = {
-  // 정적 자산과 Next 내부 경로는 제외
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt).*)"],
+  // 정적 자산과 Next 내부 경로는 제외. apple-icon.png·icon.png·manifest.webmanifest는
+  // 브라우저가 **어느 페이지에서든 자동으로** 요청한다 — 로그인 전 화면(/login)도 예외가
+  // 아니다(2026-09-18, 실사용 중 발견: 로그인 화면 자체가 401을 내는 리소스를 참조하고 있었다).
+  // 커미션 링크나 개인정보를 담지 않는 순수 정적 파일이라 게이트를 아예 타지 않게 뺐다.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|apple-icon.png|icon.png|manifest.webmanifest|robots.txt).*)",
+  ],
 };

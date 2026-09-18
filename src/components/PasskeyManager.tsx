@@ -7,6 +7,7 @@ import { deletePasskeyAction } from "@/app/actions";
 import { ACTOR_NAME_MAX } from "@/lib/session";
 import { inputCls, primaryBtnCls } from "./form";
 import { passkeyErrorMessage, rpIdMismatch } from "./passkey-error";
+import { InAppBrowserNotice } from "./InAppBrowserNotice";
 
 export interface PasskeyView {
   id: string;
@@ -28,9 +29,27 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
   const [busy, setBusy] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  /** PasskeyLogin.tsx의 같은 이름 함수와 같은 이유·같은 구현이다 — 공용 모듈로 뺄 만큼
+   * 무겁지 않아 각자 두었지만, 고칠 때는 둘 다 고쳐야 한다. */
+  async function hasAuthenticator(): Promise<boolean> {
+    if (typeof window.PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable !== "function") {
+      return true;
+    }
+    try {
+      return await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    } catch {
+      return true;
+    }
+  }
+
   async function register() {
     if (typeof window === "undefined" || !window.PublicKeyCredential) {
       return setProblem("이 브라우저는 패스키를 지원하지 않습니다.");
+    }
+    // 없는 기기에서 시도하면 응답 없이 매달려 "등록 중…" 버튼이 영원히 굳어버린다
+    // (2026-09-18, 테스트 중 재현) — 시도 전에 먼저 확인한다.
+    if (!(await hasAuthenticator())) {
+      return setProblem("이 기기에는 Face ID·Touch ID 같은 잠금 해제 수단이 없어 패스키를 쓸 수 없습니다.");
     }
     setBusy(true);
     setNote(null);
@@ -74,6 +93,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
 
   return (
     <div className="flex flex-col gap-3">
+      <InAppBrowserNotice />
       {passkeys.length > 0 && (
         <ul className="flex flex-col gap-2 rounded-lg border border-line p-3">
           {passkeys.map((key) => (
