@@ -89,7 +89,7 @@ export function CopyPane({
         type="button"
         onClick={handleCopy}
         className={`w-full rounded-lg px-4 py-3 text-base font-semibold transition-colors ${
-          state === "copied" ? "bg-ok text-accent-ink" : "bg-honey text-accent-ink active:opacity-90"
+          state === "copied" ? "bg-accent text-accent-ink" : "bg-accent text-accent-ink active:opacity-90"
         }`}
       >
         {state === "copied" ? "✓ 복사됨 — 카톡에 붙여넣으세요" : label}
@@ -109,7 +109,7 @@ export function CopyPane({
         readOnly
         value={text}
         rows={estimateRows(text)}
-        className="w-full resize-none rounded-lg border border-line bg-panel p-3 text-[16px] leading-relaxed"
+        className="w-full resize-none rounded-lg border border-line bg-surface p-3 text-[16px] leading-relaxed"
       />
     </div>
   );

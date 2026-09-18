@@ -29,7 +29,7 @@ export function DedupeCard() {
 
   if (done !== null) {
     return (
-      <p className="rounded-md bg-ok/10 px-3 py-2 text-sm text-ok">
+      <p className="rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">
         ✅ {done}장을 기록 완료로 옮겼습니다. 딜 탭의 “기록 완료” 필터에 그대로 있습니다.
       </p>
     );
@@ -47,13 +47,13 @@ export function DedupeCard() {
           {pending ? "확인 중…" : "중복 카드 확인"}
         </button>
       ) : plan.closeCount === 0 && plan.manualCount === 0 ? (
-        <p className="text-sm text-muted">정리할 중복이 없습니다.</p>
+        <p className="text-sm text-ink-soft">정리할 중복이 없습니다.</p>
       ) : (
         <>
           <p className="text-sm">
             상품 <b>{plan.groups.length}개</b>에서 <b>{plan.closeCount}장</b>을 닫습니다.
             {plan.manualCount > 0 && (
-              <span className="text-muted">
+              <span className="text-ink-soft">
                 {" "}
                 링크가 붙은 {plan.manualCount}장은 그대로 둡니다.
               </span>
@@ -64,16 +64,16 @@ export function DedupeCard() {
             {plan.groups.map((group) => (
               <li key={group.keep.dealId} className="text-xs">
                 <div className="truncate font-medium">{group.productLabel}</div>
-                <div className="text-muted">
+                <div className="text-ink-soft">
                   남김: {group.keep.stageLabel} ({group.keep.when})
                 </div>
                 {group.close.map((card) => (
-                  <div key={card.dealId} className="text-muted">
+                  <div key={card.dealId} className="text-ink-soft">
                     닫음: {card.stageLabel} ({card.when})
                   </div>
                 ))}
                 {group.manual.map((card) => (
-                  <div key={card.dealId} className="text-honey">
+                  <div key={card.dealId} className="text-accent">
                     그대로 둠: {card.stageLabel} ({card.when}) — 링크 {card.links}개
                   </div>
                 ))}

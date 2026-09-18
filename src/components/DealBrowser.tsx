@@ -1,5 +1,6 @@
 "use client";
 
+import { emptyCls, inputCls, segmentCls, segmentItemCls } from "./form";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { unwatchAction } from "@/app/actions";
 import type { DealDTO } from "@/lib/api-types";
@@ -186,9 +187,9 @@ export function DealBrowser({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 칩: 활성은 진한 바탕. 테두리 대신 면으로 구분한다 — 여덟 개가 한 줄에 서면 선이 소란스럽다 */}
+      {/* 필터: GrowthPilot의 세그먼트 스위치 — 흰 상자 안 연한 초록 알약 */}
       <div className="-mx-4 overflow-x-auto px-4 no-scrollbar">
-        <div className="flex w-max gap-1.5">
+        <div className={`w-max ${segmentCls}`}>
           {FILTERS.map((f) => {
             const active = f.key === filter;
             return (
@@ -197,9 +198,7 @@ export function DealBrowser({
                 type="button"
                 onClick={() => selectFilter(f.key)}
                 aria-pressed={active}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${
-                  active ? "bg-foreground font-semibold text-background" : "bg-panel text-muted shadow-[var(--shadow-card)]"
-                }`}
+                className={segmentItemCls(active)}
               >
                 {f.label}
                 {counts[f.key] > 0 && (
@@ -217,25 +216,25 @@ export function DealBrowser({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="브랜드 · 상품명 검색"
           aria-label="딜 검색"
-          className="w-full rounded-xl border border-line-strong bg-panel px-3.5 py-2.5 text-[16px] outline-none focus:border-honey sm:text-sm"
+          className={inputCls}
         />
         <button
           type="button"
           onClick={() => setManualOpen(true)}
-          className="shrink-0 rounded-xl bg-panel px-3.5 py-2.5 text-sm font-medium text-muted shadow-[var(--shadow-card)]"
+          className="shrink-0 rounded-xl border border-line bg-surface px-3.5 py-3 text-sm font-semibold text-ink-soft"
         >
           ✏️ 직접 입력
         </button>
       </div>
 
       {visible.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-line-strong/50 p-8 text-center text-sm text-muted">
+        <p className={emptyCls}>
           {query.trim() ? `“${query.trim()}”와 맞는 딜이 없습니다.` : EMPTY_TEXT[filter]}
         </p>
       ) : (
         groups.map((group) => (
           <section key={group.key} className="flex flex-col gap-2">
-            <h3 className="px-1 text-[13px] font-medium text-muted">{group.label}</h3>
+            <h3 className="px-1 text-[13px] font-medium text-ink-soft">{group.label}</h3>
             <ul className="card divide-y divide-line">
               {group.deals.map((deal) => (
                 <DealRow
@@ -255,13 +254,13 @@ export function DealBrowser({
         // backdrop(=dialog 자신) 클릭으로 닫는다. 내용 영역 클릭은 여기까지 올라오지 않는다.
         if (e.target === sheetRef.current) closeSheet();
       }}>
-        <div className="max-h-[88dvh] overflow-y-auto rounded-t-3xl bg-background p-4 sm:rounded-3xl">
+        <div className="max-h-[88dvh] overflow-y-auto rounded-t-3xl bg-paper p-4 sm:rounded-3xl">
           <div className="mb-3 flex items-center justify-between">
             <span className="h-1 w-10 rounded-full bg-line-strong/50 sm:hidden" aria-hidden />
             <button
               type="button"
               onClick={closeSheet}
-              className="ml-auto rounded-lg bg-panel px-3 py-1.5 text-sm text-muted shadow-[var(--shadow-card)]"
+              className="ml-auto rounded-lg bg-surface px-3 py-1.5 text-sm text-ink-soft border border-line"
             >
               닫기
             </button>
@@ -273,13 +272,13 @@ export function DealBrowser({
       <dialog ref={manualRef} className="sheet" onClose={() => setManualOpen(false)} onClick={(e) => {
         if (e.target === manualRef.current) setManualOpen(false);
       }}>
-        <div className="max-h-[88dvh] overflow-y-auto rounded-t-3xl bg-background p-4 sm:rounded-3xl">
+        <div className="max-h-[88dvh] overflow-y-auto rounded-t-3xl bg-paper p-4 sm:rounded-3xl">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold">✏️ 직접 입력으로 카드 만들기</h2>
             <button
               type="button"
               onClick={() => setManualOpen(false)}
-              className="rounded-lg bg-panel px-3 py-1.5 text-sm text-muted shadow-[var(--shadow-card)]"
+              className="rounded-lg bg-surface px-3 py-1.5 text-sm text-ink-soft border border-line"
             >
               닫기
             </button>
@@ -308,7 +307,7 @@ function DealRow({
     <li>
       <DealListRow deal={deal} trailing={time} hideSavedTag={showRelease} onOpen={onOpen} />
       {showRelease && (
-        <div className="flex items-center justify-between gap-3 px-3.5 pb-3 pl-[66px] text-xs text-muted">
+        <div className="flex items-center justify-between gap-3 px-3.5 pb-3 pl-[66px] text-xs text-ink-soft">
           <span>
             {deal.priceHistory?.currentCapturedLabel
               ? `마지막 기록 ${deal.priceHistory.currentCapturedLabel}`

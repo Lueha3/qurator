@@ -19,7 +19,7 @@ export function MagnitudeBars({
   unit?: string;
 }) {
   if (rows.length === 0) {
-    return <p className="rounded-lg border border-dashed border-line px-4 py-6 text-center text-sm text-muted">{emptyText}</p>;
+    return <p className="rounded-lg border border-dashed border-line px-4 py-6 text-center text-sm text-ink-soft">{emptyText}</p>;
   }
   const max = Math.max(...rows.map((r) => r.value), 1);
 
@@ -29,14 +29,14 @@ export function MagnitudeBars({
         <li key={row.label}>
           <div className="mb-1 flex items-baseline justify-between gap-3">
             <span className="truncate text-sm">{row.label}</span>
-            <span className="shrink-0 text-sm tabular-nums text-muted">
+            <span className="shrink-0 text-sm tabular-nums text-ink-soft">
               {row.value.toLocaleString("ko-KR")}
               {unit}
             </span>
           </div>
           <div className="h-2.5 w-full">
             <div
-              className="h-2.5 rounded-r-[4px] bg-honey"
+              className="h-2.5 rounded-r-[4px] bg-accent"
               style={{ width: `${Math.max((row.value / max) * 100, 2)}%` }}
             />
           </div>
@@ -68,17 +68,17 @@ export function Meter({
     <div>
       <div className="mb-1 flex items-baseline justify-between gap-3">
         <span className="text-sm">{label}</span>
-        <span className={`text-sm tabular-nums ${over ? "text-danger" : "text-muted"}`}>
+        <span className={`text-sm tabular-nums ${over ? "text-danger" : "text-ink-soft"}`}>
           {value} / {limit}
         </span>
       </div>
-      <div className="h-2.5 w-full rounded-full bg-honey-soft">
+      <div className="h-2.5 w-full rounded-full bg-accent-soft">
         <div
-          className={`h-2.5 rounded-full ${over ? "bg-danger" : "bg-honey"}`}
+          className={`h-2.5 rounded-full ${over ? "bg-danger" : "bg-accent"}`}
           style={{ width: `${Math.max(pct, value > 0 ? 4 : 0)}%` }}
         />
       </div>
-      {note && <p className="mt-1.5 text-xs text-muted">{note}</p>}
+      {note && <p className="mt-1.5 text-xs text-ink-soft">{note}</p>}
     </div>
   );
 }

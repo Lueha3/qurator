@@ -33,8 +33,8 @@ const UNTAGGED = "오늘의 꿀매";
 
 const BADGE_CLASS: Record<HubBadge["kind"], string> = {
   coupon: "bg-danger/10 text-danger",
-  lowest: "bg-honey text-accent-ink",
-  drop: "bg-honey-soft text-honey",
+  lowest: "bg-accent text-accent-ink",
+  drop: "bg-accent-soft text-accent",
 };
 
 /**
@@ -97,23 +97,23 @@ export default async function HubPage() {
     <main className="mx-auto flex max-w-lg flex-col gap-5 p-5">
       <header className="flex flex-col items-center gap-1 pt-4 text-center">
         <h1 className="text-[22px] font-semibold tracking-tight">꿀매각 아이템</h1>
-        <p className="text-sm text-muted">@{creator?.handle ?? "maison_jenflox"}</p>
+        <p className="text-sm text-ink-soft">@{creator?.handle ?? "maison_jenflox"}</p>
         {creator?.bio && <p className="mt-1 text-sm">{creator.bio}</p>}
       </header>
 
       {/* 고지는 링크 목록 위에 상시 노출한다 — 개별 항목마다 붙이지 않아도 되도록 지면 상단 고정 */}
-      <p className="rounded-lg bg-honey-soft px-4 py-2.5 text-center text-xs text-honey">
+      <p className="rounded-lg bg-accent-soft px-4 py-2.5 text-center text-xs text-accent">
         {DISCLOSURE.NOTION}
       </p>
 
       {deals.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
+        <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-soft">
           지금은 살아있는 딜이 없어요. 곧 새 아이템이 올라옵니다.
         </p>
       ) : (
         ordered.map(([title, rows]) => (
           <section key={title} className="flex flex-col gap-2">
-            <h2 className="px-1 text-[13px] font-medium text-muted">{title}</h2>
+            <h2 className="px-1 text-[13px] font-medium text-ink-soft">{title}</h2>
             <ul className="card divide-y divide-line">
               {rows.map((deal) => {
                 // 쿠폰이 만료됐으면 쿠폰 적용가와 쿠폰 문구를 쓰지 않는다 —
@@ -135,11 +135,11 @@ export default async function HubPage() {
                     <a
                       href={`/l/${deal.shortLinks[0].code}`}
                       rel="nofollow noopener"
-                      className="flex items-start gap-3 px-3.5 py-3 transition-colors active:bg-background"
+                      className="flex items-start gap-3 px-3.5 py-3 transition-colors active:bg-paper"
                     >
                       <BrandMark brand={deal.product.brandName} />
                       <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="flex items-center gap-1.5 text-[11px] leading-4 text-muted">
+                        <span className="flex items-center gap-1.5 text-[11px] leading-4 text-ink-soft">
                           <span className="truncate">{deal.product.brandName}</span>
                           {badge && (
                             <span
@@ -150,25 +150,26 @@ export default async function HubPage() {
                           )}
                         </span>
                         <span className="mt-0.5 text-[15px] font-semibold leading-snug">{deal.product.productName}</span>
-                        <span className="mt-1 flex items-baseline gap-1.5 text-sm">
+                        {/* 숫자는 줄바꿈하지 않는다 — 쿠폰 설명이 길면 그쪽이 다음 줄로 내려간다 */}
+                        <span className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-sm">
                           {effective > 0 ? (
                             <>
-                              <span className="font-semibold">{formatKRW(effective)}</span>
+                              <span className="whitespace-nowrap font-semibold">{formatKRW(effective)}</span>
                               {/* 공백을 취소선 밖에 둔다 — 안에 넣으면 취소선이 공백까지 덮어 두 숫자가 붙어 보인다 */}
                               {discounted && (
-                                <span className="text-xs text-muted line-through">{formatKRW(deal.product.listPrice)}</span>
+                                <span className="whitespace-nowrap text-xs text-ink-soft line-through">{formatKRW(deal.product.listPrice)}</span>
                               )}
                             </>
                           ) : (
-                            <span className="text-xs text-muted">가격은 링크에서 확인</span>
+                            <span className="text-xs text-ink-soft">가격은 링크에서 확인</span>
                           )}
                           {couponLive && deal.couponDesc && (
-                            <span className="text-xs text-muted">· 쿠폰 {deal.couponDesc}</span>
+                            <span className="text-xs text-ink-soft">쿠폰 {deal.couponDesc}</span>
                           )}
                         </span>
                       </span>
                       {discounted && deal.discountRate != null && deal.discountRate > 0 && (
-                        <span className="shrink-0 rounded-md bg-honey px-1.5 py-0.5 text-[11px] font-bold leading-4 text-accent-ink">
+                        <span className="shrink-0 rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-bold leading-4 text-accent-ink">
                           {deal.discountRate}%
                         </span>
                       )}
@@ -191,7 +192,7 @@ export default async function HubPage() {
         </a>
       )}
 
-      <footer className="flex flex-col gap-1 pb-8 text-center text-[11px] text-muted">
+      <footer className="flex flex-col gap-1 pb-8 text-center text-[11px] text-ink-soft">
         <span>품절되거나 할인이 끝난 상품은 목록에서 바로 내려갑니다.</span>
         {/* 배지가 과장으로 읽히지 않게, 근거의 범위를 말해둔다 */}
         {hasLowestBadge && <span>‘최저가’는 제가 기록해 온 가격 범위 안에서의 최저가입니다.</span>}

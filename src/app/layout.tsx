@@ -1,16 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "qurator",
@@ -25,8 +14,8 @@ export const viewport: Viewport = {
   // 노치·홈 인디케이터 영역까지 배경을 채우고, 여백은 env(safe-area-inset-*)로 각자 준다.
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf9f6" },
-    { media: "(prefers-color-scheme: dark)", color: "#171411" },
+    { media: "(prefers-color-scheme: light)", color: "#f9f6f1" },
+    { media: "(prefers-color-scheme: dark)", color: "#17130f" },
   ],
 };
 
@@ -34,7 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

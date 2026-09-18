@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChartIcon, SlidersIcon, HomeIcon, ListIcon } from "./icons";
 
 // 하단 탭 — docs/08 §3.2. 주 동작은 전부 엄지 영역에 둔다.
+// 아이콘은 GrowthPilot과 같이 이모지다(§4.0.7). 활성 탭은 연한 초록 알약.
 
 const TABS = [
-  { href: "/", label: "홈", Icon: HomeIcon },
-  { href: "/deals", label: "딜", Icon: ListIcon },
-  { href: "/stats", label: "성과", Icon: ChartIcon },
-  { href: "/settings", label: "설정", Icon: SlidersIcon },
+  { href: "/", label: "홈", icon: "🏠" },
+  { href: "/deals", label: "딜", icon: "🏷️" },
+  { href: "/stats", label: "성과", icon: "📈" },
+  { href: "/settings", label: "설정", icon: "⚙️" },
 ] as const;
 
 export function BottomNav() {
@@ -18,10 +18,10 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-line/60 bg-panel/95 shadow-[0_-4px_16px_rgb(26_23_20/0.06)] backdrop-blur-md"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 backdrop-blur-md"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
-      <ul className="mx-auto flex max-w-3xl">
+      <ul className="mx-auto flex max-w-3xl px-2">
         {TABS.map((tab) => {
           const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
           return (
@@ -29,11 +29,18 @@ export function BottomNav() {
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-col items-center gap-1 py-2 text-[11px] transition-colors ${
-                  active ? "font-semibold text-honey" : "text-muted"
+                className={`flex flex-col items-center gap-0.5 pb-1.5 pt-2 text-[11px] font-semibold transition-colors ${
+                  active ? "text-accent" : "text-ink-faint"
                 }`}
               >
-                <tab.Icon className="h-[22px] w-[22px]" />
+                <span
+                  aria-hidden
+                  className={`flex h-8 w-14 items-center justify-center rounded-xl text-[19px] leading-none transition-colors ${
+                    active ? "bg-accent-soft" : ""
+                  }`}
+                >
+                  {tab.icon}
+                </span>
                 {tab.label}
               </Link>
             </li>

@@ -36,10 +36,11 @@ export default async function ExpiredPage({ params }: { params: Promise<{ code: 
   });
 
   return (
-    <main className="mx-auto flex max-w-lg flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-8">
       <header className="flex flex-col gap-2">
-        <h1 className="text-xl font-semibold">지금은 살 수 없는 상품이에요</h1>
-        <p className="text-sm text-muted">
+        <p className="text-3xl" aria-hidden>😢</p>
+        <h1 className="text-xl font-bold">지금은 살 수 없는 상품이에요</h1>
+        <p className="text-sm text-ink-soft">
           {link?.deal.product
             ? `${link.deal.product.brandName} · ${link.deal.product.productName} 은(는) 품절되었거나 할인이 종료됐습니다.`
             : "품절되었거나 할인이 종료된 링크입니다."}
@@ -48,8 +49,8 @@ export default async function ExpiredPage({ params }: { params: Promise<{ code: 
 
       {alternatives.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium text-muted">지금 살아있는 다른 꿀템</h2>
-          <p className="text-xs text-muted">{DISCLOSURE.NOTION}</p>
+          <h2 className="text-sm font-medium text-ink-soft">지금 살아있는 다른 꿀템</h2>
+          <p className="text-xs text-ink-soft">{DISCLOSURE.NOTION}</p>
           <ul className="flex flex-col gap-2">
             {alternatives.map((deal) => (
               <li key={deal.id}>
@@ -69,8 +70,11 @@ export default async function ExpiredPage({ params }: { params: Promise<{ code: 
         </section>
       )}
 
-      <a href="/hub" className="text-center text-sm text-honey hover:underline">
-        전체 목록 보기 →
+      <a
+        href="/hub"
+        className="rounded-xl border border-line bg-surface px-4 py-3 text-center text-sm font-semibold text-ink-soft transition-colors hover:border-accent hover:text-accent"
+      >
+        지금 살 수 있는 것 전부 보기
       </a>
     </main>
   );

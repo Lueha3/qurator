@@ -18,7 +18,7 @@ export function WatchList({ rows }: { rows: WatchRow[] }) {
 
   if (rows.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">
+      <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-ink-soft">
         지켜보는 중인 상품이 없습니다. 딜 카드의 [📈 가격만 지켜보기]로 등록하세요.
       </p>
     );
@@ -32,7 +32,7 @@ export function WatchList({ rows }: { rows: WatchRow[] }) {
             <div className="truncate text-sm font-medium">
               {row.brand} · {row.productName}
             </div>
-            <div className="text-xs text-muted">
+            <div className="text-xs text-ink-soft">
               {row.lastSnapshotLabel ? `마지막 기록 ${row.lastSnapshotLabel}` : "아직 기록 없음"}
             </div>
           </div>

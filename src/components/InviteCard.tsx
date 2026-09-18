@@ -31,7 +31,7 @@ export function InviteCard({ invites }: { invites: InviteView[] }) {
             <li key={invite.id} className="flex items-center justify-between gap-3 text-xs">
               <span className="min-w-0">
                 <b className="text-sm font-medium">{invite.note ?? "이름 없음"}</b>
-                <span className="block text-muted">
+                <span className="block text-ink-soft">
                   {formatExpiry(invite.expiresAt)}까지 · 아직 사용 안 함
                 </span>
               </span>
@@ -55,11 +55,11 @@ export function InviteCard({ invites }: { invites: InviteView[] }) {
 
       {fresh ? (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-muted">
+          <p className="text-xs text-ink-soft">
             이 링크를 보내주세요. <b>30분 뒤 만료</b>되고 <b>한 번만</b> 쓸 수 있습니다. 이 화면을
             벗어나면 다시 볼 수 없습니다.
           </p>
-          <code className="block break-all rounded-lg border border-line bg-background p-3 font-mono text-xs">
+          <code className="block break-all rounded-lg border border-line bg-paper p-3 font-mono text-xs">
             {fresh}
           </code>
           <div className="flex gap-2">
@@ -85,7 +85,7 @@ export function InviteCard({ invites }: { invites: InviteView[] }) {
       ) : (
         <div className="flex flex-col gap-2">
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted">누구에게 보내나요</span>
+            <span className="text-xs font-medium text-ink-soft">누구에게 보내나요</span>
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}

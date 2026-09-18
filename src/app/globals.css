@@ -1,47 +1,51 @@
 @import "tailwindcss";
 
 /*
-  색 토큰 — 값은 눈이 아니라 대비 계산으로 골랐다 (docs/08 §3.5.1).
-  모든 글자 조합이 WCAG AA(본문 4.5:1), 입력 테두리 같은 UI 경계가 3:1을 넘는다.
-  이전 값(honey #c77800, muted #8a8171)은 본문 크기에서 3.4~3.9:1이라 기준 미달이었다.
+  색 토큰 — GrowthPilot 팔레트 이식 (2026-09-18, docs/08 §4.0.7).
+  사용자가 만든 다른 앱(GrowthPilot)과 같은 색감·느낌으로 맞추기로 했다. 값은 그쪽 globals.css의
+  oklch를 그대로 가져오되, 이 앱의 규율(모든 글자 조합 WCAG AA 4.5:1, UI 경계 3:1)에 맞게 두 군데만
+  손봤다: ink-faint를 한 단계 진하게(GrowthPilot 62% → 55%, 3.4:1 → 4.5:1), 앰버 위 글자용 amber-ink 추가
+  (앰버 자체는 2.5:1이라 글자로 못 쓴다). 다크는 GrowthPilot에 없어서 같은 색상(hue)으로 새로 잡았다.
+  검증: scratchpad/tokens-gp.js — 라이트·다크 모든 글자 조합 ≥4.5, 경계 ≥3.
 
-  V3 (2026-09-18, docs/08 §4.0.6): 면은 선이 아니라 그림자로 나눈다. 배경을 한 단계 눌러
-  흰 카드가 떠 보이게 했고(#faf9f7 → #f3f0ea), 상태색 4종과 브랜드 모노그램 8색을 더했다.
-  전부 다시 계산했다 — 라이트·다크 모든 글자 조합이 AA를 넘는다.
+  이름은 GrowthPilot과 같게 했다(paper/surface/ink/ink-soft/ink-faint/accent/amber/line).
+  두 앱을 오가며 고칠 때 같은 이름이 같은 뜻이어야 한다.
 */
 :root {
-  --background: #f3f0ea;
-  --foreground: #1a1714;
-  --panel: #ffffff;
-  /** 장식용 구분선 — 카드 경계. 글자가 아니므로 대비 기준이 없다 */
-  --line: #e9e4dc;
-  /** 조작 가능한 요소의 테두리(입력칸 등) — 3:1을 넘겨야 어디를 눌러야 할지 보인다 */
-  --line-strong: #968c7e;
-  --muted: #6d6355;
-  --honey: #9a5a00;
-  --honey-soft: #fdf0da;
-  /** 강조색 위에 얹는 글자색. 라이트에서는 흰색, 다크에서는 진한 갈색이 된다 */
+  /** 바탕. 종이색 — 카드(surface)가 이 위에 선 하나로 얹힌다 */
+  --paper: oklch(97.5% 0.008 85);
+  /** 카드·입력칸의 면 */
+  --surface: oklch(99.2% 0.004 85);
+  /** 글자 3단계: 본문 / 보조 / 캡션. 셋 다 paper·surface 위에서 4.5:1 이상 */
+  --ink: oklch(24% 0.015 60);
+  --ink-soft: oklch(45% 0.015 60);
+  --ink-faint: oklch(55% 0.012 60);
+  /** 강조 — 짙은 초록. 주 버튼 바탕이자 강조 글자 */
+  --accent: oklch(42% 0.09 155);
+  --accent-soft: oklch(94% 0.025 155);
+  /** 강조색 위에 얹는 글자. 라이트는 흰색, 다크는 짙은 초록 */
   --accent-ink: #ffffff;
-  --ok: #1f6145;
-  --danger: #a1362a;
-
-  /** 카드 그림자. 카드는 이것 하나로 뜬다 — 테두리를 두르지 않는다 */
-  --shadow-card: 0 1px 2px rgb(26 23 20 / 0.05), 0 2px 8px rgb(26 23 20 / 0.06);
+  /** 앰버 — 주의·"지금 할 일". 글자로는 amber-ink를 쓴다 */
+  --amber: oklch(72% 0.15 65);
+  --amber-soft: oklch(95% 0.04 80);
+  --amber-ink: oklch(48% 0.12 65);
+  /** 면을 나누는 선(장식) / 누를 수 있는 것의 테두리(3:1) */
+  --line: oklch(88% 0.012 80);
+  --line-strong: oklch(62% 0.012 60);
+  --danger: oklch(55% 0.19 25);
 
   /**
-   * 상태색 — 후보(무채)·링크 대기(앰버)·승인 대기(허니, 지금 할 일)·승인(초록).
-   * 점으로만 쓰므로 3:1(UI 경계)이 기준이고, 전부 넘는다. 기록 완료(SKIPPED)는 색이 없다 —
-   * 끝난 일에 색을 쓰면 정작 해야 할 일의 색이 묻힌다.
+   * 단계 점 — 후보(회색)·링크 대기(앰버)·발행 준비(진한 앰버, 지금 할 일)·승인(초록).
+   * 점으로만 쓰므로 3:1이 기준. 기록 완료(SKIPPED)는 색이 없다 — 끝난 일에 색을 쓰면 해야 할 일의 색이 묻힌다.
    */
-  --stage-candidate: #968c7e;
-  --stage-awaiting: #c47c1a;
-  --stage-ready: #9a5a00;
-  --stage-approved: #1f6145;
+  --stage-candidate: var(--ink-faint);
+  --stage-awaiting: oklch(62% 0.15 65);
+  --stage-ready: var(--amber-ink);
+  --stage-approved: var(--accent);
 
   /**
-   * 브랜드 모노그램 8색 — 사진 없이 줄마다 시각적 앵커를 주기 위한 것(BrandMark.tsx).
-   * 채도를 낮춘 따뜻한 계열로 묶어 한 화면에 여러 색이 있어도 소란스럽지 않게 했다.
-   * 글자/바탕 대비는 전부 6.4:1 이상.
+   * 브랜드 모노그램 8색 — 사진 없이 줄마다 시각적 앵커(BrandMark.tsx). 채도를 낮춘 따뜻한 계열.
+   * 글자/바탕 대비 전부 6.4:1 이상 (scratchpad/contrast-v3.js).
    */
   --mark-0-bg: #f3ddd4; --mark-0-ink: #7a3420;
   --mark-1-bg: #dfe9de; --mark-1-ink: #2f5236;
@@ -51,58 +55,59 @@
   --mark-5-bg: #e5e9d3; --mark-5-ink: #455119;
   --mark-6-bg: #f5dce3; --mark-6-ink: #752a42;
   --mark-7-bg: #e0e3e8; --mark-7-ink: #374050;
+
+  --duration-fast: 150ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-amber-ink: var(--amber-ink);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-danger: var(--danger);
   --color-stage-candidate: var(--stage-candidate);
   --color-stage-awaiting: var(--stage-awaiting);
   --color-stage-ready: var(--stage-ready);
   --color-stage-approved: var(--stage-approved);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-panel: var(--panel);
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
-  --color-muted: var(--muted);
-  --color-honey: var(--honey);
-  --color-honey-soft: var(--honey-soft);
-  --color-accent-ink: var(--accent-ink);
-  --color-ok: var(--ok);
-  --color-danger: var(--danger);
 
   /*
-    라틴 글자·숫자는 Geist(직접 호스팅), 한글은 기기의 UI 서체를 쓴다.
-    아이폰에서 Apple SD Gothic Neo가 잡히는 것이 목적이다 — 웹폰트로 한글을 받으면
-    수 MB를 추가로 내려받아야 하고, 정작 기기 기본 서체보다 나을 것이 없다.
+    서체는 GrowthPilot과 같다: 기기 서체. 아이폰에서는 Apple SD Gothic Neo가 잡힌다.
+    (이전에는 라틴·숫자만 Geist를 따로 받았는데, 두 앱의 느낌을 맞추면서 뺐다.)
   */
-  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
-    Pretendard, "Noto Sans KR", "Malgun Gothic", sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #16130f;
-    --foreground: #efe9df;
-    --panel: #1e1a15;
-    --line: #342e26;
-    --line-strong: #7d7364;
-    --muted: #a99e8d;
-    --honey: #f2ae3f;
-    --honey-soft: #3a2b11;
-    /* 다크의 강조색은 밝은 앰버다 — 그 위에 흰 글자를 얹으면 2:1까지 떨어진다 */
-    --accent-ink: #231a0b;
-    --ok: #7fc7a4;
-    --danger: #ef8b76;
+    --paper: oklch(19% 0.01 60);
+    --surface: oklch(23.5% 0.01 60);
+    --ink: oklch(93% 0.01 85);
+    --ink-soft: oklch(76% 0.012 80);
+    --ink-faint: oklch(66% 0.012 70);
+    /* 다크의 강조는 밝은 초록 — 그 위 글자는 짙은 초록이어야 10:1이 나온다 */
+    --accent: oklch(80% 0.13 155);
+    --accent-soft: oklch(31% 0.05 155);
+    --accent-ink: oklch(18% 0.05 155);
+    --amber: oklch(80% 0.14 70);
+    --amber-soft: oklch(33% 0.06 70);
+    --amber-ink: oklch(88% 0.12 80);
+    --line: oklch(33% 0.012 70);
+    --line-strong: oklch(55% 0.012 70);
+    --danger: oklch(74% 0.16 25);
 
-    /* 다크에서 그림자는 보이지 않는다 — 대신 카드를 배경보다 한 단계 밝게 하고 1px 링을 두른다 */
-    --panel: #221d17;
-    --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.05);
-
-    --stage-candidate: #7d7364;
-    --stage-awaiting: #e0a04a;
-    --stage-ready: #f2ae3f;
-    --stage-approved: #7fc7a4;
+    --stage-awaiting: var(--amber);
 
     --mark-0-bg: #4a2a20; --mark-0-ink: #f2c4b5;
     --mark-1-bg: #23342a; --mark-1-ink: #b7d4bd;
@@ -116,22 +121,27 @@
 }
 
 /*
-  카드 — V3의 기본 면. 테두리 없이 그림자로 뜬다.
-  이전(V2-H까지)에는 "면은 선으로 나눈다"였는데, 1px 선을 두른 흰 상자가 화면 가득이면
-  서식(form)처럼 읽힌다. 선은 이제 입력칸(어디에 쓰는지 알아야 하므로 3:1)에만 남는다.
+  카드 — 기본 면. GrowthPilot과 같이 종이 위에 선 하나로 얹힌 흰 면이다.
+  (V3에서 잠깐 그림자로 띄웠는데, 두 앱의 느낌을 맞추면서 선으로 돌아왔다. 바탕이 종이색이라
+  흰 면은 선이 있어도 서식처럼 읽히지 않는다.)
 */
 .card {
-  background: var(--panel);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 1rem;
-  box-shadow: var(--shadow-card);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--paper);
+  color: var(--ink);
   font-family: var(--font-sans);
+  letter-spacing: -0.011em;
   /* 가로/세로 전환 시 iOS가 글자를 임의로 키우지 않게 한다 */
   -webkit-text-size-adjust: 100%;
+}
+
+::selection {
+  background: var(--accent-soft);
 }
 
 /*

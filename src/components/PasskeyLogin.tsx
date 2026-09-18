@@ -123,7 +123,7 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
       <div className="flex flex-col gap-3">
         <InAppBrowserNotice />
         <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-muted">이 기기 이름 (기록에 남습니다)</span>
+          <span className="text-xs font-medium text-ink-soft">이 기기 이름 (기록에 남습니다)</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -168,15 +168,15 @@ function Problem({ text }: { text: string | null }) {
 function Note({ state, invite }: { state: State; invite?: boolean }) {
   if (state === "none")
     return (
-      <p className="text-xs text-muted">
+      <p className="text-xs text-ink-soft">
         이 앱에 등록된 패스키가 없습니다. 앱을 관리하는 분께 <b>등록 초대 링크</b>를 요청해주세요.
       </p>
     );
   if (state === "unsupported")
-    return <p className="text-xs text-muted">이 브라우저는 패스키를 지원하지 않습니다.</p>;
+    return <p className="text-xs text-ink-soft">이 브라우저는 패스키를 지원하지 않습니다.</p>;
   if (state === "no-authenticator")
     return (
-      <p className="text-xs text-muted">
+      <p className="text-xs text-ink-soft">
         이 기기에는 Face ID·Touch ID 같은 잠금 해제 수단이 없어 패스키를 쓸 수 없습니다.
       </p>
     );

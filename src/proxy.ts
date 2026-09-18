@@ -110,42 +110,47 @@ function isHttps(req: NextRequest): boolean {
  * 토큰은 여기 적지 않는다(적으면 이 페이지가 곧 토큰 유출 경로가 된다). 어디서 찾는지만 말한다.
  */
 function unauthorizedPage(): NextResponse {
+  // 모양은 로그인 화면(GrowthPilot SetupCard식 가운데 카드)과 같다 — 인라인 CSS라 토큰 대신 같은 hex를 적는다.
   const html = `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>로그인이 필요합니다</title>
+<title>잠겨 있어요 · qurator</title>
 <style>
   :root { color-scheme: light dark; }
   body { margin:0; min-height:100dvh; display:flex; align-items:center; justify-content:center;
-    padding:24px; background:#faf9f7; color:#1a1714;
+    padding:24px 16px; background:#f9f6f1; color:#251e18; letter-spacing:-0.011em;
     font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",Pretendard,"Noto Sans KR",sans-serif; }
-  main { max-width:30rem; }
-  h1 { font-size:1.125rem; margin:0 0 .75rem; }
-  p, li { font-size:.875rem; line-height:1.7; color:#6d6355; margin:0 0 .75rem; }
-  ol { padding-left:1.25rem; margin:0; }
-  b { color:#1a1714; }
-  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; background:#f0ece5;
-    padding:.1em .35em; border-radius:.25em; color:#1a1714; }
-  .cta { display:block; text-align:center; text-decoration:none; background:#9a5a00; color:#fff;
-    font-weight:600; padding:.75rem 1rem; border-radius:.75rem; margin:0 0 1rem; }
+  main { width:100%; max-width:24rem; background:#fefcf9; border:1px solid #dcd7cf; border-radius:1rem; padding:1.75rem;
+    box-shadow:0 1px 2px rgb(0 0 0 / .04); }
+  .emoji { font-size:1.875rem; margin:0; }
+  h1 { font-size:1.25rem; font-weight:700; margin:1rem 0 .5rem; }
+  p { font-size:.875rem; line-height:1.7; color:#5c534d; margin:0 0 .75rem; }
+  .cta { display:block; text-align:center; text-decoration:none; background:#185b37; color:#fff;
+    font-weight:600; font-size:1rem; padding:.8rem 1rem; border-radius:.75rem; margin:1.25rem 0 1rem; }
+  .steps { border-top:1px solid #dcd7cf; padding-top:.9rem; margin-top:.25rem; }
+  .steps p { margin:0 0 .6rem; }
+  b { color:#251e18; }
+  small { display:block; margin-top:.9rem; font-size:.75rem; line-height:1.6; color:#77706b; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; background:#efebe4; padding:.1em .35em; border-radius:.25em; color:#251e18; }
   @media (prefers-color-scheme: dark) {
-    body { background:#16130f; color:#efe9df; }
-    p, li { color:#a99e8d; } b { color:#efe9df; }
-    code { background:#2a251e; color:#efe9df; }
-    .cta { background:#f2ae3f; color:#231a0b; }
+    body { background:#17130f; color:#ebe7e0; }
+    main { background:#221d19; border-color:#39342f; }
+    p { color:#b5b0a9; } b { color:#ebe7e0; } small { color:#97918a; }
+    code { background:#39342f; color:#ebe7e0; }
+    .steps { border-color:#39342f; }
+    .cta { background:#72d699; color:#001807; }
   }
 </style></head>
 <body><main>
-  <h1>🔒 로그인이 필요합니다</h1>
-  <p>이 주소는 커미션 링크가 들어 있는 작업 화면이라 아무나 열 수 없습니다.</p>
-  <p><a class="cta" href="/login">🔓 Face ID로 열기</a></p>
-  <ol>
-    <li>위 버튼이 안 되면 <b>홈 화면에 추가한 앱 아이콘</b>으로 열어보세요.</li>
-    <li>그래도 이 화면이면 <code>?k=</code> 주소로 <b>한 번만</b> 열면 됩니다. 그 뒤로는
-      주소만 쳐도 들어와집니다(90일, 쓸 때마다 갱신).</li>
-  </ol>
-  <p><b>Safari에서 방금 이 화면을 보셨다면</b> 그게 정상입니다 — 아이폰은 홈 화면 앱과 Safari가
-    로그인을 따로 기억합니다. 두 곳에서 다 쓰시려면 각각 한 번씩 <code>?k=</code>로 열어주세요.</p>
+  <p class="emoji" aria-hidden="true">🔒</p>
+  <h1>잠겨 있어요</h1>
+  <p>이 화면에는 내 링크가 들어 있어서 아무나 열 수 없어요.</p>
+  <a class="cta" href="/login">🔓 Face ID로 열기</a>
+  <div class="steps">
+    <p><b>처음이신가요?</b> 이 주소로는 등록이 안 돼요. 관리자에게 받은 <b>등록 링크</b>(주소 끝에 <code>?invite=</code>가 붙은 것)를 Safari에서 열어주세요.</p>
+    <p><b>홈 화면 앱으로 쓰고 계셨나요?</b> 그 아이콘으로 열어주세요. 아이폰은 Safari와 홈 화면 앱의 로그인을 따로 기억해요.</p>
+  </div>
+  <small>관리자용: <code>?k=</code> 주소로 한 번 열면 90일 동안 유지돼요.</small>
 </main></body></html>`;
   return new NextResponse(html, {
     status: 401,

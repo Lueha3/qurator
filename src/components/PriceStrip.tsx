@@ -18,9 +18,9 @@ function Cell({
   tone?: "normal" | "muted";
 }) {
   return (
-    <div className="flex-1 rounded-xl bg-background px-3 py-2">
-      <div className="text-[11px] text-muted">{label}</div>
-      <div className={`mt-0.5 text-sm ${tone === "muted" ? "text-muted" : "font-medium"}`}>
+    <div className="flex-1 rounded-xl bg-paper px-3 py-2">
+      <div className="text-[11px] text-ink-soft">{label}</div>
+      <div className={`mt-0.5 text-sm ${tone === "muted" ? "text-ink-soft" : "font-medium"}`}>
         {children}
       </div>
     </div>
@@ -33,7 +33,7 @@ function EventCell({ event }: { event: PriceEventDTO }) {
   // 쿠폰가 라인은 두 분기(실할인 있음/없음) 모두에서 조건이 같아 한 번만 만든다 —
   // "작년 vs 올해"를 나란히 볼 때 쿠폰가 유무로 줄 수가 흔들리면 비교가 깨진다.
   const couponLine = event.couponPrice !== null && (
-    <div className="text-xs font-normal text-muted">
+    <div className="text-xs font-normal text-ink-soft">
       쿠폰가 {formatKRW(event.couponPrice)}
       {event.couponDiscountRate !== null && ` · 실할인 ${event.couponDiscountRate}%`}
     </div>
@@ -43,8 +43,8 @@ function EventCell({ event }: { event: PriceEventDTO }) {
   if (event.realDiscountRate !== null) {
     return (
       <Cell label={label}>
-        {event.realDiscountRate}%<span className="ml-1.5 text-xs text-muted">실할인</span>
-        <div className="text-xs font-normal text-muted">{formatKRW(event.salePrice)}</div>
+        {event.realDiscountRate}%<span className="ml-1.5 text-xs text-ink-soft">실할인</span>
+        <div className="text-xs font-normal text-ink-soft">{formatKRW(event.salePrice)}</div>
         {couponLine}
       </Cell>
     );
@@ -54,13 +54,13 @@ function EventCell({ event }: { event: PriceEventDTO }) {
     <Cell label={label}>
       {formatKRW(event.salePrice)}
       {event.listDiscountRate !== null && (
-        <span className="ml-1.5 text-xs text-muted">정가 대비 {event.listDiscountRate}%</span>
+        <span className="ml-1.5 text-xs text-ink-soft">정가 대비 {event.listDiscountRate}%</span>
       )}
       {/*
         기준가 진행률은 "앞으로 모이면 실할인율이 나온다"는 뜻이다.
         수동 입력 행사(시스템 이전의 과거)는 표본이 영영 오지 않으므로 진행률을 띄우면 거짓말이 된다.
       */}
-      <div className="text-xs font-normal text-muted">
+      <div className="text-xs font-normal text-ink-soft">
         {event.manualOnly
           ? "기록 이전 행사 — 실할인율 없음"
           : `기준가 수집 ${event.baselineSampleSize}/3`}
@@ -80,7 +80,7 @@ function FirstRecordCell({ history }: { history: PriceHistoryDTO }) {
     return (
       <Cell label="행사 기록" tone="muted">
         아직 없음
-        <div className="text-xs font-normal text-muted">
+        <div className="text-xs font-normal text-ink-soft">
           스냅샷 {history.snapshotCount}건 수집 중
         </div>
       </Cell>
@@ -92,11 +92,11 @@ function FirstRecordCell({ history }: { history: PriceHistoryDTO }) {
     <Cell label="첫 기록">
       {formatKRW(history.firstSalePrice)}
       {rate !== null && rate !== 0 && (
-        <span className="ml-1.5 text-xs text-muted">
+        <span className="ml-1.5 text-xs text-ink-soft">
           현재 대비 {rate > 0 ? `${rate}% 하락` : `${Math.abs(rate)}% 상승`}
         </span>
       )}
-      <div className="text-xs font-normal text-muted">
+      <div className="text-xs font-normal text-ink-soft">
         {history.firstCapturedLabel} 기록
         {history.firstCouponPrice !== null && ` · 쿠폰가 ${formatKRW(history.firstCouponPrice)}`}
       </div>
@@ -123,9 +123,9 @@ export function PriceStrip({ history }: { history: PriceHistoryDTO }) {
           <>
             {formatKRW(history.currentCouponPrice ?? history.currentSalePrice)}
             {history.currentCouponPrice !== null && (
-              <span className="ml-1.5 text-xs text-muted">쿠폰가</span>
+              <span className="ml-1.5 text-xs text-ink-soft">쿠폰가</span>
             )}
-            <div className="text-xs font-normal text-muted">
+            <div className="text-xs font-normal text-ink-soft">
               {history.currentCapturedLabel} 기준 · 스냅샷 {history.snapshotCount}건
             </div>
           </>

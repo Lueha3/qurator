@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { CopyPane } from "@/components/CopyPane";
 import { StatTile } from "@/components/StatTile";
 import { DealListRow } from "@/components/DealListRow";
+import { emptyCls } from "@/components/form";
 
 // 홈 — docs/08 §3.3. 열면 3초 안에 "지금 할 일"이 보이는 것이 이 화면의 전부다.
 // 할 일이 없으면 그 블록 자체를 그리지 않는다(없는 데이터를 그리지 않는다 — PriceStrip과 같은 원칙).
@@ -50,18 +51,18 @@ export default async function HomePage() {
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-7 px-4 pb-6 pt-2">
         {todo.length > 0 && (
           <section className="flex flex-col gap-2">
-            <h2 className="text-[13px] font-medium text-muted">오늘 할 일</h2>
+            <h2 className="text-[13px] font-medium text-ink-soft">오늘 할 일</h2>
             <div className="card divide-y divide-line">
               {todo.map((item) => (
                 <Link
                   key={item.stage}
                   href={item.href}
-                  className="flex items-center gap-3 px-4 py-3.5 transition-colors active:bg-background"
+                  className="flex items-center gap-3 px-4 py-3.5 transition-colors active:bg-paper"
                 >
                   <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${STAGE_DOT[item.stage]}`} />
                   <span className="flex-1 text-[15px] font-medium">{item.label}</span>
-                  <span className="text-[17px] font-semibold tabular-nums text-honey">{item.count}</span>
-                  <span aria-hidden className="text-muted">›</span>
+                  <span className="text-[17px] font-semibold tabular-nums text-accent">{item.count}</span>
+                  <span aria-hidden className="text-ink-soft">›</span>
                 </Link>
               ))}
             </div>
@@ -74,12 +75,12 @@ export default async function HomePage() {
             {deadLinks.map((alert) => (
               <div key={alert.dealId} className="card border-l-[3px] border-danger p-4">
                 <p className="text-[15px] font-semibold">{alert.productName}</p>
-                <p className="text-xs text-muted">
+                <p className="text-xs text-ink-soft">
                   {alert.brand}
                   {alert.priceLabel && ` · ${alert.priceLabel}`} · {HEALTH_LABEL[alert.health]} 확정
                   {alert.confirmedAt && ` · ${formatRelativeFromNow(alert.confirmedAt, now)}`}
                 </p>
-                <p className="mb-3 mt-1 text-xs text-muted">
+                <p className="mb-3 mt-1 text-xs text-ink-soft">
                   링크허브에서 내렸고, 이미 나간 링크는 안내 페이지로 갑니다.
                 </p>
                 <CopyPane text={alert.correction} label="📋 정정 공지 복사" />
@@ -89,19 +90,19 @@ export default async function HomePage() {
         )}
 
         {reminders.length > 0 && (
-          <section className="rounded-2xl border-l-[3px] border-honey bg-honey-soft/70 px-4 py-3.5">
-            <h2 className="text-[15px] font-semibold text-honey">오늘 가격을 기록할 상품 {reminders.length}개</h2>
-            <p className="mb-2.5 text-xs text-muted">
+          <section className="rounded-2xl border border-amber bg-amber-soft px-4 py-3.5">
+            <h2 className="text-[15px] font-semibold text-amber-ink">오늘 가격을 기록할 상품 {reminders.length}개</h2>
+            <p className="mb-2.5 text-xs text-ink-soft">
               무신사 앱에서 열어 다시 찍어 올려주세요 — 올리는 순간 가격이 기록됩니다 (자동 수집은 하지 않습니다).
             </p>
             <ul className="flex flex-col gap-1.5 text-sm">
               {reminders.map((item) => (
                 <li key={item.productId} className="flex items-baseline justify-between gap-3">
                   <span className="truncate">
-                    <span className="text-muted">{item.brandName} · </span>
+                    <span className="text-ink-soft">{item.brandName} · </span>
                     <span className="font-medium">{item.productName}</span>
                   </span>
-                  <span className="shrink-0 text-[11px] text-muted">
+                  <span className="shrink-0 text-[11px] text-ink-soft">
                     {item.lastSnapshotAt ? `마지막 기록 ${formatRelativeFromNow(item.lastSnapshotAt, now)}` : "아직 기록 없음"}
                   </span>
                 </li>
@@ -112,8 +113,8 @@ export default async function HomePage() {
 
         <section className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-[13px] font-medium text-muted">지난 7일</h2>
-            <Link href="/stats" className="text-xs font-medium text-honey">
+            <h2 className="text-[13px] font-medium text-ink-soft">지난 7일</h2>
+            <Link href="/stats" className="text-xs font-medium text-accent">
               성과 보기
             </Link>
           </div>
@@ -126,13 +127,13 @@ export default async function HomePage() {
 
         <section className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-[13px] font-medium text-muted">최근 캡처</h2>
-            <Link href="/deals" className="text-xs font-medium text-honey">
+            <h2 className="text-[13px] font-medium text-ink-soft">최근 캡처</h2>
+            <Link href="/deals" className="text-xs font-medium text-accent">
               전체 보기
             </Link>
           </div>
           {recent.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-line-strong/50 p-8 text-center text-sm text-muted">
+            <p className={emptyCls}>
               아직 딜이 없습니다. 무신사 앱에서 상품 화면을 찍고 [📷 올리기]로 올려보세요.
             </p>
           ) : (

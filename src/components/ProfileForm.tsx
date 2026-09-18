@@ -53,7 +53,7 @@ export function ProfileForm({
         />
       </Field>
       {message && (
-        <p className={`rounded-md px-3 py-2 text-sm ${message.tone === "ok" ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>
+        <p className={`rounded-md px-3 py-2 text-sm ${message.tone === "ok" ? "bg-accent-soft text-accent" : "bg-danger/10 text-danger"}`}>
           {message.text}
         </p>
       )}

@@ -17,17 +17,17 @@ export function DealCard({ card }: { card: CardDTO }) {
   const limit = CHANNEL_LIMIT[card.channel];
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl bg-background">
+    <div className="flex flex-col overflow-hidden rounded-xl bg-paper">
       <div className="flex items-center justify-between border-b border-line px-3 py-2">
         <span className="text-sm font-medium">{CHANNEL_LABEL[card.channel]}</span>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs text-muted">
+          <span className="font-mono text-xs text-ink-soft">
             {card.charCount}
             {limit ? `/${limit}` : ""}자
           </span>
           <span
             className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
-              card.disclosureOk ? "bg-ok/15 text-ok" : "bg-danger/15 text-danger"
+              card.disclosureOk ? "bg-accent-soft text-accent" : "bg-danger/15 text-danger"
             }`}
           >
             {card.disclosureOk ? "고지 OK" : "고지 실패"}
@@ -47,9 +47,9 @@ export function DealCard({ card }: { card: CardDTO }) {
       )}
       <div className="flex items-center justify-between border-t border-line px-3 py-2">
         {card.aiGeneratedFields.includes("hookLine") ? (
-          <span className="text-[11px] text-muted">AI 훅 초안</span>
+          <span className="text-[11px] text-ink-soft">AI 훅 초안</span>
         ) : (
-          <span className="text-[11px] text-muted">&nbsp;</span>
+          <span className="text-[11px] text-ink-soft">&nbsp;</span>
         )}
         <CopyButton text={card.bodyText} cardId={card.id} />
       </div>

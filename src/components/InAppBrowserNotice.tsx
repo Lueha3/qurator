@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { detectInAppBrowser } from "./in-app-browser";
+import { noticeCls } from "./form";
 
 // 인앱 브라우저 경고 — docs/03 §7.1·§7.2. 시도하기 **전에** 보여준다.
 //
@@ -38,7 +39,7 @@ export function InAppBrowserNotice() {
   if (!appName) return null;
 
   return (
-    <div className="rounded-lg border border-honey/40 bg-honey-soft px-3 py-2.5 text-xs leading-relaxed">
+    <div className={noticeCls}>
       <p>
         <b>{appName}</b> 안에서 열려 있어 <b>Face ID를 쓸 수 없습니다.</b> 더보기(⋯) 또는 공유 버튼에서{" "}
         <b>“Safari로 열기”</b>를 선택해 다시 시도해주세요.
@@ -47,7 +48,7 @@ export function InAppBrowserNotice() {
         <p className="mt-1.5">
           메뉴가 안 보이면 아래 주소를 길게 눌러 “Safari에서 열기”를 선택하세요:
           <br />
-          <a href={url} className="break-all text-honey underline">
+          <a href={url} className="break-all font-semibold underline">
             {url}
           </a>
         </p>

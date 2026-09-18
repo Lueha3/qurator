@@ -6,6 +6,8 @@ import { PasskeyLogin } from "@/components/PasskeyLogin";
 //
 // 초대 코드는 검사하지 않고 그대로 넘긴다. 유효한지는 라우트가 판정한다 — 이 화면이
 // "이 코드는 살아 있다"를 알려주면 코드를 긁는 도구에게 답을 주는 꼴이 된다.
+//
+// 모양은 GrowthPilot의 첫 화면(SetupCard)과 같다: 가운데 카드 하나, 손 흔드는 이모지, 제목 한 줄, 설명 한 문단.
 export const metadata = { title: "로그인 · qurator" };
 
 export default async function LoginPage(props: PageProps<"/login">) {
@@ -13,22 +15,27 @@ export default async function LoginPage(props: PageProps<"/login">) {
   const code = typeof invite === "string" ? invite : undefined;
 
   return (
-    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-5 px-6 py-10">
-      <div>
-        <h1 className="text-lg font-semibold">qurator</h1>
-        <p className="mt-1 text-sm text-muted">
+    <main className="flex min-h-dvh items-center justify-center px-4 py-10">
+      <div className="card w-full max-w-sm p-7 shadow-sm">
+        <p className="text-3xl" aria-hidden>
+          {code ? "👋" : "🔒"}
+        </p>
+        <h1 className="mt-4 text-xl font-bold">{code ? "이 폰을 등록할게요" : "qurator"}</h1>
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
           {code
-            ? "이 기기를 등록하면, 다음부터는 얼굴만 보면 열립니다."
-            : "커미션 링크가 들어 있는 작업 화면이라 잠겨 있습니다."}
+            ? "한 번만 등록하면, 다음부터는 주소만 열고 얼굴만 보면 들어와져요."
+            : "내 링크가 들어 있는 작업 화면이라 잠겨 있어요. Face ID로 열어주세요."}
+        </p>
+
+        <div className="mt-6">
+          <PasskeyLogin invite={code} />
+        </div>
+
+        <p className="mt-5 text-xs leading-relaxed text-ink-faint">
+          얼굴 정보는 폰 밖으로 나가지 않아요. 아이클라우드에 함께 저장돼서 Safari·홈 화면 앱·맥 어디서든
+          같은 얼굴로 열려요.
         </p>
       </div>
-
-      <PasskeyLogin invite={code} />
-
-      <p className="text-xs leading-relaxed text-muted">
-        패스키는 이 기기 안에서만 만들어지고 나가지 않습니다. 아이클라우드 키체인에 저장되므로
-        Safari·홈 화면 앱·맥 어디서든 같은 얼굴로 열립니다.
-      </p>
     </main>
   );
 }

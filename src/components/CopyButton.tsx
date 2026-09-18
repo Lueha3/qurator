@@ -23,8 +23,8 @@ export function CopyButton({ text, cardId }: { text: string; cardId: string }) {
       onClick={handleCopy}
       className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
         copied
-          ? "bg-ok/15 text-ok"
-          : "bg-honey text-accent-ink hover:opacity-90"
+          ? "bg-accent-soft text-accent"
+          : "bg-accent text-accent-ink hover:opacity-90"
       }`}
     >
       {copied ? "복사됨" : "복사"}

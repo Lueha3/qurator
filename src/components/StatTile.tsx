@@ -31,12 +31,12 @@ export function StatTile({
 
   const body = (
     <>
-      <div className="text-[11px] font-medium text-muted">{label}</div>
+      <div className="text-[11px] font-medium text-ink-soft">{label}</div>
       {/* 큰 숫자에는 tabular-nums를 쓰지 않는다 — 자릿폭이 같아져 121 같은 값이 헐거워 보인다 */}
       <div className="mt-1 text-[22px] font-semibold leading-none tracking-tight">
         {value.toLocaleString("ko-KR")}
       </div>
-      <div className={`mt-1.5 text-[11px] leading-4 ${delta?.up ? "text-ok" : "text-muted"}`}>
+      <div className={`mt-1.5 text-[11px] leading-4 ${delta?.up ? "text-accent" : "text-ink-soft"}`}>
         {delta?.text ?? " "}
       </div>
     </>

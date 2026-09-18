@@ -59,7 +59,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
       <header className="mb-3 flex items-start gap-3">
         <BrandMark brand={deal.brand} size="lg" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 text-[11px] leading-4 text-muted">
+          <div className="flex items-center gap-1.5 text-[11px] leading-4 text-ink-soft">
             <span className="truncate">{deal.brand}</span>
             <span aria-hidden>·</span>
             <span className="flex shrink-0 items-center gap-1">
@@ -72,11 +72,11 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
           </div>
           <h3 className="mt-0.5 text-[17px] font-semibold leading-snug tracking-tight">
             {deal.productName}
-            {deal.styleCode ? <span className="whitespace-nowrap text-sm font-normal text-muted"> · {deal.styleCode}</span> : null}
+            {deal.styleCode ? <span className="whitespace-nowrap text-sm font-normal text-ink-soft"> · {deal.styleCode}</span> : null}
           </h3>
           <p className="mt-0.5 text-sm">
             {dealPriceLine(deal)}
-            {deal.couponDesc ? <span className="text-muted"> · 쿠폰 {deal.couponDesc}</span> : null}
+            {deal.couponDesc ? <span className="text-ink-soft"> · 쿠폰 {deal.couponDesc}</span> : null}
           </p>
         </div>
       </header>
@@ -86,7 +86,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
       {deal.approvalStage === "CANDIDATE" && (
         <div className="flex flex-col gap-3">
           {deal.priceChangeNote && (
-            <pre className="whitespace-pre-wrap rounded-md bg-honey-soft px-3 py-2 font-sans text-sm text-honey">
+            <pre className="whitespace-pre-wrap rounded-md bg-accent-soft px-3 py-2 font-sans text-sm text-accent">
               {deal.priceChangeNote}
             </pre>
           )}
@@ -94,7 +94,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
             <p className="text-sm text-danger">⚠️ 상품 정보를 읽지 못했습니다. [✏️ 정보 고치기]로 채워주세요.</p>
           )}
           {deal.parseSource === "opengraph" && (
-            <p className="text-sm text-muted">일부 정보만 읽었습니다 — 승인 전 확인해주세요.</p>
+            <p className="text-sm text-ink-soft">일부 정보만 읽었습니다 — 승인 전 확인해주세요.</p>
           )}
           {canProceed && (
             <button
@@ -137,13 +137,13 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
         <div className="flex flex-col gap-3">
           <p className="text-sm">
             📎 <b>큐레이터 링크를 붙여넣어 주세요.</b>{" "}
-            <span className="text-muted">큐레이터센터에서 링크를 만든 뒤 그대로 붙여넣으면 카드가 완성됩니다.</span>
+            <span className="text-ink-soft">큐레이터센터에서 링크를 만든 뒤 그대로 붙여넣으면 카드가 완성됩니다.</span>
           </p>
           <a
             href={curatorShopUrl ?? CURATOR_CENTER}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-lg border border-line px-3 py-2.5 text-center text-sm font-medium hover:border-honey"
+            className="rounded-lg border border-line px-3 py-2.5 text-center text-sm font-medium hover:border-accent"
           >
             🔗 큐레이터센터 열기
           </a>
@@ -192,10 +192,10 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
           {deal.hookLine ? (
             <p className="text-sm">
               💬 <b>{deal.hookLine}</b>
-              {deal.hookSource === "ai" && <span className="ml-1 text-[11px] text-muted">AI 초안</span>}
+              {deal.hookSource === "ai" && <span className="ml-1 text-[11px] text-ink-soft">AI 초안</span>}
             </p>
           ) : (
-            <p className="text-sm text-muted">훅 문구 없음 — 아래에서 넣을 수 있습니다.</p>
+            <p className="text-sm text-ink-soft">훅 문구 없음 — 아래에서 넣을 수 있습니다.</p>
           )}
           <div className="flex gap-2">
             <input
@@ -214,21 +214,21 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
                   else setHookText("");
                 })
               }
-              className="shrink-0 rounded-lg border border-line px-3 text-sm font-medium hover:border-honey disabled:opacity-50"
+              className="shrink-0 rounded-lg border border-line px-3 text-sm font-medium hover:border-accent disabled:opacity-50"
             >
               ✏️ 훅 교체
             </button>
           </div>
 
-          <p className="text-xs text-muted">🔗 링크 {deal.linkCount}개</p>
+          <p className="text-xs text-ink-soft">🔗 링크 {deal.linkCount}개</p>
 
           {kakao && (
             <div className="rounded-lg border border-line">
-              <div className="flex items-center justify-between border-b border-line px-3 py-1.5 text-xs text-muted">
+              <div className="flex items-center justify-between border-b border-line px-3 py-1.5 text-xs text-ink-soft">
                 <span>카톡 오픈채팅 미리보기 — 보이는 그대로 나갑니다</span>
                 <span>
                   {kakao.charCount}자 ·{" "}
-                  <span className={kakao.disclosureOk ? "text-ok" : "text-danger"}>
+                  <span className={kakao.disclosureOk ? "text-accent" : "text-danger"}>
                     {kakao.disclosureOk ? "고지 OK" : "고지 실패"}
                   </span>
                 </span>
@@ -267,8 +267,8 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
       {deal.approvalStage === "APPROVED" && (
         <div className="flex flex-col gap-3">
           {deal.soldOut ? (
-            <p className="text-sm text-muted">
-              🚫 <b className="text-foreground">품절로 표시됨</b> — 링크허브에서 내려갔고, 이미 나간 링크는
+            <p className="text-sm text-ink-soft">
+              🚫 <b className="text-ink">품절로 표시됨</b> — 링크허브에서 내려갔고, 이미 나간 링크는
               안내 페이지로 갑니다.
             </p>
           ) : (
@@ -277,7 +277,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
           {kakao && <CopyPane text={kakao.bodyText} cardId={kakao.id} />}
           {others.length > 0 && (
             <details className="rounded-lg border border-line">
-              <summary className="cursor-pointer px-3 py-2 text-sm text-muted">
+              <summary className="cursor-pointer px-3 py-2 text-sm text-ink-soft">
                 다른 채널 문구 (스레드 · 인스타 고정댓글 · 노션)
               </summary>
               <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2">
@@ -314,7 +314,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
       )}
 
       {deal.approvalStage === "SKIPPED" && (
-        <p className="text-sm text-muted">✔️ 기록 완료 — 가격은 저장했고, 발행은 하지 않았습니다.</p>
+        <p className="text-sm text-ink-soft">✔️ 기록 완료 — 가격은 저장했고, 발행은 하지 않았습니다.</p>
       )}
 
       {deal.approvalStage !== "APPROVED" && deal.approvalStage !== "SKIPPED" && (
@@ -331,16 +331,16 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
       {editing && <DealEditForm deal={deal} onClose={() => setEditing(false)} />}
 
       {showGuide && (
-        <div className="mt-3 rounded-lg bg-background p-3 text-xs leading-relaxed text-muted">
-          <p className="mb-1"><b className="text-foreground">✅ 이 상품 올릴게요</b> — 발행 준비를 시작합니다. 큐레이터센터에서 링크를 만들어 붙여넣으면 카톡 문구가 완성됩니다. <i>바로 발행되지 않습니다 — 마지막에 승인 단계가 있습니다.</i></p>
-          <p className="mb-1"><b className="text-foreground">📈 가격만 지켜보기</b> — 지금 올리진 않지만 가격 변화를 계속 보고 싶을 때. 나중에 같은 상품을 다시 찍어 올리면 “그때 얼마 → 지금 얼마”가 자동으로 비교됩니다.</p>
-          <p className="mb-1"><b className="text-foreground">✔️ 기록 완료</b> — 이 카드를 닫습니다. <i>삭제가 아닙니다</i> — 스크린샷을 올린 순간 가격은 이미 저장됐으니, 발행만 하지 않고 끝내는 것입니다.</p>
-          <p className="mb-1"><b className="text-foreground">✏️ 정보 고치기</b> — 브랜드·상품명·가격을 잘못 읽었을 때 바로잡습니다.</p>
-          <p>💡 <b className="text-foreground">스크린샷을 올리는 것만으로 가격은 항상 기록됩니다.</b> 버튼은 “이 다음에 무엇을 할지”를 고르는 것입니다.</p>
+        <div className="mt-3 rounded-lg bg-paper p-3 text-xs leading-relaxed text-ink-soft">
+          <p className="mb-1"><b className="text-ink">✅ 이 상품 올릴게요</b> — 발행 준비를 시작합니다. 큐레이터센터에서 링크를 만들어 붙여넣으면 카톡 문구가 완성됩니다. <i>바로 발행되지 않습니다 — 마지막에 승인 단계가 있습니다.</i></p>
+          <p className="mb-1"><b className="text-ink">📈 가격만 지켜보기</b> — 지금 올리진 않지만 가격 변화를 계속 보고 싶을 때. 나중에 같은 상품을 다시 찍어 올리면 “그때 얼마 → 지금 얼마”가 자동으로 비교됩니다.</p>
+          <p className="mb-1"><b className="text-ink">✔️ 기록 완료</b> — 이 카드를 닫습니다. <i>삭제가 아닙니다</i> — 스크린샷을 올린 순간 가격은 이미 저장됐으니, 발행만 하지 않고 끝내는 것입니다.</p>
+          <p className="mb-1"><b className="text-ink">✏️ 정보 고치기</b> — 브랜드·상품명·가격을 잘못 읽었을 때 바로잡습니다.</p>
+          <p>💡 <b className="text-ink">스크린샷을 올리는 것만으로 가격은 항상 기록됩니다.</b> 버튼은 “이 다음에 무엇을 할지”를 고르는 것입니다.</p>
         </div>
       )}
 
-      {notice && <p className="mt-3 rounded-md bg-honey-soft px-3 py-2 text-sm text-honey">{notice}</p>}
+      {notice && <p className="mt-3 rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">{notice}</p>}
       {error && <p className="mt-3 rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
     </article>
   );

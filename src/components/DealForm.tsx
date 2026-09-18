@@ -239,11 +239,11 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
 
       <div>
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-xs font-medium text-muted">색상별 링크 (선택)</span>
+          <span className="text-xs font-medium text-ink-soft">색상별 링크 (선택)</span>
           <button
             type="button"
             onClick={addColorLink}
-            className="text-xs font-medium text-honey hover:underline"
+            className="text-xs font-medium text-accent hover:underline"
           >
             + 색상 추가
           </button>
@@ -287,7 +287,7 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
         />
       </Field>
 
-      <label className="flex items-center gap-2 text-sm text-muted">
+      <label className="flex items-center gap-2 text-sm text-ink-soft">
         <input
           type="checkbox"
           checked={useAiHook}
@@ -304,7 +304,7 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-md bg-honey px-4 py-2.5 font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50"
+        className="rounded-md bg-accent px-4 py-2.5 font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50"
       >
         {submitting ? "카드 생성 중…" : "카드 생성"}
       </button>

@@ -100,7 +100,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
             <li key={key.id} className="flex items-center justify-between gap-3 text-xs">
               <span className="min-w-0">
                 <b className="text-sm font-medium">{key.label ?? "기기"}</b>
-                <span className="block text-muted">
+                <span className="block text-ink-soft">
                   {key.lastUsedAt
                     ? `마지막 사용 ${formatDay(key.lastUsedAt)}`
                     : `등록 ${formatDay(key.createdAt)} · 아직 사용 안 함`}
@@ -125,7 +125,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
       )}
 
       <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted">이 기기 이름 (작업 기록에 남습니다)</span>
+        <span className="text-xs font-medium text-ink-soft">이 기기 이름 (작업 기록에 남습니다)</span>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -139,7 +139,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
         {busy ? "등록 중…" : passkeys.length > 0 ? "이 기기도 등록하기" : "이 기기에 Face ID 등록"}
       </button>
 
-      {note && <p className="rounded-md bg-ok/10 px-3 py-2 text-sm text-ok">{note}</p>}
+      {note && <p className="rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">{note}</p>}
       {problem && (
         <p className="rounded-md bg-danger/10 px-3 py-2 text-sm leading-relaxed text-danger">
           {problem}

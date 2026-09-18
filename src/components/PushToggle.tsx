@@ -112,11 +112,11 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
     }
   }
 
-  if (state === "loading") return <p className="text-xs text-muted">확인 중…</p>;
+  if (state === "loading") return <p className="text-xs text-ink-soft">확인 중…</p>;
 
   if (state === "no-keys")
     return (
-      <p className="text-xs text-muted">
+      <p className="text-xs text-ink-soft">
         서버에 알림 키(<code className="font-mono">VAPID_PUBLIC_KEY</code>)가 없습니다. Vercel 환경변수에
         등록하면 이 자리에 스위치가 생깁니다.
       </p>
@@ -124,14 +124,14 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
 
   if (state === "needs-install")
     return (
-      <p className="text-xs text-muted">
+      <p className="text-xs text-ink-soft">
         아이폰은 <b>홈 화면에 추가한 앱</b>에서만 알림을 켤 수 있습니다. 홈 화면 아이콘으로 이 앱을 연 뒤
         설정 탭에 다시 오면 스위치가 보입니다.
       </p>
     );
 
   if (state === "unsupported")
-    return <p className="text-xs text-muted">이 브라우저는 웹 알림을 지원하지 않습니다.</p>;
+    return <p className="text-xs text-ink-soft">이 브라우저는 웹 알림을 지원하지 않습니다.</p>;
 
   if (state === "denied")
     return (
@@ -158,7 +158,7 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
           </button>
         )}
       </div>
-      {note && <p className="text-xs text-muted">{note}</p>}
+      {note && <p className="text-xs text-ink-soft">{note}</p>}
     </div>
   );
 }

@@ -53,7 +53,7 @@ export function DealEditForm({ deal, onClose }: { deal: DealDTO; onClose: () => 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-3 flex flex-col gap-3 rounded-lg border border-line bg-background p-3">
+    <form onSubmit={handleSubmit} className="mt-3 flex flex-col gap-3 rounded-lg border border-line bg-paper p-3">
       <div className="grid grid-cols-2 gap-3">
         <Field label="브랜드">
           <input value={form.brand} onChange={(e) => set("brand", e.target.value)} placeholder="쿠어" className={inputCls} />
@@ -110,7 +110,7 @@ export function DealEditForm({ deal, onClose }: { deal: DealDTO; onClose: () => 
       <Field label={`링크허브 섹션 태그 (쉼표로 구분, 최대 ${MAX_TAGS}개)`}>
         <input value={form.tags} onChange={(e) => set("tags", e.target.value)} placeholder="가을 아우터, BF 픽" className={inputCls} />
       </Field>
-      <p className="-mt-2 text-xs text-muted">
+      <p className="-mt-2 text-xs text-ink-soft">
         태그를 붙이면 링크허브에서 그 이름의 섹션으로 묶입니다. 비워두면 “오늘의 꿀매”에 들어갑니다.
       </p>
 

@@ -33,7 +33,7 @@ export function DealListRow({ deal, trailing, hideSavedTag, href, onOpen }: RowP
     <>
       <BrandMark brand={deal.brand} />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 text-[11px] leading-4 text-muted">
+        <div className="flex items-center gap-1.5 text-[11px] leading-4 text-ink-soft">
           <span className="truncate">{deal.brand}</span>
           <span aria-hidden>·</span>
           <span className="flex shrink-0 items-center gap-1">
@@ -41,12 +41,12 @@ export function DealListRow({ deal, trailing, hideSavedTag, href, onOpen }: RowP
             {STAGE_LABEL[deal.approvalStage]}
           </span>
           {deal.watchActive && !hideSavedTag && (
-            <span className="shrink-0 text-honey">· 저장함</span>
+            <span className="shrink-0 text-accent">· 저장함</span>
           )}
           {deal.parseSource === "none" && <span className="shrink-0 text-danger">· 정보 없음</span>}
         </div>
 
-        <div className={`mt-0.5 truncate text-[15px] font-semibold leading-snug ${done ? "text-muted" : ""}`}>
+        <div className={`mt-0.5 truncate text-[15px] font-semibold leading-snug ${done ? "text-ink-soft" : ""}`}>
           {deal.productName}
         </div>
 
@@ -55,9 +55,9 @@ export function DealListRow({ deal, trailing, hideSavedTag, href, onOpen }: RowP
             <span className="text-xs font-medium text-danger">⚠️ 가격 미확인 — 정보 고치기 필요</span>
           ) : (
             <>
-              <span className={`font-semibold ${done ? "text-muted" : ""}`}>{formatKRW(price.effective!)}</span>
+              <span className={`font-semibold ${done ? "text-ink-soft" : ""}`}>{formatKRW(price.effective!)}</span>
               {price.list != null && (
-                <span className="text-xs text-muted line-through">{formatKRW(price.list)}</span>
+                <span className="text-xs text-ink-soft line-through">{formatKRW(price.list)}</span>
               )}
             </>
           )}
@@ -66,13 +66,13 @@ export function DealListRow({ deal, trailing, hideSavedTag, href, onOpen }: RowP
 
       <div className="flex shrink-0 flex-col items-end gap-1.5 self-stretch">
         {price.discountRate != null && price.discountRate > 0 ? (
-          <span className="rounded-md bg-honey px-1.5 py-0.5 text-[11px] font-bold leading-4 text-accent-ink">
+          <span className="rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-bold leading-4 text-accent-ink">
             {price.discountRate}%
           </span>
         ) : (
           <span className="h-5" aria-hidden />
         )}
-        {trailing && <span className="mt-auto text-[11px] tabular-nums text-muted">{trailing}</span>}
+        {trailing && <span className="mt-auto text-[11px] tabular-nums text-ink-soft">{trailing}</span>}
       </div>
     </>
   );

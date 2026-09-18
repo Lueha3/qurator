@@ -42,7 +42,7 @@ export function ManualPriceForm({ products }: { products: ProductOption[] }) {
   }
 
   if (products.length === 0) {
-    return <p className="text-sm text-muted">등록된 상품이 없습니다. 스크린샷을 먼저 올려 상품을 등록하세요.</p>;
+    return <p className="text-sm text-ink-soft">등록된 상품이 없습니다. 스크린샷을 먼저 올려 상품을 등록하세요.</p>;
   }
 
   return (
@@ -68,16 +68,16 @@ export function ManualPriceForm({ products }: { products: ProductOption[] }) {
           <input inputMode="numeric" value={couponPrice} onChange={(e) => setCouponPrice(e.target.value)} placeholder="37900" className={inputCls} />
         </Field>
       </div>
-      <p className="-mt-1 text-xs text-muted">작년 BF 당시 값입니다. 정가·쿠폰가는 비워도 됩니다(정가를 비우면 상품 정가를 씁니다).</p>
+      <p className="-mt-1 text-xs text-ink-soft">작년 BF 당시 값입니다. 정가·쿠폰가는 비워도 됩니다(정가를 비우면 상품 정가를 씁니다).</p>
       {message && (
-        <p className={`rounded-md px-3 py-2 text-sm ${message.tone === "ok" ? "bg-ok/10 text-ok" : "bg-danger/10 text-danger"}`}>
+        <p className={`rounded-md px-3 py-2 text-sm ${message.tone === "ok" ? "bg-accent-soft text-accent" : "bg-danger/10 text-danger"}`}>
           {message.text}
         </p>
       )}
       <button type="submit" disabled={pending} className={primaryBtnCls}>
         {pending ? "기록 중…" : "💾 작년 BF 가격 기록"}
       </button>
-      <p className="text-xs text-muted">수동 입력 값은 올해 BF 비교에 “작년(수동)”으로 표시됩니다. 네트워크 요청은 없습니다.</p>
+      <p className="text-xs text-ink-soft">수동 입력 값은 올해 BF 비교에 “작년(수동)”으로 표시됩니다. 네트워크 요청은 없습니다.</p>
     </form>
   );
 }
