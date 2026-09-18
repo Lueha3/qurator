@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { SESSION_COOKIE, setSessionCookie } from "@/lib/session";
 
 // 웹 표면 접근 통제 — docs/03-account-safety.md §5.4. (Next.js 16: middleware → proxy)
 //
@@ -6,8 +7,6 @@ import { NextRequest, NextResponse } from "next/server";
 // 들어 있다(utm_term ULID 포함). 인증 없이 열어두면 커미션 키가 인터넷에 공개되어, 우리가
 // 게이트웨이에서 그토록 막은 "제3자가 현표 실적으로 클릭을 쌓는" 사고가 훨씬 큰 규모로 일어난다.
 // 서버 액션은 페이지 경로로 POST되므로 같은 게이트 뒤에 있다.
-
-const COOKIE_NAME = "qurator_session";
 
 /**
  * 쿠키 대신 토큰을 직접 싣는 헤더. 아이폰 단축어처럼 **쿠키를 들고 다닐 수 없는 클라이언트**가
@@ -27,10 +26,19 @@ const TOKEN_HEADER = "x-app-token";
 // 이 경로들은 전부 noindex를 달아 검색봇이 커미션 링크를 따라가지 못하게 한다.
 const PUBLIC_PREFIXES = ["/l/", "/expired/", "/hub"];
 
+/**
+ * 정확히 일치할 때만 여는 경로. 패스키 로그인은 **로그인하기 전에** 닿아야 하므로 열려 있다.
+ * 여기서 나가는 것은 챌린지(무작위 문자열)와 성공 여부뿐이고, 통과 조건은 기기 안 개인키의
+ * 서명이라 열려 있어도 열쇠가 되지 않는다. prefix가 아니라 완전 일치인 이유는
+ * `/login`으로 시작하는 다른 경로까지 딸려 열리는 것을 막기 위해서다.
+ */
+const PUBLIC_PATHS = new Set(["/login", "/api/auth/passkey/login"]);
+
 export function proxy(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
 
-  const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+  const isPublic =
+    PUBLIC_PATHS.has(pathname) || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
   if (isPublic) return withNoIndex(NextResponse.next());
 
   const expected = process.env.APP_ACCESS_TOKEN;
@@ -70,34 +78,25 @@ export function proxy(req: NextRequest) {
     const url = req.nextUrl.clone();
     url.searchParams.delete("k"); // 토큰이 주소창·리퍼러에 남지 않게 즉시 제거
     const res = NextResponse.redirect(url);
-    setSessionCookie(res, req, expected);
+    setSessionCookie(res, expected, isHttps(req));
     return withNoIndex(res);
   }
 
-  const cookie = req.cookies.get(COOKIE_NAME)?.value;
+  const cookie = req.cookies.get(SESSION_COOKIE)?.value;
   if (cookie && safeEqual(cookie, expected)) {
     // 쓸 때마다 만료 시계를 되감는다(슬라이딩 만료). 고정 만료였을 때는 잘 쓰고 있는데도
     // 어느 날 갑자기 "unauthorized" 흰 화면을 만나게 된다 — 로그인이 필요한 순간이
     // 하필 급할 때 온다는 뜻이다. 계속 쓰는 한 다시 로그인할 일이 없어야 한다.
     const res = NextResponse.next();
-    setSessionCookie(res, req, expected);
+    setSessionCookie(res, expected, isHttps(req));
     return withNoIndex(res);
   }
 
   return withNoIndex(unauthorizedPage());
 }
 
-/** 세션 쿠키 수명. 슬라이딩이라 이 기간은 "마지막으로 앱을 연 뒤" 방치할 수 있는 시간이다. */
-const SESSION_MAX_AGE = 60 * 60 * 24 * 90;
-
-function setSessionCookie(res: NextResponse, req: NextRequest, token: string): void {
-  res.cookies.set(COOKIE_NAME, token, {
-    httpOnly: true, // 스크립트가 못 읽는다 — 쿠키 값이 곧 토큰이라 이게 중요하다
-    sameSite: "lax",
-    secure: req.nextUrl.protocol === "https:",
-    path: "/",
-    maxAge: SESSION_MAX_AGE,
-  });
+function isHttps(req: NextRequest): boolean {
+  return req.nextUrl.protocol === "https:";
 }
 
 /**
@@ -123,17 +122,21 @@ function unauthorizedPage(): NextResponse {
   b { color:#1a1714; }
   code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; background:#f0ece5;
     padding:.1em .35em; border-radius:.25em; color:#1a1714; }
+  .cta { display:block; text-align:center; text-decoration:none; background:#9a5a00; color:#fff;
+    font-weight:600; padding:.75rem 1rem; border-radius:.75rem; margin:0 0 1rem; }
   @media (prefers-color-scheme: dark) {
     body { background:#16130f; color:#efe9df; }
     p, li { color:#a99e8d; } b { color:#efe9df; }
     code { background:#2a251e; color:#efe9df; }
+    .cta { background:#f2ae3f; color:#231a0b; }
   }
 </style></head>
 <body><main>
   <h1>🔒 로그인이 필요합니다</h1>
   <p>이 주소는 커미션 링크가 들어 있는 작업 화면이라 아무나 열 수 없습니다.</p>
+  <p><a class="cta" href="/login">🔓 Face ID로 열기</a></p>
   <ol>
-    <li><b>홈 화면에 추가한 앱 아이콘</b>으로 열어보세요. 가장 빠릅니다.</li>
+    <li>위 버튼이 안 되면 <b>홈 화면에 추가한 앱 아이콘</b>으로 열어보세요.</li>
     <li>그래도 이 화면이면 <code>?k=</code> 주소로 <b>한 번만</b> 열면 됩니다. 그 뒤로는
       주소만 쳐도 들어와집니다(90일, 쓸 때마다 갱신).</li>
   </ol>

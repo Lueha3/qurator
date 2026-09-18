@@ -27,6 +27,7 @@ import { parseTagInput } from "@/lib/deal-tags";
 import { updateProfile, type ProfileResult } from "@/lib/profile";
 import { markSoldOut, restoreDeal, type LinkHealthResult } from "@/lib/link-health";
 import { applyDedupe, planDedupe, type DedupePlan } from "@/lib/dedupe";
+import { deletePasskey } from "@/lib/passkey";
 import {
   removeSubscription,
   saveSubscription,
@@ -219,4 +220,10 @@ export async function pushUnsubscribeAction(endpoint: string): Promise<boolean> 
 
 export async function pushTestAction(): Promise<DigestRun> {
   return sendTestPush();
+}
+
+export async function deletePasskeyAction(id: string): Promise<boolean> {
+  const ok = await deletePasskey(id);
+  revalidatePath("/settings");
+  return ok;
 }

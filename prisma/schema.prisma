@@ -502,3 +502,44 @@ model PushSubscription {
 
   @@map("push_subscriptions")
 }
+
+// ── passkeys ────────────────────────────────────────────────────────────
+// Face ID 로그인 — docs/03 §7.1. `?k=` 토큰은 "알고 있으면 누구나"인 비밀번호라,
+// 주소·리퍼러·스크린샷·어깨너머로 샐 경로가 계속 있다. 패스키는 기기 안 보안 요소에서
+// 나가지 않는 개인키로 서명하므로 **훔쳐갈 문자열 자체가 없다**.
+//
+// 등록은 반드시 이미 로그인된 상태에서만 된다(게이트 뒤 경로). 그렇지 않으면
+// 아무나 자기 얼굴을 등록해 이 앱의 주인이 된다.
+model Passkey {
+  id           String  @id @default(uuid())
+  credentialId String  @unique // 인증기가 준 자격증명 ID (base64url)
+  publicKey    String // COSE 공개키 (base64url). 개인키는 기기를 떠나지 않는다
+  /**
+   * 서명 카운터. 인증기가 매번 올려 보내며, 값이 되돌아가면 복제된 자격증명 신호다.
+   * 아이클라우드 키체인 패스키는 항상 0이라 그 경우 이 검사가 사실상 무효다 — 그래서
+   * 이것만 믿지 않는다(서명 검증이 본선이다).
+   */
+  counter      Int     @default(0)
+  transports   String? // JSON 배열 — 다음 로그인에서 브라우저에 힌트로 준다
+  label        String? // "아이폰" 같은 사람이 알아볼 이름
+
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@map("passkeys")
+}
+
+// WebAuthn 챌린지. **서버가 낸 것을 그대로 돌려받았는지**가 재전송 공격을 막는 전부라,
+// 클라이언트가 보낸 값을 믿을 수 없고 서버 어딘가에 남아 있어야 한다.
+// 쿠키가 아니라 DB에 두는 이유: 서버리스는 인스턴스가 여러 개고, 쓴 챌린지를
+// **한 번 쓰면 지워야** 하기 때문이다(쿠키로는 "이미 썼다"를 강제할 수 없다).
+model AuthChallenge {
+  id        String   @id @default(uuid())
+  challenge String   @unique
+  purpose   String // "register" | "login"
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@map("auth_challenges")
+}

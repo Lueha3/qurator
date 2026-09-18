@@ -89,7 +89,7 @@ DATABASE_URL="<transaction pooler url, 6543>" DIRECT_URL="<session pooler url, 5
    | `DATABASE_URL` | Supabase Transaction pooler (6543) |
    | `DIRECT_URL` | Supabase Session pooler (5432) — "Direct connection"이 아님, §2 참고 |
    | `ANTHROPIC_API_KEY` | Vision 추출용. 없으면 캡처가 "읽지 못했습니다"로 떨어지고 [직접 입력]으로 진행 |
-   | `PUBLIC_BASE_URL` | 배포된 Vercel 주소 (예: `https://qurator.vercel.app`) |
+   | `PUBLIC_BASE_URL` | 배포된 Vercel 주소 (예: `https://qurator.vercel.app`). **Face ID 로그인의 도메인이 여기서 나온다** — 실제 주소와 한 글자라도 다르면 패스키가 브라우저에 아예 안 뜬다 |
    | `APP_ACCESS_TOKEN` | 대시보드 접근 암호. 비면 웹 표면 전체 503(fail closed) |
    | `VAPID_PUBLIC_KEY` | 아침 알림용. `npm run push:keys`로 한 쌍을 만든다. **공개키는 브라우저로 나간다**(그러라고 있는 값) |
    | `VAPID_PRIVATE_KEY` | 같은 쌍의 개인키. 화면·문서·저장소 어디에도 적지 않는다(`APP_ACCESS_TOKEN`과 같은 취급) |
@@ -134,6 +134,11 @@ DATABASE_URL="<transaction pooler url, 6543>" DIRECT_URL="<session pooler url, 5
   두 곳에서 다 쓰려면 **각각 한 번씩** `?k=`로 열어야 한다.
 - 막혔을 때 나오는 401 화면은 흰 화면이 아니라 **다음에 뭘 해야 하는지 적힌 안내**다
   (토큰은 적지 않는다 — 안내가 유출 경로가 되면 안 된다).
+- **Face ID(패스키)를 등록해두면 `?k=`를 다시 찾을 일이 없다**(2026-09-18, [03 §7.1]).
+  설정 탭 → Face ID 로그인 → 등록. 그 뒤로는 주소만 치고 `/login`에서 얼굴만 보면 된다.
+  패스키는 아이클라우드 키체인에 저장되므로 **Safari·홈 화면 앱·맥이 같은 패스키를 쓴다** —
+  쿠키와 달리 기기·브라우저마다 따로 로그인할 필요가 없다.
+  프리뷰 배포는 도메인이 달라 패스키가 뜨지 않는다(정상. 프로덕션 주소에서만 쓴다).
 - 스크린샷 업로드는 파일 선택창에서 **사진첩 → 방금 찍은 스크린샷**을 고르는 흐름이다(카메라 아님).
 
 ---

@@ -115,6 +115,12 @@ npm run dev                  # http://localhost:3000/?k=<APP_ACCESS_TOKEN 값>
 `ANTHROPIC_API_KEY`가 있어야 스크린샷을 읽는다(Vision). 없으면 캡처는 "읽지 못했습니다"로 떨어지고
 [직접 입력]으로 카드를 만들 수 있다 — 나머지 기능은 전부 그대로 동작한다.
 
+**Face ID 로그인(선택)** — 설정 탭 → **Face ID 로그인** → 등록해두면, 그 뒤로는 주소만 치고
+`/login`에서 얼굴만 보면 열린다. 개인키는 기기 보안 요소를 떠나지 않아 **훔쳐갈 문자열이 없고**,
+아이클라우드 키체인에 저장되므로 Safari·홈 화면 앱·맥이 같은 패스키를 쓴다.
+`PUBLIC_BASE_URL`이 실제 주소와 정확히 같아야 동작한다. 등록은 이미 로그인한 상태에서만 되고,
+`?k=`는 부트스트랩·비상구로 그대로 남는다 ([docs/03 §7.1](docs/03-account-safety.md)).
+
 **아침 알림(선택)** — `npm run push:keys`로 VAPID 키 한 쌍을 만들어 `VAPID_PUBLIC_KEY`·
 `VAPID_PRIVATE_KEY`·`VAPID_SUBJECT`와 `CRON_SECRET`을 넣으면, 설정 탭에서 알림을 켤 수 있다.
 매일 08:00 KST에 **할 일이 있는 날에만** "기록할 상품 N개 · 정정 공지 N건" 한 통이 간다
