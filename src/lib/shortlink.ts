@@ -92,10 +92,11 @@ function isUniqueViolation(err: unknown): boolean {
   );
 }
 
-export function shortLinkUrl(code: string): string | null {
-  const base = process.env.PUBLIC_BASE_URL;
-  return base ? `${base.replace(/\/$/, "")}/l/${code}` : null;
-}
+// shortLinkUrl()을 여기서 지웠다 (2026-09-18). 호출부가 하나도 없는 죽은 함수였는데,
+// "PUBLIC_BASE_URL이 팔로워 링크를 만든다"고 **읽히게** 만들어 실제로 오진을 유발했다.
+// 사실은 카톡 카드가 무신사 원본 링크를 그대로 싣고(deal-flow.ts toFacts), 허브는
+// 상대경로 `/l/{code}`를 쓴다 — 둘 다 이 환경변수와 무관하다.
+// 절대 URL이 필요한 지면(노션 등)이 생기면 그때 두 줄로 되살리면 된다.
 
 /**
  * 숏링크 모드 (docs/02 §10.2).
