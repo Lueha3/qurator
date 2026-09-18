@@ -141,7 +141,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
 
       {note && <p className="rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">{note}</p>}
       {problem && (
-        <p className="rounded-md bg-danger/10 px-3 py-2 text-sm leading-relaxed text-danger">
+        <p className="whitespace-pre-line rounded-xl bg-danger/10 px-3 py-2 text-sm leading-relaxed text-danger">
           {problem}
         </p>
       )}

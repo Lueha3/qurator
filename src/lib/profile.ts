@@ -21,13 +21,13 @@ export function validateCuratorShopUrl(raw: string): { ok: true; value: string |
   try {
     url = new URL(trimmed);
   } catch {
-    return { ok: false, reason: "주소 형식이 올바르지 않습니다. https://로 시작하는 전체 주소를 넣어주세요." };
+    return { ok: false, reason: "주소를 읽을 수 없어요. https://로 시작하는 전체 주소를 넣어주세요." };
   }
   if (url.protocol !== "https:") {
-    return { ok: false, reason: "https:// 주소만 넣을 수 있습니다." };
+    return { ok: false, reason: "https://로 시작하는 주소만 넣을 수 있어요." };
   }
   if (url.hostname !== "musinsa.com" && !url.hostname.endsWith(".musinsa.com")) {
-    return { ok: false, reason: "무신사 주소만 넣을 수 있습니다 (musinsa.com)." };
+    return { ok: false, reason: "무신사 주소만 넣을 수 있어요. (musinsa.com)" };
   }
   return { ok: true, value: url.toString() };
 }
@@ -38,7 +38,7 @@ export async function updateProfile(input: { bio: string; curatorShopUrl: string
 
   const bio = input.bio.trim().replace(/\s+/g, " ");
   if (bio.length > MAX_BIO_LENGTH) {
-    return { ok: false, reason: `소개는 ${MAX_BIO_LENGTH}자까지 넣을 수 있습니다.` };
+    return { ok: false, reason: `소개는 ${MAX_BIO_LENGTH}자까지예요.` };
   }
 
   const creator = await getDefaultCreator();

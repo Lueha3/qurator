@@ -96,7 +96,25 @@ export function proxy(req: NextRequest) {
     return withNoIndex(res);
   }
 
+  // 사람이 주소를 열었다면(문서 요청) 401 HTML을 보여주지 않고 로그인 화면으로 보낸다 — 잠금 화면과
+  // 로그인 화면이 같은 말을 두 번 하던 것을 하나로 합쳤다(docs/08 §4.0.7). 로그인이 끝나면 원래
+  // 가려던 곳으로 돌아간다(next — 같은 출처의 경로만). fetch·API·서버 액션은 지금처럼 401이다.
+  if (req.method === "GET" && wantsDocument(req)) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "";
+    const next = pathname + req.nextUrl.search;
+    if (next !== "/") url.searchParams.set("next", next);
+    return withNoIndex(NextResponse.redirect(url));
+  }
   return withNoIndex(unauthorizedPage());
+}
+
+/** 브라우저가 화면으로 열려는 요청인가(주소창·링크·홈 화면 아이콘). RSC·fetch·XHR은 아니다. */
+function wantsDocument(req: NextRequest): boolean {
+  if (req.headers.get("sec-fetch-dest") === "document") return true;
+  if (req.headers.get("rsc") === "1") return false;
+  return (req.headers.get("accept") ?? "").includes("text/html");
 }
 
 function isHttps(req: NextRequest): boolean {
@@ -114,7 +132,7 @@ function unauthorizedPage(): NextResponse {
   const html = `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>잠겨 있어요 · qurator</title>
+<title>Face ID로 열어주세요 · qurator</title>
 <style>
   :root { color-scheme: light dark; }
   body { margin:0; min-height:100dvh; display:flex; align-items:center; justify-content:center;
@@ -143,14 +161,12 @@ function unauthorizedPage(): NextResponse {
 </style></head>
 <body><main>
   <p class="emoji" aria-hidden="true">🔒</p>
-  <h1>잠겨 있어요</h1>
-  <p>이 화면에는 내 링크가 들어 있어서 아무나 열 수 없어요.</p>
+  <h1>Face ID로 열어주세요</h1>
   <a class="cta" href="/login">🔓 Face ID로 열기</a>
   <div class="steps">
-    <p><b>처음이신가요?</b> 이 주소로는 등록이 안 돼요. 관리자에게 받은 <b>등록 링크</b>(주소 끝에 <code>?invite=</code>가 붙은 것)를 Safari에서 열어주세요.</p>
-    <p><b>홈 화면 앱으로 쓰고 계셨나요?</b> 그 아이콘으로 열어주세요. 아이폰은 Safari와 홈 화면 앱의 로그인을 따로 기억해요.</p>
+    <p>처음이면 관리자에게 받은 <b>등록 링크</b>를 Safari에서 열어주세요.</p>
+    <p>홈 화면에 추가한 앱이 있다면 그 아이콘으로 열어주세요.</p>
   </div>
-  <small>관리자용: <code>?k=</code> 주소로 한 번 열면 90일 동안 유지돼요.</small>
 </main></body></html>`;
   return new NextResponse(html, {
     status: 401,

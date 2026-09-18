@@ -27,7 +27,7 @@ export function CopyButton({ text, cardId }: { text: string; cardId: string }) {
           : "bg-accent text-accent-ink hover:opacity-90"
       }`}
     >
-      {copied ? "복사됨" : "복사"}
+      {copied ? "복사했어요" : "복사"}
     </button>
   );
 }

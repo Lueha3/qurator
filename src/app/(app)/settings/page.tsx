@@ -170,7 +170,7 @@ export default async function SettingsPage() {
           <h3 className="mb-1 text-sm font-semibold">🧹 중복 딜 정리</h3>
           <p className="mb-3 text-xs text-ink-soft">
             예전에는 같은 상품을 다시 찍을 때마다 새 딜이 생겼어요(지금은 있던 딜에 기록돼요). 그때 쌓인 중복을
-            한 번에 보관으로 옮겨요. 지우지 않고, 링크가 붙은 딜은 건드리지 않아요.
+            한 번에 “안 올림”으로 옮겨요. 지우지 않고, 링크가 붙은 딜은 건드리지 않아요.
           </p>
           <DedupeCard />
         </section>

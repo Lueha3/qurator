@@ -29,19 +29,19 @@ export type CuratorLinkResult =
 export function parseCuratorLink(text: string): CuratorLinkResult {
   const found = text.match(/https?:\/\/[^\s<>"']+/);
   if (!found) {
-    return { ok: false, reason: "메시지에서 링크를 찾지 못했습니다." };
+    return { ok: false, reason: "붙여넣은 글에 링크가 없어요." };
   }
 
   let url: URL;
   try {
     url = new URL(found[0]);
   } catch {
-    return { ok: false, reason: "링크 형식이 올바르지 않습니다." };
+    return { ok: false, reason: "링크 모양이 이상해요." };
   }
 
   const host = url.hostname.toLowerCase();
   if (!host.endsWith("musinsa.com")) {
-    return { ok: false, reason: `무신사 링크가 아닙니다 (${host}).` };
+    return { ok: false, reason: "무신사 링크가 아니에요." };
   }
 
   const ulid = url.searchParams.get("utm_term");

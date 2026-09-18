@@ -19,43 +19,50 @@ export function passkeyErrorMessage(error: unknown, action: "등록" | "로그�
 
   switch (e.code) {
     case "ERROR_CEREMONY_ABORTED":
-      return `${action}을 취소했습니다. 다시 누르시면 됩니다.`;
+      return `${action}을 취소했어요. 다시 누르면 돼요.`;
 
     case "ERROR_INVALID_RP_ID":
+      // 첫 줄은 현표용, 둘째 줄은 관리자용 — 현표는 화면을 보내는 것으로 할 일이 끝난다.
       return (
-        `앱 주소 설정이 지금 주소와 달라 기기가 거부했습니다. ` +
-        `Vercel 환경변수 PUBLIC_BASE_URL을 "${currentOrigin()}"로 맞춰주세요.`
+        `지금은 이 주소에서 Face ID를 쓸 수 없어요. 관리자에게 이 화면을 보내주세요.\n` +
+        `(관리자용) 앱 주소 설정이 지금 주소와 달라 기기가 거부했어요. Vercel 환경변수 PUBLIC_BASE_URL을 "${currentOrigin()}"로 맞춰주세요.`
       );
 
     case "ERROR_INVALID_DOMAIN":
-      return "이 주소에서는 패스키를 쓸 수 없습니다(https가 아니거나 유효하지 않은 도메인).";
+      return "이 주소에서는 Face ID를 쓸 수 없어요. 관리자에게 알려주세요.";
 
     case "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED":
-      return "이 기기는 이미 등록되어 있습니다. 목록에서 확인해주세요.";
+      return "이 폰은 이미 등록돼 있어요. Face ID로 열어보세요.";
 
     case "ERROR_AUTHENTICATOR_MISSING_DISCOVERABLE_CREDENTIAL_SUPPORT":
     case "ERROR_AUTHENTICATOR_MISSING_USER_VERIFICATION_SUPPORT":
-      return "이 기기는 Face ID/Touch ID 패스키를 지원하지 않습니다.";
+      return "이 기기에서는 Face ID를 쓸 수 없어요.";
 
     case "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY":
-      return `${action}하지 못했습니다 (${e.cause?.name ?? "알 수 없는 오류"}). 다시 시도해주세요.`;
+      return `${action}이 안 됐어요. 다시 눌러주세요. (${e.cause?.name ?? "알 수 없는 오류"})`;
   }
 
   // SimpleWebAuthn이 알려진 코드로 못 묶은 순수 NotAllowedError. 취소일 수도 있지만,
   // 인앱 브라우저(카톡 등)가 Face ID 접근 자체를 거부한 경우도 똑같이 이 이름으로 온다 —
   // 화면에서 detectInAppBrowser()로 먼저 걸러지지 않았다면(모르는 앱이라서) 여기서 짚어준다.
   if (e.name === "NotAllowedError" && !e.code) {
+    // 로그인에서 가장 흔한 실제 상황은 "다른 기기는 등록됐는데 이 폰은 아직"이다 — 그걸 먼저 말한다.
+    if (action === "로그인") {
+      return (
+        `열리지 않았어요. 이 폰을 아직 등록하지 않았다면 관리자에게 등록 링크를 받아주세요. ` +
+        `카톡·인스타 안에서 열었다면 더보기(⋯)에서 "Safari로 열기"를 눌러주세요. 직접 취소했다면 무시해도 돼요.`
+      );
+    }
     return (
-      `${action}이 거부됐습니다. 카카오톡·인스타그램처럼 앱 안에서 뜨는 브라우저라면 ` +
-      `Face ID를 쓸 수 없습니다 — 더보기(⋯) 메뉴에서 "Safari로 열기"를 선택해 다시 시도해주세요. ` +
-      `직접 취소하셨다면 무시하셔도 됩니다.`
+      `등록이 안 됐어요. 카톡·인스타처럼 앱 안에서 뜨는 브라우저에서는 Face ID를 쓸 수 없어요 — ` +
+      `더보기(⋯)에서 "Safari로 열기"를 눌러 다시 해주세요. 직접 취소했다면 무시해도 돼요.`
     );
   }
 
   // 라이브러리를 거치지 않은 오류(네트워크 등)도 이름만은 보여준다 —
   // "아무 일도 안 일어남"보다 무엇이든 단서가 있는 편이 낫다.
   const label = e.code ?? e.name ?? "알 수 없는 오류";
-  return `${action}하지 못했습니다 (${label}).`;
+  return `${action}이 안 됐어요. (${label})`;
 }
 
 /** 서버가 기대하는 도메인과 지금 보고 있는 주소가 다르면, 브라우저가 창을 띄우기도 전에 거부한다. */
@@ -65,7 +72,8 @@ export function rpIdMismatch(options: unknown): string | null {
   if (!rpID || rpID === window.location.hostname) return null;
 
   return (
-    `서버 설정(PUBLIC_BASE_URL)은 "${rpID}"인데 지금 주소는 "${window.location.hostname}"입니다. ` +
+    `지금은 이 주소에서 Face ID를 쓸 수 없어요. 관리자에게 이 화면을 보내주세요.\n` +
+    `(관리자용) 서버 설정(PUBLIC_BASE_URL)은 "${rpID}"인데 지금 주소는 "${window.location.hostname}"이에요. ` +
     `Vercel 환경변수를 "${currentOrigin()}"로 맞춰주세요.`
   );
 }

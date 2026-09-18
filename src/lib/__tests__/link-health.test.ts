@@ -126,7 +126,7 @@ describe("사람이 표시하는 품절", () => {
     const deal = await db.deal.create({ data: { productId: product.id, creatorId: creator.id } });
 
     const result = await markSoldOut(deal.id);
-    expect(result).toEqual({ ok: false, reason: "붙어 있는 큐레이터 링크가 없습니다." });
+    expect(result).toEqual({ ok: false, reason: "이 딜에는 링크가 없어서 품절 표시를 할 수 없어요." });
   });
 
   it("사람이 한 일로 감사 로그에 남는다 — 제재 소명의 증적이다", async () => {

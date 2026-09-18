@@ -97,7 +97,7 @@ function intOrNull(raw: string, label: string): number | null | { error: string 
   const trimmed = raw.trim();
   if (!trimmed) return null;
   const digits = trimmed.replace(/[^\d]/g, "");
-  if (!digits) return { error: `${label}는 숫자로 입력해주세요.` };
+  if (!digits) return { error: `${label}은(는) 숫자만 적어주세요.` };
   return Number(digits);
 }
 

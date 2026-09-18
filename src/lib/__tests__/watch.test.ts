@@ -144,7 +144,7 @@ describe("워치 등록 — 상한이 실제로 막는다", () => {
     const overflow = await addWatch(products[30].id);
     expect(overflow.ok).toBe(false);
     if (overflow.ok) return;
-    expect(overflow.reason).toContain("상한");
+    expect(overflow.reason).toContain("개까지예요");
     expect(await countActiveWatches()).toBe(30);
   });
 

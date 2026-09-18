@@ -158,8 +158,8 @@ describe("스크린샷 캡처 (docs/06 §3-4)", () => {
     expect(second.priceChangeNote).toContain("53,400원");
     expect(second.priceChangeNote).toContain("42,900원");
     expect(second.priceChangeNote).toMatch(/하락|📉/);
-    expect(second.priceChangeNote).toContain("정가 89,000원 기준 할인율 40% → 52%");
-    expect(second.priceChangeNote).toContain("쿠폰 적용 시 45,000원 (49% 할인)");
+    expect(second.priceChangeNote).toContain("정가 89,000원 기준 할인 40% → 52%");
+    expect(second.priceChangeNote).toContain("쿠폰 쓰면 45,000원 (49% 할인)");
 
     // 화면이 다시 그려질 때도 같은 비교가 DTO에 실린다.
     expect((await dealDTO(second.dealId)).priceChangeNote).toContain("42,900원");
@@ -346,7 +346,7 @@ describe("링크 검증 경고 — 승인 화면에 반드시 보여야 한다",
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.warnings.join(" ")).toContain("중복 상품");
+    expect(result.warnings.join(" ")).toContain("중복일 수 있어요");
 
     const deal = await db.deal.findUniqueOrThrow({ where: { id: dealId }, include: { product: true } });
     expect(deal.product.musinsaGoodsNo).toBeNull(); // 자동으로 합치지 않는다
@@ -374,7 +374,7 @@ describe("링크 검증 경고 — 승인 화면에 반드시 보여야 한다",
     const result = await attachCuratorLink(dealId, "https://www.musinsa.com/products/8888888");
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.warnings.join(" ")).toContain("커미션 파라미터");
+    expect(result.warnings.join(" ")).toContain("수수료가 안 잡힐");
   });
 });
 

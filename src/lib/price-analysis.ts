@@ -216,7 +216,7 @@ export function analyzeSnapshots(snapshots: SnapshotLike[], now: Date = new Date
  * 다른 질문 — 여기는 "바로 전 vs 지금"만 본다. 최대 3줄:
  *   ① 판매가 자체가 어떻게 바뀌었나 (항상)
  *   ② 정가 대비 실할인율이 어떻게 바뀌었나 (정가를 읽었을 때만)
- *   ③ 쿠폰 적용 시 최종가 (화면에 쿠폰가가 보였을 때만)
+ *   ③ 쿠폰 쓰면 최종가 (화면에 쿠폰가가 보였을 때만)
  *
  * previous가 없으면(첫 기록이라 비교 대상이 없음) null — 아무것도 보여주지 않는 것 자체가
  * "비교할 게 없다"는 정직한 신호다. 마찬가지로 정가·쿠폰가는 실제로 읽힌 경우에만 줄을 더한다
@@ -234,15 +234,15 @@ export function buildPriceChangeNote(analysis: PriceAnalysis | undefined): strin
   const prevSale = formatKRW(previous.salePrice);
   const nowSale = formatKRW(current.salePrice);
   if (current.salePrice === previous.salePrice) {
-    lines.push(`➡️ 지난번과 같은 판매가예요 (${nowSale})`);
+    lines.push(`➡️ 지난번과 같은 가격이에요 (${nowSale})`);
   } else {
     const rate = discountRate(previous.salePrice, current.salePrice);
     lines.push(
       rate === null || rate === 0
         ? `${prevSale} → ${nowSale}`
         : rate > 0
-          ? `📉 지난번 ${prevSale} → 지금 ${nowSale} (${rate}% 하락)`
-          : `📈 지난번 ${prevSale} → 지금 ${nowSale} (${Math.abs(rate)}% 상승)`
+          ? `📉 지난번 ${prevSale} → 지금 ${nowSale} (${rate}% 내렸어요)`
+          : `📈 지난번 ${prevSale} → 지금 ${nowSale} (${Math.abs(rate)}% 올랐어요)`
     );
   }
 
@@ -258,8 +258,8 @@ export function buildPriceChangeNote(analysis: PriceAnalysis | undefined): strin
           : null;
       lines.push(
         prevRate !== null
-          ? `정가 ${formatKRW(listPrice)} 기준 할인율 ${prevRate}% → ${nowRate}%`
-          : `정가 ${formatKRW(listPrice)} 기준 할인율 ${nowRate}%`
+          ? `정가 ${formatKRW(listPrice)} 기준 할인 ${prevRate}% → ${nowRate}%`
+          : `정가 ${formatKRW(listPrice)} 기준 할인 ${nowRate}%`
       );
     }
   }
@@ -272,10 +272,10 @@ export function buildPriceChangeNote(analysis: PriceAnalysis | undefined): strin
     const couponLabel = couponRate !== null ? ` (${couponRate}% 할인)` : "";
     if (previous.couponPrice !== null && previous.couponPrice !== current.couponPrice) {
       lines.push(
-        `쿠폰 적용 시 지난번 ${formatKRW(previous.couponPrice)} → 지금 ${formatKRW(current.couponPrice)}${couponLabel}`
+        `쿠폰 쓰면 지난번 ${formatKRW(previous.couponPrice)} → 지금 ${formatKRW(current.couponPrice)}${couponLabel}`
       );
     } else {
-      lines.push(`쿠폰 적용 시 ${formatKRW(current.couponPrice)}${couponLabel}`);
+      lines.push(`쿠폰 쓰면 ${formatKRW(current.couponPrice)}${couponLabel}`);
     }
   }
 

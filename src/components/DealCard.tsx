@@ -30,7 +30,7 @@ export function DealCard({ card }: { card: CardDTO }) {
               card.disclosureOk ? "bg-accent-soft text-accent" : "bg-danger/15 text-danger"
             }`}
           >
-            {card.disclosureOk ? "고지 OK" : "고지 실패"}
+            {card.disclosureOk ? "광고 표시 있음 ✓" : "⚠️ 광고 표시 없음"}
           </span>
         </div>
       </div>
@@ -39,7 +39,7 @@ export function DealCard({ card }: { card: CardDTO }) {
       </pre>
       {(card.truncated || card.warnings.length > 0) && (
         <div className="border-t border-line px-3 py-1.5 text-[11px] text-danger">
-          {card.truncated && <div>글자수 초과로 자동 축약됨</div>}
+          {card.truncated && <div>너무 길어서 조금 줄였어요</div>}
           {card.warnings.map((w, i) => (
             <div key={i}>{w}</div>
           ))}
@@ -47,7 +47,7 @@ export function DealCard({ card }: { card: CardDTO }) {
       )}
       <div className="flex items-center justify-between border-t border-line px-3 py-2">
         {card.aiGeneratedFields.includes("hookLine") ? (
-          <span className="text-[11px] text-ink-soft">AI 훅 초안</span>
+          <span className="text-[11px] text-ink-soft">AI 초안</span>
         ) : (
           <span className="text-[11px] text-ink-soft">&nbsp;</span>
         )}

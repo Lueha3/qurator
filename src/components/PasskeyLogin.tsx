@@ -18,7 +18,13 @@ import { InAppBrowserNotice } from "./InAppBrowserNotice";
 
 type State = "idle" | "working" | "unsupported" | "no-authenticator" | "none" | "failed" | "bad-invite";
 
-export function PasskeyLogin({ invite }: { invite?: string }) {
+/** 로그인 뒤 돌아갈 곳. 같은 출처의 경로만 — 외부 주소·프로토콜 상대 주소는 홈으로 */
+function safeNext(next?: string): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/login")) return "/";
+  return next;
+}
+
+export function PasskeyLogin({ invite, next }: { invite?: string; next?: string }) {
   const router = useRouter();
   const [state, setState] = useState<State>("idle");
   const [name, setName] = useState("");
@@ -114,7 +120,7 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
   }
 
   function enter() {
-    router.replace("/");
+    router.replace(safeNext(next));
     router.refresh();
   }
 
@@ -123,7 +129,7 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
       <div className="flex flex-col gap-3">
         <InAppBrowserNotice />
         <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-ink-soft">이 폰 이름</span>
+          <span className="text-xs font-medium text-ink-soft">이 폰 이름 (비워도 돼요)</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -138,7 +144,7 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
           disabled={state === "working"}
           className={primaryBtnCls}
         >
-          {state === "working" ? "등록 중…" : "🔐 이 기기에 Face ID 등록"}
+          {state === "working" ? "등록 중…" : "🔐 Face ID로 등록하기"}
         </button>
         <Note state={state} invite />
         <Problem text={problem} />
@@ -161,7 +167,7 @@ export function PasskeyLogin({ invite }: { invite?: string }) {
 function Problem({ text }: { text: string | null }) {
   if (!text) return null;
   return (
-    <p className="rounded-md bg-danger/10 px-3 py-2 text-sm leading-relaxed text-danger">{text}</p>
+    <p className="whitespace-pre-line rounded-xl bg-danger/10 px-3 py-2 text-sm leading-relaxed text-danger">{text}</p>
   );
 }
 
@@ -169,27 +175,27 @@ function Note({ state, invite }: { state: State; invite?: boolean }) {
   if (state === "none")
     return (
       <p className="text-xs text-ink-soft">
-        아직 등록된 폰이 없어요. 관리자에게 <b>초대 링크</b>를 받아 그 링크로 열어주세요.
+        아직 등록된 폰이 없어요. 관리자에게 <b>등록 링크</b>를 받아 그 링크로 열어주세요.
       </p>
     );
   if (state === "unsupported")
-    return <p className="text-xs text-ink-soft">이 브라우저에서는 Face ID 로그인을 쓸 수 없어요.</p>;
+    return <p className="text-xs text-ink-soft">이 브라우저에서는 Face ID를 쓸 수 없어요. Safari로 열어주세요.</p>;
   if (state === "no-authenticator")
     return (
       <p className="text-xs text-ink-soft">
-        이 기기에는 Face ID·Touch ID 같은 잠금 해제 수단이 없어 쓸 수 없어요.
+        이 기기에는 Face ID가 없어서 쓸 수 없어요. 아이폰에서 열어주세요.
       </p>
     );
   if (state === "bad-invite")
     return (
       <p className="text-xs text-danger">
-        이 초대 링크는 만료되었거나 이미 사용됐어요. 새 링크를 받아주세요.
+        이 등록 링크는 만료되었거나 이미 사용됐어요. 관리자에게 새 링크를 받아주세요.
       </p>
     );
   if (state === "failed")
     return (
       <p className="text-xs text-danger">
-        {invite ? "등록하지" : "열지"} 못했어요. 다시 눌러주세요.
+        {invite ? "등록이 안 됐어요." : "열리지 않았어요."} 다시 눌러주세요.
       </p>
     );
   return null;

@@ -91,8 +91,22 @@ describe("접근 게이트", () => {
     expect(res.status).toBe(401);
     expect(res.headers.get("content-type")).toContain("text/html");
     const body = await res.text();
+    expect(body).toContain("Face ID로 열기");
+    expect(body).toContain("등록 링크");
     expect(body).toContain("홈 화면");
-    expect(body).toContain("?k=");
+  });
+
+  it("사람이 주소를 열면(문서 요청) 401 대신 로그인 화면으로 보내고, 원래 가려던 곳을 기억한다", () => {
+    const res = proxy(request("/deals?f=saved", { headers: { "sec-fetch-dest": "document" } }));
+    expect(res.status).toBe(307);
+    const to = new URL(res.headers.get("location")!);
+    expect(to.pathname).toBe("/login");
+    expect(to.searchParams.get("next")).toBe("/deals?f=saved");
+  });
+
+  it("RSC·fetch 요청은 리다이렉트하지 않고 401이다", () => {
+    expect(proxy(request("/deals", { headers: { rsc: "1", accept: "text/x-component" } })).status).toBe(401);
+    expect(proxy(request("/api/deals", { headers: { accept: "application/json" } })).status).toBe(401);
   });
 
   it("막힌 화면에 토큰이 들어 있지 않다 — 안내가 유출 경로가 되면 안 된다", async () => {

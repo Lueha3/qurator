@@ -32,7 +32,7 @@ export async function markSoldOut(dealId: string, now: Date = new Date()): Promi
   const deal = await loadDealWithLinks(dealId);
   if (!deal) return { ok: false, reason: "딜을 찾을 수 없습니다." };
   if (deal.curatorLinks.length === 0) {
-    return { ok: false, reason: "붙어 있는 큐레이터 링크가 없습니다." };
+    return { ok: false, reason: "이 딜에는 링크가 없어서 품절 표시를 할 수 없어요." };
   }
 
   await db.$transaction([

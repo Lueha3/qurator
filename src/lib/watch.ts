@@ -61,7 +61,7 @@ export async function addWatch(
   if (!isActiveNow && activeCount >= limits.itemsMax) {
     return {
       ok: false,
-      reason: `추적 상한 ${limits.itemsMax}개를 이미 채웠습니다. 먼저 하나를 해제해주세요.`,
+      reason: `지켜보기는 ${limits.itemsMax}개까지예요. 하나를 그만 지켜본 뒤 다시 눌러주세요.`,
       activeCount,
     };
   }

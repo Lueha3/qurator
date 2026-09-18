@@ -17,7 +17,7 @@ const KST_ENDS_AT = new Intl.DateTimeFormat("ko-KR", {
 
 const KST_SHORT = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
-  month: "numeric",
+  month: "long", // "9월 18일 14:49" — 목록의 날짜 그룹 제목("9월 16일 (수)")과 같은 꼴
   day: "numeric",
   hour: "2-digit",
   minute: "2-digit",

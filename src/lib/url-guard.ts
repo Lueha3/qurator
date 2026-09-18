@@ -66,20 +66,20 @@ export function canonicalizeMusinsaUrl(raw: string): UrlCheck<string> {
   try {
     parsed = new URL(raw.trim());
   } catch {
-    return { ok: false, error: { code: "NOT_A_URL", reason: "URL 형식이 아닙니다." } };
+    return { ok: false, error: { code: "NOT_A_URL", reason: "주소 모양이 이상해요." } };
   }
 
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
     return {
       ok: false,
-      error: { code: "BAD_PROTOCOL", reason: `지원하지 않는 프로토콜입니다: ${parsed.protocol}` },
+      error: { code: "BAD_PROTOCOL", reason: "https로 시작하는 주소만 넣을 수 있어요." },
     };
   }
   // user:pass@host 형태는 SSRF·파서 혼동 공격의 고전적 벡터다.
   if (parsed.username || parsed.password) {
     return {
       ok: false,
-      error: { code: "URL_HAS_CREDENTIALS", reason: "URL에 인증 정보가 포함되어 있습니다." },
+      error: { code: "URL_HAS_CREDENTIALS", reason: "이 주소는 쓸 수 없어요. 상품 페이지 주소를 그대로 붙여주세요." },
     };
   }
 
@@ -89,7 +89,7 @@ export function canonicalizeMusinsaUrl(raw: string): UrlCheck<string> {
       ok: false,
       error: {
         code: "HOST_NOT_ALLOWED",
-        reason: `무신사 상품 페이지 주소만 받습니다 (받은 호스트: ${host}).`,
+        reason: "무신사 상품 페이지 주소만 넣을 수 있어요.",
       },
     };
   }
@@ -126,7 +126,7 @@ export function assertFetchable(url: string): UrlCheck<URL> {
   try {
     parsed = new URL(url);
   } catch {
-    return { ok: false, error: { code: "NOT_A_URL", reason: "URL 형식이 아닙니다." } };
+    return { ok: false, error: { code: "NOT_A_URL", reason: "주소 모양이 이상해요." } };
   }
   if (parsed.protocol !== "https:") {
     return { ok: false, error: { code: "BAD_PROTOCOL", reason: "https만 허용합니다." } };
@@ -134,7 +134,7 @@ export function assertFetchable(url: string): UrlCheck<URL> {
   if (parsed.username || parsed.password) {
     return {
       ok: false,
-      error: { code: "URL_HAS_CREDENTIALS", reason: "URL에 인증 정보가 포함되어 있습니다." },
+      error: { code: "URL_HAS_CREDENTIALS", reason: "이 주소는 쓸 수 없어요. 상품 페이지 주소를 그대로 붙여주세요." },
     };
   }
   if (!ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) {

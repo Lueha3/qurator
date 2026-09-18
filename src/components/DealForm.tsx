@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import type { ColorLinkInput, CreateDealInput, DealDTO } from "@/lib/api-types";
+import type { CreateDealInput, DealDTO } from "@/lib/api-types";
 import { Field, inputCls, primaryBtnCls } from "./form";
 
 const EMPTY_FORM = {
@@ -33,8 +33,6 @@ function toNumberOrUndefined(v: string): number | undefined {
 export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void }) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [colorLinks, setColorLinks] = useState<ColorLinkInput[]>([]);
-  const [useAiHook, setUseAiHook] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,17 +40,6 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  function addColorLink() {
-    setColorLinks((links) => [...links, { label: "", url: "" }]);
-  }
-  function updateColorLink(i: number, field: keyof ColorLinkInput, value: string) {
-    setColorLinks((links) =>
-      links.map((l, idx) => (idx === i ? { ...l, [field]: value } : l))
-    );
-  }
-  function removeColorLink(i: number) {
-    setColorLinks((links) => links.filter((_, idx) => idx !== i));
-  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -73,9 +60,9 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
       endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
       curatorNote: form.curatorNote || undefined,
       hookLine: form.hookLine || undefined,
-      useAiHook,
+      useAiHook: true, // 첫 줄이 비어 있으면 AI가 초안을 쓴다 — 실패해도 진행된다(ai-hook)
       defaultLinkUrl: form.defaultLinkUrl || undefined,
-      colorLinks: colorLinks.filter((l) => l.url.trim()),
+      colorLinks: [],
     };
 
     try {
@@ -86,16 +73,15 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json.error ?? "만들지 못했어요.");
+        setError(json.error ?? "만들지 못했어요. 다시 시도해주세요.");
         return;
       }
       setForm(EMPTY_FORM);
-      setColorLinks([]);
       // 목록은 서버가 그린다 — 새로 읽어 오면 방금 만든 딜이 '진행 중' 맨 위에 온다.
       router.refresh();
       onCreated?.(json.deal as DealDTO);
     } catch {
-      setError("서버에 연결할 수 없어요.");
+      setError("인터넷 연결을 확인해주세요.");
     } finally {
       setSubmitting(false);
     }
@@ -237,46 +223,6 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
         />
       </Field>
 
-      <div>
-        <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-xs font-medium text-ink-soft">색상별 링크 (선택)</span>
-          <button
-            type="button"
-            onClick={addColorLink}
-            className="text-xs font-medium text-accent hover:underline"
-          >
-            + 색상 추가
-          </button>
-        </div>
-        <div className="flex flex-col gap-2">
-          {colorLinks.map((cl, i) => (
-            <div key={i} className="flex gap-2">
-              <input
-                value={cl.label}
-                onChange={(e) => updateColorLink(i, "label", e.target.value)}
-                placeholder="크림"
-                className={`${inputCls} w-24 shrink-0`}
-              />
-              <input
-                type="url"
-                value={cl.url}
-                onChange={(e) => updateColorLink(i, "url", e.target.value)}
-                placeholder="색상별 내 링크"
-                className={inputCls}
-              />
-              <button
-                type="button"
-                onClick={() => removeColorLink(i)}
-                className="shrink-0 rounded-md px-2 text-sm text-danger hover:bg-danger/10"
-                aria-label="색상 링크 삭제"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
       <Field label="첫 줄 문구" hint="비우면 AI가 초안을 써요">
         <textarea
           value={form.hookLine}
@@ -287,15 +233,6 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
         />
       </Field>
 
-      <label className="flex items-center gap-2 text-sm text-ink-soft">
-        <input
-          type="checkbox"
-          checked={useAiHook}
-          onChange={(e) => setUseAiHook(e.target.checked)}
-          className="h-4 w-4 rounded border-line"
-        />
-        첫 줄이 비어 있으면 AI 초안 쓰기
-      </label>
 
       {error && (
         <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
@@ -306,7 +243,7 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
         disabled={submitting}
         className={primaryBtnCls}
       >
-        {submitting ? "만드는 중…" : "만들기"}
+        {submitting ? "만드는 중…" : "✅ 만들기"}
       </button>
     </form>
   );

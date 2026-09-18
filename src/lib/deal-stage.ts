@@ -12,7 +12,7 @@ export const STAGE_LABEL: Record<ApprovalStageDTO, string> = {
   AWAITING_LINK: "링크 필요",
   READY_TO_PUBLISH: "문구 준비됨",
   APPROVED: "올림",
-  SKIPPED: "보관",
+  SKIPPED: "안 올림",
 };
 
 /** 홈 "오늘 할 일"의 문구 — 상태가 아니라 **할 일**로 읽히게 동사로 쓴다 */
@@ -21,12 +21,12 @@ export const TODO_LABEL: Record<ApprovalStageDTO, string> = {
   AWAITING_LINK: "링크 붙이기",
   READY_TO_PUBLISH: "카톡 문구 받기",
   APPROVED: "올림",
-  SKIPPED: "보관",
+  SKIPPED: "안 올림",
 };
 
 /**
  * 상태 점의 Tailwind 클래스. null이면 점을 찍지 않는다.
- * 보관(SKIPPED)에 색이 없는 이유: 끝난 일에 색을 쓰면 정작 지금 해야 할 일의 색이 묻힌다.
+ * 안 올림(SKIPPED)에 색이 없는 이유: 끝난 일에 색을 쓰면 정작 지금 해야 할 일의 색이 묻힌다.
  */
 export const STAGE_DOT: Record<ApprovalStageDTO, string | null> = {
   CANDIDATE: "bg-stage-candidate",

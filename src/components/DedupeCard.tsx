@@ -30,7 +30,7 @@ export function DedupeCard() {
   if (done !== null) {
     return (
       <p className="rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">
-        ✅ {done}개를 보관으로 옮겼어요. 딜 탭의 “보관”에서 볼 수 있어요.
+        ✅ {done}개를 “안 올림”으로 옮겼어요. 딜 탭의 “안 올림”에서 볼 수 있어요.
       </p>
     );
   }
@@ -51,7 +51,7 @@ export function DedupeCard() {
       ) : (
         <>
           <p className="text-sm">
-            상품 <b>{plan.groups.length}개</b>에서 <b>{plan.closeCount}개</b>를 보관으로 옮겨요.
+            상품 <b>{plan.groups.length}개</b>에서 <b>{plan.closeCount}개</b>를 “안 올림”으로 옮겨요.
             {plan.manualCount > 0 && (
               <span className="text-ink-soft">
                 {" "}

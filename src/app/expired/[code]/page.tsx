@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { DISCLOSURE } from "@/lib/disclosure";
+import { liveHubDealsWhere } from "@/lib/hub-query";
 
 // 죽은 링크의 착지 지점 — docs/03-account-safety.md 불변식 I-5.
 //
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ExpiredPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
+  const now = new Date();
 
   const link =
     code === "unknown"
@@ -23,8 +25,7 @@ export default async function ExpiredPage({ params }: { params: Promise<{ code: 
   // 대안 딜: 지금 살아있는 다른 딜 몇 개. 자동 이동이 아니라 목록으로만 제시한다.
   const alternatives = await db.deal.findMany({
     where: {
-      status: "PUBLISHED",
-      shortLinks: { some: { state: "ACTIVE", surface: "hub" } },
+      ...liveHubDealsWhere(now),
       ...(link ? { NOT: { id: link.dealId } } : {}),
     },
     include: {
@@ -41,15 +42,21 @@ export default async function ExpiredPage({ params }: { params: Promise<{ code: 
         <p className="text-3xl" aria-hidden>😢</p>
         <h1 className="text-xl font-bold">지금은 살 수 없는 상품이에요</h1>
         <p className="text-sm text-ink-soft">
-          {link?.deal.product
-            ? `${link.deal.product.brandName} · ${link.deal.product.productName} 은(는) 품절됐거나 할인이 끝났어요.`
-            : "품절됐거나 할인이 끝난 링크예요."}
+          {link?.deal.product ? (
+            <>
+              <b>{link.deal.product.brandName} {link.deal.product.productName}</b>
+              <br />
+              품절됐거나 할인이 끝났어요.
+            </>
+          ) : (
+            "품절됐거나 할인이 끝난 상품이에요."
+          )}
         </p>
       </header>
 
       {alternatives.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium text-ink-soft">지금 살 수 있는 다른 꿀템</h2>
+          <h2 className="text-sm font-medium text-ink-soft">지금 살 수 있는 다른 꿀매</h2>
           <p className="text-xs text-ink-soft">{DISCLOSURE.NOTION}</p>
           <ul className="flex flex-col gap-2">
             {alternatives.map((deal) => (
@@ -74,7 +81,7 @@ export default async function ExpiredPage({ params }: { params: Promise<{ code: 
         href="/hub"
         className="rounded-xl border border-line bg-surface px-4 py-3 text-center text-sm font-semibold text-ink-soft transition-colors hover:border-accent hover:text-accent"
       >
-        지금 살 수 있는 것 전부 보기
+        지금 살 수 있는 꿀매 전부 보기
       </a>
     </main>
   );

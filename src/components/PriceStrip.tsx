@@ -28,14 +28,14 @@ function Cell({
 }
 
 function EventCell({ event }: { event: PriceEventDTO }) {
-  const label = event.manualOnly ? `${event.eventTag} (수동)` : event.eventTag;
+  const label = event.manualOnly ? `${event.eventTag} (직접 입력)` : event.eventTag;
 
   // 쿠폰가 라인은 두 분기(실할인 있음/없음) 모두에서 조건이 같아 한 번만 만든다 —
   // "작년 vs 올해"를 나란히 볼 때 쿠폰가 유무로 줄 수가 흔들리면 비교가 깨진다.
   const couponLine = event.couponPrice !== null && (
     <div className="text-xs font-normal text-ink-soft">
       쿠폰가 {formatKRW(event.couponPrice)}
-      {event.couponDiscountRate !== null && ` · 실제 할인 ${event.couponDiscountRate}%`}
+      {event.couponDiscountRate !== null && ` · 평소보다 ${event.couponDiscountRate}% 싸요`}
     </div>
   );
 
@@ -43,7 +43,7 @@ function EventCell({ event }: { event: PriceEventDTO }) {
   if (event.realDiscountRate !== null) {
     return (
       <Cell label={label}>
-        {event.realDiscountRate}%<span className="ml-1.5 text-xs text-ink-soft">실제 할인</span>
+        <span className="text-xs font-normal text-ink-soft">평소보다 </span>{event.realDiscountRate}%<span className="ml-1 text-xs font-normal text-ink-soft">싸요</span>
         <div className="text-xs font-normal text-ink-soft">{formatKRW(event.salePrice)}</div>
         {couponLine}
       </Cell>
@@ -54,7 +54,7 @@ function EventCell({ event }: { event: PriceEventDTO }) {
     <Cell label={label}>
       {formatKRW(event.salePrice)}
       {event.listDiscountRate !== null && (
-        <span className="ml-1.5 text-xs text-ink-soft">정가 대비 {event.listDiscountRate}%</span>
+        <span className="ml-1.5 text-xs text-ink-soft">정가에서 {event.listDiscountRate}%</span>
       )}
       {/*
         기준가 진행률은 "앞으로 모이면 실할인율이 나온다"는 뜻이다.
@@ -62,7 +62,7 @@ function EventCell({ event }: { event: PriceEventDTO }) {
       */}
       <div className="text-xs font-normal text-ink-soft">
         {event.manualOnly
-          ? "기록 전 행사라 실제 할인은 몰라요"
+          ? "기록 시작 전 행사라 비교는 없어요"
           : `평소 가격 모으는 중 ${event.baselineSampleSize}/3`}
       </div>
       {couponLine}
@@ -79,9 +79,9 @@ function FirstRecordCell({ history }: { history: PriceHistoryDTO }) {
   if (history.firstSalePrice === null) {
     return (
       <Cell label="행사 기록" tone="muted">
-        아직 없음
+        아직 없어요
         <div className="text-xs font-normal text-ink-soft">
-          기록 {history.snapshotCount}건 모으는 중
+          가격 {history.snapshotCount}번 기록했어요
         </div>
       </Cell>
     );
@@ -93,7 +93,7 @@ function FirstRecordCell({ history }: { history: PriceHistoryDTO }) {
       {formatKRW(history.firstSalePrice)}
       {rate !== null && rate !== 0 && (
         <span className="ml-1.5 text-xs text-ink-soft">
-          현재 대비 {rate > 0 ? `${rate}% 하락` : `${Math.abs(rate)}% 상승`}
+          {rate > 0 ? `지금이 ${rate}% 더 싸요` : `지금이 ${Math.abs(rate)}% 더 비싸요`}
         </span>
       )}
       <div className="text-xs font-normal text-ink-soft">
@@ -107,6 +107,8 @@ function FirstRecordCell({ history }: { history: PriceHistoryDTO }) {
 export function PriceStrip({ history }: { history: PriceHistoryDTO }) {
   // 최근 두 행사만 — "작년 vs 올해"가 한눈에 들어오는 것이 목적이다.
   const events = history.events.slice(-2);
+  // 비교할 것이 하나도 없으면(첫 기록뿐) 스트립을 그리지 않는다 — 빈 셀 두 개가 자리만 차지한다.
+  if (events.length === 0 && history.firstSalePrice === null) return null;
 
   return (
     <div className="mb-3 flex flex-wrap gap-2">
@@ -116,7 +118,7 @@ export function PriceStrip({ history }: { history: PriceHistoryDTO }) {
         events.map((e) => <EventCell key={e.eventTag} event={e} />)
       )}
 
-      <Cell label="현재가" tone={history.currentSalePrice === null ? "muted" : "normal"}>
+      <Cell label="지금 가격" tone={history.currentSalePrice === null ? "muted" : "normal"}>
         {history.currentSalePrice === null ? (
           "아직 기록 없음"
         ) : (
@@ -126,7 +128,7 @@ export function PriceStrip({ history }: { history: PriceHistoryDTO }) {
               <span className="ml-1.5 text-xs text-ink-soft">쿠폰가</span>
             )}
             <div className="text-xs font-normal text-ink-soft">
-              {history.currentCapturedLabel} 기준 · 기록 {history.snapshotCount}건
+              {history.currentCapturedLabel} 기록 · 지금까지 {history.snapshotCount}번
             </div>
           </>
         )}

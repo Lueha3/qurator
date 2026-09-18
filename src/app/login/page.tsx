@@ -11,8 +11,9 @@ import { PasskeyLogin } from "@/components/PasskeyLogin";
 export const metadata = { title: "로그인 · qurator" };
 
 export default async function LoginPage(props: PageProps<"/login">) {
-  const { invite } = await props.searchParams;
+  const { invite, next } = await props.searchParams;
   const code = typeof invite === "string" ? invite : undefined;
+  const nextPath = typeof next === "string" ? next : undefined;
 
   return (
     <main className="flex min-h-dvh items-center justify-center px-4 py-10">
@@ -20,21 +21,18 @@ export default async function LoginPage(props: PageProps<"/login">) {
         <p className="text-3xl" aria-hidden>
           {code ? "👋" : "🔒"}
         </p>
-        <h1 className="mt-4 text-xl font-bold">{code ? "이 폰을 등록할게요" : "qurator"}</h1>
+        <h1 className="mt-4 text-xl font-bold">{code ? "이 폰을 등록할게요" : "Face ID로 열어주세요"}</h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-soft">
           {code
-            ? "한 번만 등록하면, 다음부터는 주소만 열고 얼굴만 보면 들어와져요."
-            : "내 링크가 들어 있는 작업 화면이라 잠겨 있어요. Face ID로 열어주세요."}
+            ? "한 번만 등록해두면, 다음부터는 Face ID로 바로 들어와요."
+            : "처음이면 관리자에게 받은 등록 링크로 먼저 등록해주세요. 홈 화면 앱과 Safari는 각각 한 번씩 열어야 해요."}
         </p>
 
         <div className="mt-6">
-          <PasskeyLogin invite={code} />
+          <PasskeyLogin invite={code} next={nextPath} />
         </div>
 
-        <p className="mt-5 text-xs leading-relaxed text-ink-faint">
-          얼굴 정보는 폰 밖으로 나가지 않아요. 아이클라우드에 함께 저장돼서 Safari·홈 화면 앱·맥 어디서든
-          같은 얼굴로 열려요.
-        </p>
+        <p className="mt-5 text-xs leading-relaxed text-ink-faint">얼굴 정보는 폰 밖으로 나가지 않아요.</p>
       </div>
     </main>
   );

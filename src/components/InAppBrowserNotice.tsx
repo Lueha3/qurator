@@ -41,18 +41,20 @@ export function InAppBrowserNotice() {
   return (
     <div className={noticeCls}>
       <p>
-        <b>{appName}</b> 안에서 열려 있어 <b>Face ID를 쓸 수 없습니다.</b> 더보기(⋯) 또는 공유 버튼에서{" "}
-        <b>“Safari로 열기”</b>를 선택해 다시 시도해주세요.
+        <b>{appName}</b> 안에서는 Face ID를 쓸 수 없어요.
       </p>
-      {url && (
-        <p className="mt-1.5">
-          메뉴가 안 보이면 아래 주소를 길게 눌러 “Safari에서 열기”를 선택하세요:
-          <br />
-          <a href={url} className="break-all font-semibold underline">
-            {url}
-          </a>
-        </p>
-      )}
+      <ol className="mt-1.5 flex list-decimal flex-col gap-1 pl-4">
+        <li>⋯ 또는 공유 버튼을 누르고 <b>“Safari로 열기”</b>를 골라주세요.</li>
+        {url && (
+          <li>
+            메뉴가 없으면 아래 주소를 길게 눌러 <b>“Safari에서 열기”</b>를 골라주세요.
+            <br />
+            <a href={url} className="break-all font-semibold underline">
+              {url}
+            </a>
+          </li>
+        )}
+      </ol>
     </div>
   );
 }

@@ -121,13 +121,13 @@ export function renderCard(channel: Channel, facts: DealFacts): RenderResult {
   if (facts.links.length === 0) {
     return {
       ok: false,
-      error: { code: "NO_LIVE_LINK", message: "살아있는 큐레이터 링크가 없습니다." },
+      error: { code: "NO_LIVE_LINK", message: "쓸 수 있는 링크가 없어요. 링크를 다시 붙여주세요." },
     };
   }
   if (facts.endsAt && facts.endsAt.getTime() < Date.now()) {
     return {
       ok: false,
-      error: { code: "EXPIRED", message: "마감 시각이 이미 지났습니다." },
+      error: { code: "EXPIRED", message: "마감 시각이 이미 지났어요. ✏️ 정보 고치기에서 바꿔주세요." },
     };
   }
 
@@ -135,7 +135,7 @@ export function renderCard(channel: Channel, facts: DealFacts): RenderResult {
   const warnings: string[] = [];
 
   if (channel === "INSTAGRAM_COMMENT" && (facts.hookLine ?? "").includes("#")) {
-    warnings.push("해시태그는 고정댓글 채널에서 지양됩니다 (docs/02 §4.3).");
+    warnings.push("인스타 고정댓글에는 해시태그를 빼는 게 좋아요.");
   }
 
   const parts: Parts = {

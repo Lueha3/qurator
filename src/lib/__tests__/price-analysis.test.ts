@@ -278,7 +278,7 @@ describe("buildPriceChangeNote — 재촬영 시 '지난번 vs 지금' 한 줄",
     const note = buildPriceChangeNote(analysis);
     expect(note).toContain("48,000원");
     expect(note).toContain("42,900원");
-    expect(note).toContain("하락");
+    expect(note).toContain("내렸어요");
     expect(note).toContain("11%"); // (1 - 42900/48000) ≈ 10.6% → 반올림 11%
   });
 
@@ -291,10 +291,10 @@ describe("buildPriceChangeNote — 재촬영 시 '지난번 vs 지금' 한 줄",
       now
     );
     const note = buildPriceChangeNote(analysis);
-    expect(note).toContain("상승");
+    expect(note).toContain("올랐어요");
   });
 
-  it("판매가가 같으면 '지난번과 같은 판매가'라고 말한다", () => {
+  it("판매가가 같으면 '지난번과 같은 가격'이라고 말한다", () => {
     const analysis = analyzeSnapshots(
       [
         snap(new Date("2026-09-10T10:00:00+09:00"), 42900),
@@ -302,7 +302,7 @@ describe("buildPriceChangeNote — 재촬영 시 '지난번 vs 지금' 한 줄",
       ],
       now
     );
-    expect(buildPriceChangeNote(analysis)).toContain("같은 판매가");
+    expect(buildPriceChangeNote(analysis)).toContain("같은 가격");
   });
 
   it("비교할 이전 기록이 없으면(첫 기록) null — 침묵이 아니라 '비교 대상 없음'의 정직한 표현", () => {
@@ -324,7 +324,7 @@ describe("buildPriceChangeNote — 재촬영 시 '지난번 vs 지금' 한 줄",
     );
     const note = buildPriceChangeNote(analysis);
     // 40%(=1-48000/89000) → 52%(=1-42900/89000)
-    expect(note).toContain("정가 89,000원 기준 할인율 46% → 52%");
+    expect(note).toContain("정가 89,000원 기준 할인 46% → 52%");
   });
 
   it("정가가 이번에만 읽혔으면(직전엔 못 읽음) 전후 비교 없이 지금 값만 보여준다", () => {
@@ -336,7 +336,7 @@ describe("buildPriceChangeNote — 재촬영 시 '지난번 vs 지금' 한 줄",
       now
     );
     const note = buildPriceChangeNote(analysis);
-    expect(note).toContain("정가 89,000원 기준 할인율 52%");
+    expect(note).toContain("정가 89,000원 기준 할인 52%");
     expect(note).not.toContain("→ 52%"); // 지어낸 "전" 수치가 없어야 한다
   });
 
@@ -349,7 +349,7 @@ describe("buildPriceChangeNote — 재촬영 시 '지난번 vs 지금' 한 줄",
       now
     );
     const note = buildPriceChangeNote(analysis);
-    expect(note).toContain("정가 89,000원 기준 할인율 52%");
+    expect(note).toContain("정가 89,000원 기준 할인 52%");
     expect(note).not.toMatch(/할인율 \d+% → /);
   });
 
@@ -368,7 +368,7 @@ describe("buildPriceChangeNote — 재촬영 시 '지난번 vs 지금' 한 줄",
       now
     );
     const note = buildPriceChangeNote(analysis);
-    expect(note).toContain("쿠폰 적용 시 45,000원 (49% 할인)");
+    expect(note).toContain("쿠폰 쓰면 45,000원 (49% 할인)");
   });
 
   it("쿠폰가도 바뀌었으면 '지난번 → 지금'으로 비교해서 보여준다", () => {
@@ -386,7 +386,7 @@ describe("buildPriceChangeNote — 재촬영 시 '지난번 vs 지금' 한 줄",
       now
     );
     const note = buildPriceChangeNote(analysis);
-    expect(note).toContain("쿠폰 적용 시 지난번 48,000원 → 지금 38,900원");
+    expect(note).toContain("쿠폰 쓰면 지난번 48,000원 → 지금 38,900원");
   });
 
   it("쿠폰가가 이번에 안 보였으면(화면에 없었음) 쿠폰 줄 자체를 내지 않는다", () => {

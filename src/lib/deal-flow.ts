@@ -238,7 +238,7 @@ export type AttachLinkResult =
  */
 export async function attachCuratorLink(dealId: string, text: string): Promise<AttachLinkResult> {
   const deal = await loadDeal(dealId);
-  if (!deal) return { ok: false, reason: "딜을 찾을 수 없습니다." };
+  if (!deal) return { ok: false, reason: "이 딜을 찾을 수 없어요. 화면을 새로고침해 주세요." };
 
   const parsed = parseCuratorLink(text);
   if (!parsed.ok) return { ok: false, reason: parsed.reason };
@@ -247,7 +247,7 @@ export async function attachCuratorLink(dealId: string, text: string): Promise<A
   const expected = deal.product.musinsaGoodsNo;
   if (expected && parsed.link.goodsNo && parsed.link.goodsNo !== expected) {
     warnings.push(
-      `이 링크는 다른 상품(#${parsed.link.goodsNo})을 가리킵니다 — 이 딜은 #${expected}입니다.`
+      `이 링크는 다른 상품 것 같아요 (링크 #${parsed.link.goodsNo}, 이 딜 #${expected}). 확인해주세요.`
     );
   } else if (!expected && parsed.link.goodsNo) {
     // 스크린샷으로 생성된 상품(docs/06 §4.2)은 musinsaGoodsNo가 없다. 처음 받는 정규 링크로
@@ -261,7 +261,7 @@ export async function attachCuratorLink(dealId: string, text: string): Promise<A
     if (collision && collision.id !== deal.productId) {
       // 같은 상품이 이미 다른 경로로 등록돼 있다 — 두 Product를 자동으로 합치지 않는다.
       warnings.push(
-        `이 링크의 상품(#${parsed.link.goodsNo})은 이미 다른 항목으로 등록돼 있습니다 — 중복 상품일 수 있습니다.`
+        `이 링크의 상품(#${parsed.link.goodsNo})은 이미 다른 딜에 있어요. 중복일 수 있어요.`
       );
     } else {
       const canonical = canonicalizeMusinsaUrl(parsed.link.rawUrl);
@@ -276,7 +276,7 @@ export async function attachCuratorLink(dealId: string, text: string): Promise<A
   if (!parsed.link.hasCommissionParams) {
     // 거부하지 않고 경고한다: 무신사가 파라미터 이름을 바꾸면 정상 링크를 전부 막게 되므로,
     // 판정은 사람에게 맡기되 승인 화면에서 반드시 보이게 한다.
-    warnings.push("커미션 파라미터가 없습니다 — 큐레이터센터에서 만든 링크가 맞는지 확인하세요.");
+    warnings.push("큐레이터센터에서 만든 링크가 아닌 것 같아요. 이대로 올리면 수수료가 안 잡힐 수 있어요.");
   }
 
   const curatorLink = await db.curatorLink.create({
@@ -335,8 +335,8 @@ export type HookResult = { ok: true } | { ok: false; reason: string };
 /** [훅 교체] — 새 훅을 반영하고 전 채널 카드를 새 버전으로 다시 렌더한다 */
 export async function replaceHook(dealId: string, hookLine: string): Promise<HookResult> {
   const hook = hookLine.trim();
-  if (!hook) return { ok: false, reason: "훅 문구가 비어 있습니다. 한 줄로 적어주세요." };
-  if (hook.length > 200) return { ok: false, reason: "훅 문구가 너무 깁니다(200자 이내)." };
+  if (!hook) return { ok: false, reason: "첫 줄 문구를 적어주세요." };
+  if (hook.length > 200) return { ok: false, reason: "첫 줄 문구가 너무 길어요. 200자 안으로 줄여주세요." };
 
   await db.deal.update({ where: { id: dealId }, data: { hookLine: hook } });
   return renderCards(dealId);
@@ -345,7 +345,7 @@ export async function replaceHook(dealId: string, hookLine: string): Promise<Hoo
 /** 딜의 현재 사실로 4채널 카드를 새 버전으로 렌더하고 발행 승인 단계로 옮긴다 */
 export async function renderCards(dealId: string): Promise<HookResult> {
   const deal = await loadDeal(dealId);
-  if (!deal) return { ok: false, reason: "딜을 찾을 수 없습니다." };
+  if (!deal) return { ok: false, reason: "이 딜을 찾을 수 없어요. 화면을 새로고침해 주세요." };
 
   const rendered = renderAllChannels(toFacts(deal));
   const failed = rendered.find((r) => !r.ok);
@@ -472,26 +472,26 @@ export async function updateDealFacts(
   patch: DealFactsPatch
 ): Promise<UpdateFactsResult> {
   const deal = await loadDeal(dealId);
-  if (!deal) return { ok: false, reason: "딜을 찾을 수 없습니다." };
+  if (!deal) return { ok: false, reason: "이 딜을 찾을 수 없어요. 화면을 새로고침해 주세요." };
 
   const brand = patch.brand?.trim();
   const productName = patch.productName?.trim();
-  if (patch.brand !== undefined && !brand) return { ok: false, reason: "브랜드는 비울 수 없습니다." };
+  if (patch.brand !== undefined && !brand) return { ok: false, reason: "브랜드를 적어주세요." };
   if (patch.productName !== undefined && !productName) {
-    return { ok: false, reason: "상품명은 비울 수 없습니다." };
+    return { ok: false, reason: "상품명을 적어주세요." };
   }
   for (const [label, value] of [
     ["정가", patch.listPrice],
     ["할인가", patch.salePrice],
     ["쿠폰 적용가", patch.finalPrice],
   ] as const) {
-    if (!nonNegativeInt(value)) return { ok: false, reason: `${label}는 0 이상의 정수여야 합니다.` };
+    if (!nonNegativeInt(value)) return { ok: false, reason: `${label}는 0 이상 숫자로 적어주세요.` };
   }
   if (patch.discountRate != null && (patch.discountRate < 0 || patch.discountRate > 100)) {
-    return { ok: false, reason: "할인율은 0~100 사이여야 합니다." };
+    return { ok: false, reason: "할인율은 0에서 100 사이로 적어주세요." };
   }
   if (patch.endsAt && Number.isNaN(patch.endsAt.getTime())) {
-    return { ok: false, reason: "마감 시각 형식이 올바르지 않습니다." };
+    return { ok: false, reason: "마감 시각을 다시 골라주세요." };
   }
 
   const productData: {
@@ -518,7 +518,7 @@ export async function updateDealFacts(
       if (collision && collision.id !== deal.productId) {
         return {
           ok: false,
-          reason: `#${goodsNo} 상품은 이미 다른 항목으로 등록돼 있습니다 — 중복 상품일 수 있습니다.`,
+          reason: `#${goodsNo} 상품은 이미 다른 딜에 있어요. 중복일 수 있어요.`,
         };
       }
       productData.musinsaGoodsNo = goodsNo;

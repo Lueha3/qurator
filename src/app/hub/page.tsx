@@ -6,6 +6,7 @@ import { formatKRW } from "@/lib/format";
 import { classifyUserAgent } from "@/lib/shortlink";
 import { parseTags } from "@/lib/deal-tags";
 import { buildHubBadges, type HubBadge } from "@/lib/hub-badge";
+import { liveHubDealsWhere } from "@/lib/hub-query";
 import { BrandMark } from "@/components/BrandMark";
 
 // 링크허브 — 링크트리 대체 (docs/02-architecture.md §10.4, docs/08 §3.3 허브 v2).
@@ -60,12 +61,7 @@ export default async function HubPage() {
   // endsAt도 함께 본다: 렌더러는 마감 지난 딜의 렌더를 거부하는데(renderer.ts 'EXPIRED')
   // 허브만 계속 노출하면 "할인이 끝난 상품은 자동으로 사라집니다"라는 이 페이지의 약속이 거짓이 된다.
   const deals = await db.deal.findMany({
-    where: {
-      status: "PUBLISHED",
-      curatorLinks: { some: { health: { in: ["OK", "UNCHECKED"] } } },
-      shortLinks: { some: { state: "ACTIVE", surface: "hub" } },
-      OR: [{ endsAt: null }, { endsAt: { gt: now } }],
-    },
+    where: liveHubDealsWhere(now),
     include: {
       product: true,
       shortLinks: { where: { state: "ACTIVE", surface: "hub" }, take: 1 },
@@ -108,7 +104,7 @@ export default async function HubPage() {
 
       {deals.length === 0 ? (
         <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-soft">
-          지금은 살 수 있는 딜이 없어요. 곧 새 아이템이 올라와요.
+          지금은 올라온 상품이 없어요. 곧 새 꿀매가 올라와요.
         </p>
       ) : (
         ordered.map(([title, rows]) => (
@@ -161,7 +157,7 @@ export default async function HubPage() {
                               )}
                             </>
                           ) : (
-                            <span className="text-xs text-ink-soft">가격은 링크에서 확인</span>
+                            <span className="text-xs text-ink-soft">눌러서 가격 보기</span>
                           )}
                           {couponLive && deal.couponDesc && (
                             <span className="text-xs text-ink-soft">쿠폰 {deal.couponDesc}</span>
@@ -188,14 +184,14 @@ export default async function HubPage() {
           rel="nofollow noopener"
           className="card px-4 py-3 text-center text-sm font-medium"
         >
-          큐레이션 샵 전체 보기
+          무신사에서 전체 보기 ↗
         </a>
       )}
 
       <footer className="flex flex-col gap-1 pb-8 text-center text-[11px] text-ink-soft">
-        <span>품절되거나 할인이 끝난 상품은 목록에서 바로 내려가요.</span>
+        <span>품절되거나 할인이 끝나면 바로 목록에서 사라져요.</span>
         {/* 배지가 과장으로 읽히지 않게, 근거의 범위를 말해둔다 */}
-        {hasLowestBadge && <span>‘최저가’는 제가 기록해 온 가격 범위 안에서의 최저가예요.</span>}
+        {hasLowestBadge && <span>‘최저가’는 제가 지켜본 기간 안에서 가장 쌌던 가격이에요.</span>}
       </footer>
     </main>
   );

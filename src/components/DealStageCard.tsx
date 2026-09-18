@@ -90,7 +90,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
             </pre>
           )}
           {deal.parseSource === "none" && (
-            <p className="text-sm text-danger">⚠️ 상품 정보를 못 읽었어요. [✏️ 정보 고치기]로 채워주세요.</p>
+            <p className="text-sm text-danger">⚠️ 사진에서 정보를 못 읽었어요. 아래 ✏️ 정보 고치기로 채워주세요.</p>
           )}
           {deal.parseSource === "opengraph" && (
             <p className="text-sm text-ink-soft">일부만 읽었어요. 올리기 전에 한 번 확인해주세요.</p>
@@ -116,7 +116,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
                     r.ok
                       ? r.alreadyActive
                         ? "이미 지켜보고 있어요."
-                        : `📈 지켜보기 시작! 같은 상품을 다시 찍어 올리면 그때마다 가격 변화가 기록돼요. (지켜보는 중 ${r.activeCount}개)`
+                        : `📈 지켜보기 시작! 다시 찍어 올릴 때마다 가격 변화가 쌓여요. (${r.activeCount}개 지켜보는 중)`
                       : `⚠️ ${r.reason}`
                   );
                 })
@@ -126,7 +126,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
               {deal.watchActive ? "📈 지켜보는 중" : "📈 가격만 지켜보기"}
             </button>
             <button type="button" disabled={pending} onClick={() => run(() => skipAction(deal.id))} className={secondaryBtnCls}>
-              📁 보관
+              ✔️ 안 올릴게요
             </button>
           </div>
         </div>
@@ -136,7 +136,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
         <div className="flex flex-col gap-3">
           <p className="text-sm">
             🔗 <b>내 링크를 붙여넣어 주세요.</b>{" "}
-            <span className="text-ink-soft">큐레이터센터에서 이 상품의 링크를 만들어 그대로 붙여넣으면 카톡 문구가 완성돼요.</span>
+            <span className="text-ink-soft">큐레이터센터에서 이 상품 링크를 만들고 여기 붙여넣으면 카톡 문구가 만들어져요.</span>
           </p>
           <a
             href={curatorShopUrl ?? CURATOR_CENTER}
@@ -150,7 +150,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
             value={linkText}
             onChange={(e) => setLinkText(e.target.value)}
             rows={3}
-            placeholder="https://www.musinsa.com/products/…?utm_source=curator&utm_term=…"
+            placeholder="여기에 링크를 붙여넣어 주세요"
             className={`${inputCls} resize-none`}
           />
           <button
@@ -173,7 +173,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
           </button>
           <div className="flex gap-2">
             <button type="button" disabled={pending} onClick={() => run(() => skipAction(deal.id))} className={secondaryBtnCls}>
-              📁 보관
+              ✔️ 안 올릴게요
             </button>
           </div>
         </div>
@@ -194,13 +194,13 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
               {deal.hookSource === "ai" && <span className="ml-1 text-[11px] text-ink-soft">AI 초안</span>}
             </p>
           ) : (
-            <p className="text-sm text-ink-soft">첫 줄 문구가 없어요. 아래에 넣을 수 있어요.</p>
+            <p className="text-sm text-ink-soft">첫 줄 문구가 없어요. 아래에 적어보세요.</p>
           )}
           <div className="flex gap-2">
             <input
               value={hookText}
               onChange={(e) => setHookText(e.target.value)}
-              placeholder="첫 줄 문구 (한 줄)"
+              placeholder="예: 이 가격에 S부터 품절각"
               className={inputCls}
             />
             <button
@@ -219,17 +219,14 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
             </button>
           </div>
 
-          <p className="text-xs text-ink-soft">🔗 링크 {deal.linkCount}개</p>
+          {deal.linkCount > 1 && <p className="text-xs text-ink-soft">🔗 링크 {deal.linkCount}개</p>}
 
           {kakao && (
             <div className="rounded-xl border border-line">
               <div className="flex items-center justify-between border-b border-line px-3 py-1.5 text-xs text-ink-soft">
                 <span>카톡에 이렇게 나가요</span>
-                <span>
-                  {kakao.charCount}자 ·{" "}
-                  <span className={kakao.disclosureOk ? "text-accent" : "text-danger"}>
-                    {kakao.disclosureOk ? "광고 표시 OK" : "광고 표시 빠짐"}
-                  </span>
+                <span className={kakao.disclosureOk ? "text-accent" : "text-danger"}>
+                  {kakao.disclosureOk ? "광고 표시 있음 ✓" : "⚠️ 광고 표시 없음"}
                 </span>
               </div>
               <pre className="whitespace-pre-wrap break-words p-3 font-sans text-[13px] leading-relaxed">{kakao.bodyText}</pre>
@@ -245,7 +242,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
                 if (!r.ok) {
                   setError(
                     r.reason === "DISCLOSURE_FAILED"
-                      ? "⛔️ 광고 표시가 빠진 문구는 올릴 수 없어요."
+                      ? "⛔️ 광고 표시가 빠져서 올릴 수 없어요. 관리자에게 알려주세요."
                       : "링크를 먼저 붙여주세요."
                   );
                 }
@@ -257,7 +254,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
           </button>
           <div className="flex gap-2">
             <button type="button" disabled={pending} onClick={() => run(() => skipAction(deal.id))} className={secondaryBtnCls}>
-              📁 보관
+              ✔️ 안 올릴게요
             </button>
           </div>
         </div>
@@ -270,13 +267,13 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
               🚫 <b className="text-ink">품절로 표시했어요.</b> 팔로워 페이지에서 내렸고, 이미 보낸 링크는 안내 페이지로 가요.
             </p>
           ) : (
-            <p className="text-sm">✅ <b>올렸어요!</b> 아래 문구를 복사해 카톡에 붙여넣으세요.</p>
+            <p className="text-sm">✅ <b>준비 끝!</b> 아래 문구를 복사해 카톡에 붙여넣으세요.</p>
           )}
           {kakao && <CopyPane text={kakao.bodyText} cardId={kakao.id} />}
           {others.length > 0 && (
             <details className="rounded-xl border border-line">
               <summary className="cursor-pointer px-3 py-2 text-sm text-ink-soft">
-                다른 채널 문구 (스레드 · 인스타 고정댓글 · 노션)
+                다른 곳에 올릴 문구 (스레드 · 인스타 · 노션)
               </summary>
               <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2">
                 {others.map((card) => (
@@ -312,7 +309,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
       )}
 
       {deal.approvalStage === "SKIPPED" && (
-        <p className="text-sm text-ink-soft">📁 보관 중이에요. 가격만 기록해뒀어요.</p>
+        <p className="text-sm text-ink-soft">✔️ 안 올리기로 한 딜이에요. 가격은 기록해뒀어요.</p>
       )}
 
       {deal.approvalStage !== "APPROVED" && deal.approvalStage !== "SKIPPED" && (
@@ -325,15 +322,18 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
 
       {editing && <DealEditForm deal={deal} onClose={() => setEditing(false)} />}
 
+      {deal.approvalStage === "CANDIDATE" && (
+        <p className="mt-3 text-xs text-ink-faint">💡 올린 순간 가격은 이미 기록됐어요. 버튼은 “이 다음에 뭘 할지”만 골라요.</p>
+      )}
+
       {deal.approvalStage !== "APPROVED" && deal.approvalStage !== "SKIPPED" && (
         <details className="mt-3 rounded-xl bg-paper text-xs leading-relaxed text-ink-soft">
           <summary className="cursor-pointer px-3 py-2 font-medium">버튼이 뭐예요?</summary>
           <div className="flex flex-col gap-1.5 px-3 pb-3">
-            <p><b className="text-ink">✅ 올릴게요</b> — 카톡에 올릴 준비를 시작해요. 링크를 붙이면 카톡 문구가 만들어져요. 바로 올라가지는 않아요.</p>
+            <p><b className="text-ink">✅ 올릴게요</b> — 카톡에 올릴 준비를 시작해요. 링크를 붙이면 문구가 만들어지고, 마지막에 한 번 더 확인해요.</p>
             <p><b className="text-ink">📈 가격만 지켜보기</b> — 지금은 안 올리지만 가격은 계속 보고 싶을 때. 같은 상품을 다시 찍어 올리면 “그때 얼마 → 지금 얼마”가 자동으로 비교돼요.</p>
-            <p><b className="text-ink">📁 보관</b> — 이 딜을 접어요. 지우는 게 아니에요. 가격은 이미 기록됐고, 올리지만 않는 거예요.</p>
+            <p><b className="text-ink">✔️ 안 올릴게요</b> — 이 딜을 닫아요. 지우는 게 아니에요. 가격은 이미 기록돼 있어요.</p>
             <p><b className="text-ink">✏️ 정보 고치기</b> — 브랜드·상품명·가격을 잘못 읽었을 때 바로잡아요.</p>
-            <p>💡 스크린샷을 올리는 것만으로 가격은 항상 기록돼요. 버튼은 “이 다음에 뭘 할지”를 고르는 거예요.</p>
           </div>
         </details>
       )}
