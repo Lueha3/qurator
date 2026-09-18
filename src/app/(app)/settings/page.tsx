@@ -10,6 +10,7 @@ import { pushPublicKey } from "@/lib/push";
 import { PasskeyManager } from "@/components/PasskeyManager";
 import { listLiveInvites, listPasskeys } from "@/lib/passkey";
 import { InviteCard } from "@/components/InviteCard";
+import { BaseUrlWarning } from "@/components/BaseUrlWarning";
 
 // 설정 — docs/08 §3.3. 매일 쓰지는 않지만 있어야 하는 것들을 한곳에 모았다.
 // (작년 BF 수동 입력은 원래 /watch 하단에 있었다 — 딜 탭이 목록 전용이 되면서 이리로 옮겼다.)
@@ -32,6 +33,9 @@ export default async function SettingsPage() {
     <>
       <PageHeader title="설정" />
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 py-5">
+        {/* 설정이 틀리면 카톡 링크가 조용히 잘못 나간다 — 맨 위에서 알린다 */}
+        <BaseUrlWarning />
+
         <section className="rounded-2xl border border-line bg-panel p-4">
           <div className="mb-3 flex items-baseline justify-between gap-3">
             <h2 className="text-sm font-semibold">프로필</h2>
