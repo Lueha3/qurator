@@ -17,11 +17,17 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const MODEL = "claude-opus-5";
 /**
- * 상품 1건 응답은 200토큰이면 충분하지만, 좋아요 목록(그리드) 한 장에는 상품이 24개까지 들어온다
- * (docs/06 §4.6). 상한은 비용이 아니라 잘림 방지용이라 넉넉히 둔다 — 잘린 JSON은 파싱 실패가 되어
- * 통째로 버려진다.
+ * 상한은 비용이 아니라 잘림 방지용이라 넉넉히 둔다 — 잘린 JSON은 파싱 실패가 되어 통째로 버려진다.
+ *
+ * **이 값은 출력 길이만으로 잡으면 안 된다.** Opus 5는 `thinking`을 생략하면 adaptive thinking이
+ * 기본으로 켜지고(4.8·4.7과 다르다), 그 사고 토큰이 max_tokens에 함께 잡힌다. 예전 값(8192)은
+ * "상품 1건 = 200토큰"이라는 출력 기준으로만 잡혀 있어서, 좋아요 목록 한 장(상품 30칸)을 올리면
+ * 사고 단계에서 예산이 바닥나 텍스트 블록이 아예 안 나오거나 JSON이 중간에 잘렸다 — 둘 다 null이
+ * 되어 화면에는 "사진을 못 읽었어요"만 떴다 (2026-09-20, 실사용자 제보).
+ *
+ * 스트리밍 없이 안전한 범위에서 사고+출력 양쪽에 여유를 준다.
  */
-const MAX_TOKENS = 8192;
+const MAX_TOKENS = 16_000;
 /**
  * 텍스트 훅 생성(ai-hook.ts, 10초)보다 넉넉히 잡는다 — 이미지 토큰 처리가 텍스트만 보낼 때보다 오래 걸린다.
  * 그리드는 읽을 것이 24배라 더 걸린다. 라우트의 maxDuration(60초) 안에서 끝나야 하므로 45초로 둔다.
@@ -288,10 +294,20 @@ export async function extractFromScreenshot(
     );
     clearTimeout(timer);
 
+    // 잘림은 조용히 넘어가면 안 된다 — 아래 어느 경로로 떨어지든 화면에는 똑같이
+    // "사진을 못 읽었어요"만 뜨므로, 원인을 구분할 수 있는 곳은 여기뿐이다.
+    if (response.stop_reason === "max_tokens") {
+      console.warn(
+        `[vision-extract] max_tokens(${MAX_TOKENS})에 걸려 응답이 잘렸습니다 — 상한을 올려야 합니다.`,
+        { outputTokens: response.usage?.output_tokens }
+      );
+    }
+
     const block = response.content.find((c) => c.type === "text");
     if (!block || block.type !== "text") {
       console.warn("[vision-extract] 응답에 텍스트 블록이 없습니다.", {
         stopReason: response.stop_reason,
+        outputTokens: response.usage?.output_tokens,
       });
       return null;
     }
