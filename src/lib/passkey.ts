@@ -94,13 +94,23 @@ async function consumeChallenge(challenge: string, purpose: "register" | "login"
 
 // ── 등록 ────────────────────────────────────────────────────────────────
 
-export async function registrationOptions() {
+/**
+ * @param excludeExisting 이미 등록된 자격증명을 브라우저가 거부하게 할지.
+ *
+ * 설정 화면(이미 로그인된 상태)에서는 켠다 — "이미 등록한 폰이면 안 눌러도 돼요"가 참이 된다.
+ * **초대 등록에서는 끈다**: iCloud 키체인은 같은 애플 계정의 기기끼리 패스키를 동기화하므로,
+ * 다른 기기에서 한 번 등록했으면 새 기기도 "이미 등록됨"으로 막힌다. 그 상태에서 로그인까지
+ * 안 되면 들어올 길이 아예 없어진다(2026-09-20, 실사용자가 이 교착에 걸렸다). 초대 링크의
+ * 존재 이유가 "이 사람에게 이 기기로 들어올 길을 준다"이므로 여기서 막으면 안 된다.
+ * 재등록 자체는 안전하다 — verifyRegistration이 credentialId로 upsert한다.
+ */
+export async function registrationOptions({ excludeExisting = true } = {}) {
   const rp = relyingParty();
   if (!rp) return null;
 
-  const existing = await db.passkey.findMany({
-    select: { credentialId: true, transports: true },
-  });
+  const existing = excludeExisting
+    ? await db.passkey.findMany({ select: { credentialId: true, transports: true } })
+    : [];
 
   const options = await generateRegistrationOptions({
     rpName: "qurator",
@@ -108,7 +118,6 @@ export async function registrationOptions() {
     userID: new TextEncoder().encode(USER_ID),
     userName: USER_NAME,
     attestationType: "none", // 인증기 제조사 증명은 필요 없다. 우리는 한 사람만 쓴다
-    // 이미 등록된 기기에 또 등록하라고 하지 않는다
     excludeCredentials: existing.map((p) => ({
       id: p.credentialId,
       transports: parseTransports(p.transports),

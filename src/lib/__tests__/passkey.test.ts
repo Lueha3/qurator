@@ -77,6 +77,16 @@ describe("등록", () => {
     expect(options?.excludeCredentials?.map((c) => c.id)).toContain("already-here");
   });
 
+  // iCloud는 같은 애플 계정의 기기끼리 패스키를 동기화한다. 초대 등록에서 이미 등록된 것을
+  // 제외하면 "이미 등록됨"으로 막히고, 로그인까지 안 되는 사람은 들어올 길이 없어진다.
+  it("초대 등록은 이미 등록된 기기여도 막지 않는다", async () => {
+    await db.passkey.create({
+      data: { credentialId: "already-here", publicKey: "x", label: "아이폰" },
+    });
+    const options = await registrationOptions({ excludeExisting: false });
+    expect(options?.excludeCredentials ?? []).toHaveLength(0);
+  });
+
   it("서버가 낸 적 없는 챌린지는 거절한다", async () => {
     const result = await verifyRegistration(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

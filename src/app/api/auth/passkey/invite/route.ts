@@ -13,7 +13,7 @@ import { setActorCookie } from "@/lib/actor";
 //
 // 열려 있는 등록 경로이므로 이 앱에서 가장 조심해야 하는 표면이다. 지키는 것:
 //   · 초대 코드는 32바이트 난수 — 추측으로는 못 맞춘다
-//   · 30분 · 1회용 — 성공했을 때만 소비하고, 갱신된 행 수로 판정해 동시 사용을 막는다
+//   · 7일 · 1회용 — 성공했을 때만 소비하고, 갱신된 행 수로 판정해 동시 사용을 막는다
 //   · 코드가 죽어 있으면 등록 옵션조차 만들지 않는다
 //   · 성공하면 초대가 닫힌다 — 링크를 다시 눌러도 아무 일이 없어야 한다
 
@@ -25,7 +25,9 @@ export async function GET(req: NextRequest) {
   if (!(await inviteIsLive(code))) {
     return NextResponse.json({ error: "invalid-invite" }, { status: 403 });
   }
-  const options = await registrationOptions();
+  // excludeCredentials를 보내지 않는다 — iCloud로 동기화된 패스키 때문에 "이미 등록됨"으로
+  // 막히면, 로그인까지 안 되는 사람은 들어올 길이 없어진다. passkey.ts의 주석 참고.
+  const options = await registrationOptions({ excludeExisting: false });
   if (!options) return NextResponse.json({ error: "not-configured" }, { status: 503 });
   return NextResponse.json(options);
 }
