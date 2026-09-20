@@ -15,7 +15,12 @@ import { parseCuratorLink } from "./curator-link";
 import { recordSnapshot } from "./price-snapshot";
 import { buildPriceAnalyses, buildPriceChangeNote } from "./price-analysis";
 import { draftHookLine } from "./ai-hook";
-import { extractFromScreenshot, type ScreenshotImage, type VisionGridItem } from "./vision-extract";
+import {
+  extractFromScreenshot,
+  type ScreenshotImage,
+  type VisionFailReason,
+  type VisionGridItem,
+} from "./vision-extract";
 import { matchOrCreateProduct, type MatchedBy } from "./product-match";
 import { renderAllChannels, type DealFacts, type DealLink } from "./renderer";
 import { audit } from "./audit";
@@ -112,7 +117,7 @@ export type CaptureResult =
   /** 상품 페이지가 아닌 화면(장바구니·옵션 시트·홈) — 기록할 것이 없어 딜·스냅샷을 만들지 않는다 */
   | { kind: "not_product_page" }
   /** Vision 실패(API 장애·타임아웃·키 없음) — 빈 딜을 만들지 않고 안내만 한다 */
-  | { kind: "vision_failed" };
+  | { kind: "vision_failed"; reason: VisionFailReason };
 
 /**
  * 스크린샷 1장 이상으로 상품을 캡처한다 — docs/06 §3-§4의 1차 입력 경로.
@@ -257,7 +262,9 @@ export async function startDealFromProduct(
 
 export async function captureFromScreenshots(images: ScreenshotImage[]): Promise<CaptureResult> {
   const result = await extractFromScreenshot(images.slice(0, MAX_CAPTURE_IMAGES));
-  if (!result) return { kind: "vision_failed" };
+  // null은 옛 계약(이유 없는 실패) — 테스트 목이 아직 쓰므로 함께 받아 준다.
+  if (!result) return { kind: "vision_failed", reason: "bad-response" };
+  if ("failed" in result) return { kind: "vision_failed", reason: result.reason };
   // 그리드가 먼저다 — 목록 화면은 isProductPage가 false로 오므로 아래 분기에 걸리면
   // "상품 페이지를 찍어주세요"라는 엉뚱한 안내가 나간다.
   if (result.gridItems !== null) return captureGridItems(result.gridItems);

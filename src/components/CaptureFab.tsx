@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { CaptureResponse } from "@/lib/api-types";
+import type { VisionFailReason } from "@/lib/vision-extract";
 
 // 캡처 진입점 — docs/08 §3.3. 모든 탭의 같은 자리(우하단)에 있고, 누르면 바로 사진첩이 열린다.
 // docs/06 §2의 "입력은 2탭"을 한 탭 더 줄이는 것이 목표이고, 여기가 그 한 탭이다.
@@ -54,6 +55,25 @@ async function downscale(file: File): Promise<Blob> {
 }
 
 type Toast = { tone: "ok" | "error"; message: string; detail?: string | null };
+
+/**
+ * 읽기 실패를 원인별로 말한다. 예전에는 전부 "사진을 못 읽었어요"였는데, 그러면
+ * 관리자가 고쳐야 할 설정 문제와 현표가 다시 찍으면 되는 사진 문제가 구분되지 않았다.
+ */
+function visionFailMessage(reason?: VisionFailReason): string {
+  switch (reason) {
+    case "no-api-key":
+      return "서버에 AI 설정이 없어요. 관리자에게 알려주세요.";
+    case "timeout":
+      return "시간이 오래 걸려 멈췄어요. 다시 해보세요.";
+    case "api-error":
+      return "AI 서버가 응답하지 않아요. 잠시 뒤 다시 해보세요.";
+    case "truncated":
+      return "상품이 너무 많아요. 나눠서 올려주세요.";
+    default:
+      return "사진을 못 읽었어요. ✏️ 직접 만들기로 해보세요.";
+  }
+}
 
 export function CaptureFab() {
   const router = useRouter();
@@ -135,10 +155,8 @@ export function CaptureFab() {
           });
           break;
         case "vision_failed":
-          setToast({
-            tone: "error",
-            message: "사진을 못 읽었어요. ✏️ 직접 만들기로 해보세요.",
-          });
+          // 원인을 뭉개지 않는다 — 설정 누락과 사진 문제는 할 일이 전혀 다르다.
+          setToast({ tone: "error", message: visionFailMessage(body.reason) });
           break;
         default:
           setToast({ tone: "error", message: body.error });

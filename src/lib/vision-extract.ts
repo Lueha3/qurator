@@ -244,6 +244,26 @@ export interface ScreenshotImage {
 }
 
 /**
+ * 추출이 실패한 **이유**. 예전에는 전부 null로 뭉개서 화면에 "사진을 못 읽었어요"만 떴는데,
+ * 그러면 설정 누락(키 없음)과 사진 문제(글씨가 작아 못 읽음)를 구분할 방법이 서버 로그밖에 없다.
+ * 원격에서 실사용자 제보만으로 원인을 좁힐 수 없었던 사고가 반복돼(2026-09-20) 이유를 위로 올린다.
+ *
+ * 값 자체는 비밀이 아니다 — 키 존재 여부만 말하고 키는 절대 싣지 않는다.
+ */
+export type VisionFailReason =
+  | "no-images"
+  | "no-api-key"
+  | "timeout"
+  | "api-error"
+  | "truncated" // max_tokens에 걸려 응답이 잘림
+  | "bad-response"; // JSON이 아니거나 필수 필드 누락
+
+export interface VisionFailure {
+  failed: true;
+  reason: VisionFailReason;
+}
+
+/**
  * 스크린샷 1장(또는 같은 상품 페이지를 나눠 찍은 여러 장)에서 상품 필드를 추출한다.
  * 실패 시(키 없음/타임아웃/API 에러/비-JSON 응답/필수 필드 누락) null을 반환하며,
  * 이는 오류가 아니라 정상적인 폴백 경로다 —
@@ -253,18 +273,24 @@ export interface ScreenshotImage {
  */
 export async function extractFromScreenshot(
   images: ScreenshotImage[]
-): Promise<VisionExtractResult | null> {
-  if (images.length === 0) return null;
+): Promise<VisionExtractResult | VisionFailure> {
+  if (images.length === 0) return { failed: true, reason: "no-images" };
 
   const anthropic = getClient();
   if (!anthropic) {
     console.warn("[vision-extract] ANTHROPIC_API_KEY가 설정되지 않아 추출을 시도하지 않습니다.");
-    return null;
+    return { failed: true, reason: "no-api-key" };
   }
 
+  const controller = new AbortController();
+  // 타임아웃으로 끊긴 것인지 API가 거부한 것인지는 catch에서 구분이 안 된다 — 여기서 표시해 둔다.
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, TIMEOUT_MS);
+
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
     const imageBlocks = images.map((img) => ({
       type: "image" as const,
@@ -292,11 +318,11 @@ export async function extractFromScreenshot(
       },
       { signal: controller.signal }
     );
-    clearTimeout(timer);
 
-    // 잘림은 조용히 넘어가면 안 된다 — 아래 어느 경로로 떨어지든 화면에는 똑같이
-    // "사진을 못 읽었어요"만 뜨므로, 원인을 구분할 수 있는 곳은 여기뿐이다.
-    if (response.stop_reason === "max_tokens") {
+    // 잘림은 조용히 넘어가면 안 된다. Opus 5는 thinking이 기본으로 켜지고 그 토큰도
+    // max_tokens에 잡히므로, 칸이 많은 목록에서는 텍스트 블록이 아예 안 나올 수 있다.
+    const truncated = response.stop_reason === "max_tokens";
+    if (truncated) {
       console.warn(
         `[vision-extract] max_tokens(${MAX_TOKENS})에 걸려 응답이 잘렸습니다 — 상한을 올려야 합니다.`,
         { outputTokens: response.usage?.output_tokens }
@@ -309,7 +335,7 @@ export async function extractFromScreenshot(
         stopReason: response.stop_reason,
         outputTokens: response.usage?.output_tokens,
       });
-      return null;
+      return { failed: true, reason: truncated ? "truncated" : "bad-response" };
     }
 
     let parsed: unknown;
@@ -319,18 +345,21 @@ export async function extractFromScreenshot(
       // 마크다운 설명이 섞이는 등 비-JSON 응답 — 카드는 빈 값으로 폴백한다.
       // block.text는 모델이 뱉은 텍스트일 뿐 이미지가 아니다 — 원인 진단용으로 로그에 남긴다.
       console.warn("[vision-extract] JSON 파싱 실패 — 응답 원문(앞 300자):", block.text.slice(0, 300));
-      return null;
+      return { failed: true, reason: truncated ? "truncated" : "bad-response" };
     }
 
     const result = toResult(parsed);
     if (!result) {
       console.warn("[vision-extract] isProductPage 필드가 없거나 형식이 잘못됨:", parsed);
+      return { failed: true, reason: "bad-response" };
     }
     return result;
   } catch (err) {
-    // 네트워크 오류·타임아웃·레이트리밋·인증 실패 등 — 전부 동일하게 "추출 실패"로 처리하되,
     // 원인 없이 조용히 삼키면 API 키 누락 같은 흔한 설정 오류를 진단할 방법이 없다.
     console.error("[vision-extract] Claude 호출 실패 (네트워크·타임아웃·API 오류):", err);
-    return null;
+    return { failed: true, reason: timedOut ? "timeout" : "api-error" };
+  } finally {
+    // 성공 경로에서만 지우면, 예외로 빠질 때 타이머가 45초까지 살아남는다(서버리스에서 낭비).
+    clearTimeout(timer);
   }
 }

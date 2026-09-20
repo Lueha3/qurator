@@ -62,5 +62,8 @@ export async function POST(req: NextRequest) {
       skipped: result.skipped,
     });
   }
+  if (result.kind === "vision_failed") {
+    return reply({ kind: "vision_failed", reason: result.reason });
+  }
   return reply({ kind: result.kind });
 }

@@ -13,6 +13,7 @@ vi.mock("@anthropic-ai/sdk", () => ({
 }));
 
 const { extractFromScreenshot } = await import("../vision-extract");
+import type { VisionExtractResult, VisionFailure } from "../vision-extract";
 
 const ORIGINAL_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -23,6 +24,12 @@ function textResponse(text: string) {
 /** 짧게 쓰기 위한 헬퍼 — extractFromScreenshot은 이미지 "배열"을 받는다(여러 장 병합 지원). */
 function img(data: string, mediaType = "image/jpeg") {
   return { data, mediaType };
+}
+
+/** 성공을 단언하며 타입을 좁힌다 — 실패하면 이유를 그대로 보여줘 진단이 빨라진다. */
+function succeeds(result: VisionExtractResult | VisionFailure): VisionExtractResult {
+  if ("failed" in result) throw new Error(`추출이 실패했다: ${result.reason}`);
+  return result;
 }
 
 describe("extractFromScreenshot", () => {
@@ -117,9 +124,9 @@ describe("extractFromScreenshot", () => {
     expect(content[1].text).not.toContain("나눠 찍은");
   });
 
-  it("이미지 배열이 비어 있으면 API를 부르지 않고 즉시 null을 반환한다", async () => {
+  it("이미지 배열이 비어 있으면 API를 부르지 않고 즉시 실패를 반환한다", async () => {
     const result = await extractFromScreenshot([]);
-    expect(result).toBeNull();
+    expect(result).toEqual({ failed: true, reason: "no-images" });
     expect(create).not.toHaveBeenCalled();
   });
 
@@ -128,9 +135,9 @@ describe("extractFromScreenshot", () => {
       textResponse("```json\n" + JSON.stringify({ isProductPage: false }) + "\n```")
     );
 
-    const result = await extractFromScreenshot([img("base64data", "image/png")]);
-    expect(result?.isProductPage).toBe(false);
-    expect(result?.confidence).toBe("low"); // 값이 없으면 방어적으로 low로 떨어진다
+    const result = succeeds(await extractFromScreenshot([img("base64data", "image/png")]));
+    expect(result.isProductPage).toBe(false);
+    expect(result.confidence).toBe("low"); // 값이 없으면 방어적으로 low로 떨어진다
   });
 
   it("가격 필드에 숫자가 아닌 값(환각)이 오면 그 필드만 null로 떨어진다", async () => {
@@ -148,35 +155,47 @@ describe("extractFromScreenshot", () => {
       )
     );
 
-    const result = await extractFromScreenshot([img("base64data")]);
-    expect(result).not.toBeNull();
-    expect(result?.listPrice).toBeNull();
-    expect(result?.salePrice).toBeNull();
-    expect(result?.discountRateShown).toBeNull();
-    expect(result?.confidence).toBe("low");
+    const result = succeeds(await extractFromScreenshot([img("base64data")]));
+    expect(result.listPrice).toBeNull();
+    expect(result.salePrice).toBeNull();
+    expect(result.discountRateShown).toBeNull();
+    expect(result.confidence).toBe("low");
   });
 
-  it("비-JSON/깨진 응답은 예외 없이 null을 반환한다", async () => {
+  it("비-JSON/깨진 응답은 예외 없이 bad-response로 떨어진다", async () => {
     create.mockResolvedValueOnce(textResponse("죄송하지만 이 이미지를 분석할 수 없습니다."));
 
     const result = await extractFromScreenshot([img("base64data")]);
-    expect(result).toBeNull();
+    expect(result).toEqual({ failed: true, reason: "bad-response" });
   });
 
-  it("isProductPage 필드가 없는 응답은 null을 반환한다", async () => {
+  it("isProductPage 필드가 없는 응답은 bad-response로 떨어진다", async () => {
     create.mockResolvedValueOnce(
       textResponse(JSON.stringify({ brand: "쿠어", productName: "오버셔츠" }))
     );
 
     const result = await extractFromScreenshot([img("base64data")]);
-    expect(result).toBeNull();
+    expect(result).toEqual({ failed: true, reason: "bad-response" });
   });
 
-  it("API 호출이 예외를 던져도(네트워크/타임아웃) null로 처리하며 throw하지 않는다", async () => {
+  it("API 호출이 예외를 던져도 throw하지 않고 api-error로 떨어진다", async () => {
     create.mockRejectedValueOnce(new Error("network error"));
 
     const result = await extractFromScreenshot([img("base64data")]);
-    expect(result).toBeNull();
+    expect(result).toEqual({ failed: true, reason: "api-error" });
+  });
+
+  // 이 구분이 이 변경의 핵심이다 — 화면에서 "서버에 AI 설정이 없어요"와
+  // "사진을 못 읽었어요"를 가르는 유일한 근거다.
+  it("max_tokens에 걸려 잘리면 bad-response가 아니라 truncated로 구분한다", async () => {
+    create.mockResolvedValueOnce({
+      content: [{ type: "text", text: '{"isProductPage":true,"brand":"쿠' }],
+      stop_reason: "max_tokens",
+      usage: { output_tokens: 16000 },
+    });
+
+    const result = await extractFromScreenshot([img("base64data")]);
+    expect(result).toEqual({ failed: true, reason: "truncated" });
   });
 
   it("ANTHROPIC_API_KEY가 없으면 클라이언트를 만들지도, API를 호출하지도 않고 즉시 null을 반환한다", async () => {
@@ -188,7 +207,7 @@ describe("extractFromScreenshot", () => {
 
     const result = await fresh.extractFromScreenshot([img("base64data")]);
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ failed: true, reason: "no-api-key" });
     expect(create).not.toHaveBeenCalled();
   });
 });

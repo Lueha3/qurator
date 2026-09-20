@@ -1,6 +1,8 @@
 // 폼(클라이언트) ↔ API 라우트가 공유하는 타입. Prisma 모델을 직접 노출하지 않고
 // 여기서 한 번 정리해, 스키마가 바뀌어도 클라이언트 코드 변경 범위를 좁힌다.
 
+import type { VisionFailReason } from "./vision-extract";
+
 export interface ColorLinkInput {
   label: string;
   url: string;
@@ -130,7 +132,8 @@ export type CaptureResponse =
   /** 좋아요 목록을 통째로 담은 결과 (docs/06 §4.6) — 딜이 아니라 지켜보는 상품이 된다 */
   | { kind: "grid"; added: number; updated: number; cheaper: number; skipped: number }
   | { kind: "not_product_page" }
-  | { kind: "vision_failed" }
+  /** reason이 있어야 설정 누락(키 없음)과 사진 문제를 화면에서 구분할 수 있다 (docs/06 §4.1) */
+  | { kind: "vision_failed"; reason?: VisionFailReason }
   | { kind: "error"; error: string };
 
 export interface ApiErrorResponse {
