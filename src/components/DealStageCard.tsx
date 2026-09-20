@@ -349,7 +349,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
 
       {deal.approvalStage !== "APPROVED" && deal.approvalStage !== "SKIPPED" && (
         <details className="mt-3 rounded-xl bg-paper text-xs leading-relaxed text-ink-soft">
-          <summary className="cursor-pointer px-3 py-2 font-medium">버튼이 뭐예요?</summary>
+          <summary className="cursor-pointer px-3 py-2 font-medium">버튼 설명</summary>
           <div className="flex flex-col gap-1.5 px-3 pb-3">
             <p><b className="text-ink">✅ 올릴게요</b> — 링크 붙이고 문구 확인하는 단계로 넘어가요.</p>
             <p><b className="text-ink">가격만 지켜보기</b> — 안 올리지만 다시 찍을 때마다 가격 비교가 쌓여요.</p>
