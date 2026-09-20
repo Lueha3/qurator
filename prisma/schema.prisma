@@ -39,6 +39,14 @@ model Creator {
 // ── products ────────────────────────────────────────────────────────────
 model Product {
   id              String   @id @default(uuid())
+  /**
+   * 상품이 시스템에 등록된 순서(DB 시퀀스, 자동 증가). 화면에 "등록순번"으로 보여주기 위한
+   * 값이다(2026-09-20, 사용자 요청). 그리드 캡처는 vision-extract.ts 프롬프트가 화면을
+   * 왼쪽 위→오른쪽, 줄 단위로 읽게 하고 captureGridItems가 그 배열 순서 그대로 순차 생성하므로,
+   * 이 번호는 곧 "그리드에서 몇 번째 칸이었나"와 같다. 지켜보는 목록의 정렬(싸진 것 먼저)과는
+   * 무관하게 각 상품에 고정으로 붙는다 — 목록이 어떻게 정렬돼도 번호로 원래 화면 위치를 되짚을 수 있다.
+   */
+  registrationNo  Int      @default(autoincrement())
   creatorId       String
   creator         Creator  @relation(fields: [creatorId], references: [id])
 

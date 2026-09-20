@@ -13,6 +13,12 @@ import { buildPriceAnalyses } from "./price-analysis";
 
 export interface WatchedProductDTO {
   productId: string;
+  /**
+   * 상품이 등록된 순서(DB 시퀀스). 그리드를 왼쪽 위→오른쪽, 줄 단위로 읽은 순서와 같다
+   * (2026-09-20, 사용자 요청) — 목록이 어떤 기준으로 정렬돼도 이 번호로 원래 화면 위치를
+   * 되짚을 수 있다.
+   */
+  registrationNo: number;
   brandName: string;
   productName: string;
   /** 마지막으로 기록된 가격. 한 번도 못 읽었으면 null */
@@ -35,7 +41,9 @@ export interface WatchedProductDTO {
 }
 
 /**
- * 지켜보는 상품 전부. 싸진 것이 맨 위, 그다음은 최근 기록순.
+ * 지켜보는 상품 전부. **기본 정렬은 등록순**(registrationNo 오름차순) — 그리드를 찍은
+ * 순서 그대로 목록에 나온다. "싸진 것부터" 정렬은 화면(DealBrowser)에서 사람이 토글로
+ * 켠다 — 이미 모든 필드(dropRate 등)가 여기 담겨 있어 다시 조회할 필요가 없다.
  *
  * 딜 연결은 **끝나지 않은 딜**만 본다 — 이미 올렸거나 안 올리기로 한 딜로 보내면, 같은 상품을
  * 다시 판단하려는 사람을 끝난 카드에 떨어뜨리게 된다. 그 경우는 딜 없는 것과 같이 취급해
@@ -74,6 +82,7 @@ export async function loadWatchedProducts(now: Date = new Date()): Promise<Watch
 
     return {
       productId: watch.productId,
+      registrationNo: watch.product.registrationNo,
       brandName: watch.product.brandName,
       productName: watch.product.productName,
       price,
@@ -86,9 +95,5 @@ export async function loadWatchedProducts(now: Date = new Date()): Promise<Watch
     };
   });
 
-  return rows.sort((a, b) => {
-    // 싸진 것이 먼저 — 이 목록을 여는 이유가 그것이다.
-    if ((b.dropRate ?? -1) !== (a.dropRate ?? -1)) return (b.dropRate ?? -1) - (a.dropRate ?? -1);
-    return (b.lastRecordedAt ?? "").localeCompare(a.lastRecordedAt ?? "");
-  });
+  return rows.sort((a, b) => a.registrationNo - b.registrationNo);
 }

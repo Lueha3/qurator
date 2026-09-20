@@ -186,7 +186,7 @@ describe("지켜보는 상품 목록", () => {
     expect(rows[0].discountRateShown).toBeNull();
   });
 
-  it("싸진 상품이 맨 위로 온다", async () => {
+  it("내린 상품의 dropRate를 정확히 계산한다 — 정렬은 등록순 담당이 아니다", async () => {
     await captureGrid([
       gridItem({ productName: "그대로", salePrice: 50000 }),
       gridItem({ productName: "내림", salePrice: 50000 }),
@@ -197,9 +197,24 @@ describe("지켜보는 상품 목록", () => {
     ]);
 
     const rows = await loadWatchedProducts();
-    expect(rows[0].productName).toBe("내림");
-    expect(rows[0].dropRate).toBe(20);
-    expect(rows[1].dropRate).toBeNull();
+    const dropped = rows.find((r) => r.productName === "내림");
+    const unchanged = rows.find((r) => r.productName === "그대로");
+    expect(dropped?.dropRate).toBe(20);
+    expect(unchanged?.dropRate).toBeNull();
+  });
+
+  // 회귀 테스트(2026-09-20, 사용자 요청): "싸진 것 먼저"였던 기본 정렬을 등록순으로 바꿨다 —
+  // "싸진 순"은 이제 화면(DealBrowser)에서 토글로 고르는 선택지다.
+  it("기본 정렬은 등록순이다 — 가격이 아무리 많이 내려도 순서가 안 바뀐다", async () => {
+    await captureGrid([
+      gridItem({ productName: "먼저", salePrice: 50000 }),
+      gridItem({ productName: "나중", salePrice: 50000 }),
+    ]);
+    await captureGrid([gridItem({ productName: "나중", salePrice: 10000 })]); // 80% 내림
+
+    const rows = await loadWatchedProducts();
+    expect(rows.map((r) => r.productName)).toEqual(["먼저", "나중"]);
+    expect(rows[0].registrationNo).toBeLessThan(rows[1].registrationNo);
   });
 });
 

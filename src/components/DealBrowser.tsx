@@ -261,13 +261,25 @@ export function DealBrowser({
 
   const showRelease = filter === "saved";
 
+  // "지켜보는 중" 정렬 — 기본은 등록순(watch-list.ts가 이미 그렇게 내려준다, 그리드를 찍은
+  // 순서). "싸진 순"은 사람이 토글로 켠다(2026-09-20, 사용자 요청) — 이미 dropRate가 각 행에
+  // 담겨 있어 다시 조회하지 않고 클라이언트에서 재정렬한다.
+  const [watchSort, setWatchSort] = useState<"registration" | "cheapest">("registration");
+
   // 지켜보는 상품은 딜 목록과 다른 배열이라 검색을 따로 건다 — 같은 검색칸이 둘 다에 걸려야
   // "쿠어"를 쳤을 때 탭을 옮겨도 같은 것을 찾는다.
   const visibleWatched = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return watched;
-    return watched.filter((w) => `${w.brandName} ${w.productName}`.toLowerCase().includes(q));
-  }, [watched, query]);
+    const filtered = q
+      ? watched.filter((w) => `${w.brandName} ${w.productName}`.toLowerCase().includes(q))
+      : watched;
+    if (watchSort === "registration") return filtered;
+    // 싸진 순 — 예전 기본 정렬과 같은 규칙(싸진 폭 큰 것 먼저, 같으면 최근 기록순).
+    return [...filtered].sort((a, b) => {
+      if ((b.dropRate ?? -1) !== (a.dropRate ?? -1)) return (b.dropRate ?? -1) - (a.dropRate ?? -1);
+      return (b.lastRecordedAt ?? "").localeCompare(a.lastRecordedAt ?? "");
+    });
+  }, [watched, query, watchSort]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -329,6 +341,27 @@ export function DealBrowser({
           </>
         )}
       </div>
+
+      {filter === "saved" && (
+        <div className={`w-max ${segmentCls}`}>
+          <button
+            type="button"
+            onClick={() => setWatchSort("registration")}
+            aria-pressed={watchSort === "registration"}
+            className={segmentItemCls(watchSort === "registration")}
+          >
+            등록순
+          </button>
+          <button
+            type="button"
+            onClick={() => setWatchSort("cheapest")}
+            aria-pressed={watchSort === "cheapest"}
+            className={segmentItemCls(watchSort === "cheapest")}
+          >
+            싸진 순
+          </button>
+        </div>
+      )}
 
       {productDeleteNote && (
         <p className="rounded-xl bg-accent-soft px-3 py-2 text-sm text-accent">{productDeleteNote}</p>

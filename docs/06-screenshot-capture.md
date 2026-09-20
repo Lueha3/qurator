@@ -383,6 +383,18 @@ Product·PriceSnapshot·WatchItem만 만들고 **딜은 0개** 만든다(`grid-c
 값**이라는 걸 배지에서도 구분한다 — dropRate(📉, 지난 기록 대비 내림)와 나란히 두되 이모지
 없는 맨 배지로 표시해 섞이지 않게 했다. 회귀 테스트: `grid-capture.test.ts`.
 
+**읽는 순서·등록순번 (2026-09-20, 사용자 요청)**: SYSTEM_PROMPT에 그리드를 읽는 순서를
+명시했다 — 왼쪽 위부터 시작해 같은 줄을 오른쪽으로, 줄이 끝나면 다음 줄로(사람이 책 읽듯).
+`captureGridItems`가 이 배열 순서 그대로 `for...of` + `await`로 순차 생성하므로, 화면 순서가
+곧 DB 생성 순서가 된다. 그 순서를 화면에서도 쓸 수 있게 `Product.registrationNo`
+(`@default(autoincrement())`, `prisma/migrations/20260920185626_product_registration_no`)를
+추가했다.
+
+`loadWatchedProducts()`의 **기본 정렬을 registrationNo 오름차순(등록순)으로 바꿨다** — 예전
+"싸진 것 먼저" 정렬은 목록 순서와 화면 위치가 안 맞아 "몇 번째 상품이 이상해요" 같은 제보를
+되짚기 어려웠다. "싸진 순"은 없앤 게 아니라 화면(`DealBrowser.tsx`)의 토글로 옮겼다 — 이미
+각 행에 `dropRate`가 담겨 있어 서버를 다시 부르지 않고 클라이언트에서 재정렬한다.
+
 #### 4.6.3 30개 상한을 목록 경로에서만 비켜간다
 
 `limits.itemsMax`(30)는 **바깥으로 나가는 요청을 묶어두려고** 있는 숫자다. 크롤리스 모드

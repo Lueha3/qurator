@@ -120,6 +120,8 @@ function WatchedRow({
         <BrandMark brand={item.brandName} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-[11px] leading-4 text-ink-soft">
+            {/* 등록순번 — 정렬을 무엇으로 바꿔도 이 번호로 원래 화면 위치를 되짚을 수 있다 */}
+            <span className="shrink-0 tabular-nums text-ink-faint">#{item.registrationNo}</span>
             <span className="truncate">{item.brandName}</span>
             {item.dealId && <span className="shrink-0 text-accent">· 딜 있음</span>}
           </div>
