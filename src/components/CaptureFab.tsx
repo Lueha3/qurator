@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { CaptureResponse } from "@/lib/api-types";
 import type { VisionFailReason } from "@/lib/vision-extract";
+import { detectInAppBrowser } from "./in-app-browser";
 
 // 캡처 진입점 — docs/08 §3.3. 모든 탭의 같은 자리(우하단)에 있고, 누르면 바로 사진첩이 열린다.
 // docs/06 §2의 "입력은 2탭"을 한 탭 더 줄이는 것이 목표이고, 여기가 그 한 탭이다.
@@ -17,7 +18,7 @@ const MAX_EDGE = 1600;
 const JPEG_QUALITY = 0.85;
 const PASSTHROUGH_BYTES = 1_500_000;
 
-function loadImage(file: File): Promise<HTMLImageElement> {
+function loadImageElement(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -27,10 +28,38 @@ function loadImage(file: File): Promise<HTMLImageElement> {
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("사진을 열 수 없어요. 다른 사진으로 해보세요."));
+      reject(new Error("<img> decode failed"));
     };
     img.src = url;
   });
+}
+
+interface Decoded {
+  source: CanvasImageSource;
+  width: number;
+  height: number;
+  /** createImageBitmap 경로일 때만 있다 — 캔버스에 그린 뒤 메모리를 바로 돌려준다 */
+  close?: () => void;
+}
+
+/**
+ * HEIC(아이폰 기본 사진 형식)는 `<img>` 디코드가 웹뷰마다 갈린다 — 카톡·인스타 인앱
+ * 브라우저에서는 실패하는 경우가 실제로 있다(2026-09-20, 현표 제보 — 관리자 폰에서는
+ * 재현 안 됨. 관리자는 홈 화면 아이콘·현표는 다른 진입 경로일 가능성). 실패를 한 경로에서
+ * 확정 짓지 않고, 코덱 지원 범위가 더 넓은 `createImageBitmap`을 먼저 시도한 뒤에만
+ * `<img>`로 폴백한다 — 어느 한쪽이 막힌 환경에서도 다른 쪽이 열어줄 여지를 남긴다.
+ */
+async function decodeImage(file: File): Promise<Decoded> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file);
+      return { source: bitmap, width: bitmap.width, height: bitmap.height, close: () => bitmap.close() };
+    } catch {
+      // 다음 경로로 — 조용히 넘어간다. 둘 다 실패했을 때만 위로 알린다.
+    }
+  }
+  const img = await loadImageElement(file);
+  return { source: img, width: img.naturalWidth, height: img.naturalHeight };
 }
 
 /**
@@ -38,20 +67,24 @@ function loadImage(file: File): Promise<HTMLImageElement> {
  * 작은 글씨(품번)까지 읽어야 하므로 필요 이상으로 줄이지는 않는다.
  */
 async function downscale(file: File): Promise<Blob> {
-  const img = await loadImage(file);
-  const longest = Math.max(img.naturalWidth, img.naturalHeight);
-  const scale = Math.min(1, MAX_EDGE / longest);
-  if (scale === 1 && file.type === "image/jpeg" && file.size <= PASSTHROUGH_BYTES) return file;
+  const decoded = await decodeImage(file);
+  try {
+    const longest = Math.max(decoded.width, decoded.height);
+    const scale = Math.min(1, MAX_EDGE / longest);
+    if (scale === 1 && file.type === "image/jpeg" && file.size <= PASSTHROUGH_BYTES) return file;
 
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(img.naturalWidth * scale);
-  canvas.height = Math.round(img.naturalHeight * scale);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return file;
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return new Promise((resolve) =>
-    canvas.toBlob((blob) => resolve(blob ?? file), "image/jpeg", JPEG_QUALITY)
-  );
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(decoded.width * scale);
+    canvas.height = Math.round(decoded.height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(decoded.source, 0, 0, canvas.width, canvas.height);
+    return await new Promise((resolve) =>
+      canvas.toBlob((blob) => resolve(blob ?? file), "image/jpeg", JPEG_QUALITY)
+    );
+  } finally {
+    decoded.close?.();
+  }
 }
 
 type Toast = { tone: "ok" | "error"; message: string; detail?: string | null };
@@ -102,7 +135,14 @@ export function CaptureFab() {
         blobs = await Promise.all(files.map(downscale));
       } catch {
         // 사진 자체를 못 연 것 — 네트워크 탓이 아니다. 잘못된 원인을 안내하지 않는다.
-        setToast({ tone: "error", message: "사진을 열 수 없어요. 다른 걸로 해보세요." });
+        // 인앱 브라우저는 이 실패의 흔한 원인이다(HEIC 디코드 제한) — 알면 알려준다.
+        const inApp = detectInAppBrowser(navigator.userAgent);
+        setToast({
+          tone: "error",
+          message: inApp
+            ? `${inApp.name} 안에서는 이 사진을 못 열어요. 더보기(⋯)에서 "Safari로 열기"를 눌러 다시 해보세요.`
+            : "사진을 열 수 없어요. 다른 걸로 해보세요.",
+        });
         return;
       }
 
