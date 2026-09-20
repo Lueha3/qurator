@@ -135,13 +135,16 @@ export function CaptureFab() {
         blobs = await Promise.all(files.map(downscale));
       } catch {
         // 사진 자체를 못 연 것 — 네트워크 탓이 아니다. 잘못된 원인을 안내하지 않는다.
-        // 인앱 브라우저는 이 실패의 흔한 원인이다(HEIC 디코드 제한) — 알면 알려준다.
+        // 흔한 원인 둘 다 HEIC(아이폰 기본 사진 형식) 디코드 제한이다:
+        //   ① 인앱 브라우저(카톡·인스타) — iOS라도 WebKit 코덱 접근이 제한된다
+        //   ② 맥에서 사파리가 아닌 브라우저 — 크롬·파이어폭스는 HEIC 디코더 자체가 없다
+        //      (2026-09-20, 친구 맥에서 재현 — 관리자 아이폰 사파리에서는 문제없었다)
         const inApp = detectInAppBrowser(navigator.userAgent);
         setToast({
           tone: "error",
           message: inApp
             ? `${inApp.name} 안에서는 이 사진을 못 열어요. 더보기(⋯)에서 "Safari로 열기"를 눌러 다시 해보세요.`
-            : "사진을 열 수 없어요. 다른 걸로 해보세요.",
+            : `사진을 열 수 없어요. Safari로 열어보거나, 사진 앱에서 JPEG로 저장한 뒤 다시 올려주세요.`,
         });
         return;
       }
