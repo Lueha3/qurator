@@ -42,7 +42,7 @@ export function ManualPriceForm({ products }: { products: ProductOption[] }) {
   }
 
   if (products.length === 0) {
-    return <p className="text-sm text-ink-soft">아직 상품이 없어요. 스크린샷을 먼저 올려주세요.</p>;
+    return <p className="text-sm text-ink-soft">상품이 없어요. 먼저 올려주세요.</p>;
   }
 
   return (
@@ -68,7 +68,7 @@ export function ManualPriceForm({ products }: { products: ProductOption[] }) {
           <input inputMode="numeric" value={couponPrice} onChange={(e) => setCouponPrice(e.target.value)} placeholder="37900" className={inputCls} />
         </Field>
       </div>
-      <p className="-mt-1 text-xs text-ink-soft">작년 블프 때 값이에요. 정가·쿠폰가는 비워도 돼요.</p>
+      <p className="-mt-1 text-xs text-ink-soft">작년 블프 때 값이에요. 비워도 돼요.</p>
       {message && (
         <p className={`rounded-md px-3 py-2 text-sm ${message.tone === "ok" ? "bg-accent-soft text-accent" : "bg-danger/10 text-danger"}`}>
           {message.text}

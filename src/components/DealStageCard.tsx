@@ -46,7 +46,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
       try {
         await work();
       } catch {
-        setError("잠깐 문제가 생겼어요. 다시 눌러주세요.");
+        setError("문제가 생겼어요. 다시 눌러주세요.");
       }
     });
   }
@@ -92,10 +92,10 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
             </pre>
           )}
           {deal.parseSource === "none" && (
-            <p className="text-sm text-danger">⚠️ 사진에서 정보를 못 읽었어요. 아래 ‘정보 고치기’로 채워주세요.</p>
+            <p className="text-sm text-danger">⚠️ 사진을 못 읽었어요. ‘정보 고치기’로 채워주세요.</p>
           )}
           {deal.parseSource === "opengraph" && (
-            <p className="text-sm text-ink-soft">일부만 읽었어요. 올리기 전에 한 번 확인해주세요.</p>
+            <p className="text-sm text-ink-soft">일부만 읽었어요. 올리기 전에 확인해주세요.</p>
           )}
           {canProceed && (
             <button
@@ -118,7 +118,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
                     r.ok
                       ? r.alreadyActive
                         ? "이미 지켜보고 있어요."
-                        : `📈 지켜보기 켰어요. 다시 찍어 올릴 때마다 가격 변화가 쌓여요. 이 딜은 ‘안 올릴게요’로 닫아도 가격은 계속 봐요. (${r.activeCount}개 지켜보는 중)`
+                        : `📈 지켜보기 시작! 다시 찍을 때마다 가격이 쌓여요. (${r.activeCount}개 지켜보는 중)`
                       : `⚠️ ${r.reason}`
                   );
                 })
@@ -138,7 +138,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
         <div className="flex flex-col gap-3">
           <p className="text-sm">
             🔗 <b>내 링크를 붙여넣어 주세요.</b>{" "}
-            <span className="text-ink-soft">큐레이터센터에서 이 상품 링크를 만들고 여기 붙여넣으면 카톡 문구가 만들어져요.</span>
+            <span className="text-ink-soft">큐레이터센터에서 링크 만들고 여기 붙여넣으면 끝이에요.</span>
           </p>
           <a
             href={curatorShopUrl ?? CURATOR_CENTER}
@@ -235,7 +235,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
             </div>
           )}
 
-          <p className="text-xs text-ink-soft">확정하면 팔로워 페이지에 올라가고, 카톡에 붙여넣을 문구가 나와요.</p>
+          <p className="text-xs text-ink-soft">확정하면 팔로워 페이지에 올라가요.</p>
           <button
             type="button"
             disabled={pending}
@@ -245,7 +245,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
                 if (!r.ok) {
                   setError(
                     r.reason === "DISCLOSURE_FAILED"
-                      ? "⛔️ 광고 표시가 빠져서 올릴 수 없어요. 관리자에게 알려주세요."
+                      ? "⛔️ 광고 표시가 빠졌어요. 관리자에게 알려주세요."
                       : "링크를 먼저 붙여주세요."
                   );
                 }
@@ -268,13 +268,12 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
           {deal.soldOut ? (
             <div className="flex flex-col gap-3">
               <p className="text-sm text-ink-soft">
-                🚫 <b className="text-ink">품절로 표시했어요.</b> 팔로워 페이지에서 내렸고, 이미 보낸 링크를 누르면 ‘지금은 살 수
-                없는 상품이에요’ 화면이 떠요. 아래 안내를 카톡에 올려주세요.
+                🚫 <b className="text-ink">품절 처리했어요.</b> 팔로워 페이지에서 내렸어요. 아래 안내를 카톡에 올려주세요.
               </p>
               <CopyPane text={correctionText(deal.brand, deal.productName)} label="📋 품절 안내 복사" />
             </div>
           ) : (
-            <p className="text-sm">✅ <b>확정했어요.</b> 아래 문구를 복사해 카톡에 붙여넣으세요.</p>
+            <p className="text-sm">✅ <b>올렸어요.</b> 아래 문구를 카톡에 붙여넣으세요.</p>
           )}
           {kakao && !deal.soldOut && <CopyPane text={kakao.bodyText} cardId={kakao.id} />}
           {others.length > 0 && (
@@ -304,7 +303,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
                     ? await restoreDealAction(deal.id)
                     : await markSoldOutAction(deal.id);
                   if (!r.ok) setError(r.reason);
-                  else if (!deal.soldOut) setNotice("팔로워 페이지에서 내렸어요. 위의 품절 안내를 복사해 카톡에 올려주세요.");
+                  else if (!deal.soldOut) setNotice("팔로워 페이지에서 내렸어요. 위 안내를 카톡에 올려주세요.");
                 })
               }
               className={secondaryBtnCls}
@@ -317,7 +316,7 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
 
       {deal.approvalStage === "SKIPPED" && (
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-ink-soft">안 올리기로 한 딜이에요. 가격은 기록해뒀어요.</p>
+          <p className="text-sm text-ink-soft">안 올린 딜이에요. 가격은 남아 있어요.</p>
           <button
             type="button"
             disabled={pending}
@@ -345,17 +344,17 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
       {editing && <DealEditForm deal={deal} onClose={() => setEditing(false)} />}
 
       {deal.approvalStage === "CANDIDATE" && (
-        <p className="mt-3 text-xs text-ink-faint">💡 올린 순간 가격은 이미 기록됐어요. ‘올릴게요’를 누르면 다음은 링크 붙이기예요.</p>
+        <p className="mt-3 text-xs text-ink-faint">💡 가격은 이미 기록됐어요. ‘올릴게요’ 누르면 링크 붙이기로 넘어가요.</p>
       )}
 
       {deal.approvalStage !== "APPROVED" && deal.approvalStage !== "SKIPPED" && (
         <details className="mt-3 rounded-xl bg-paper text-xs leading-relaxed text-ink-soft">
           <summary className="cursor-pointer px-3 py-2 font-medium">버튼이 뭐예요?</summary>
           <div className="flex flex-col gap-1.5 px-3 pb-3">
-            <p><b className="text-ink">✅ 올릴게요</b> — 카톡에 올릴 준비를 시작해요. 링크를 붙이면 문구가 만들어지고, 마지막에 한 번 더 확인해요.</p>
-            <p><b className="text-ink">가격만 지켜보기</b> — 지금은 안 올리지만 가격은 계속 보고 싶을 때. 같은 상품을 다시 찍어 올리면 “그때 얼마 → 지금 얼마”가 자동으로 비교돼요.</p>
-            <p><b className="text-ink">안 올릴게요</b> — 이 딜을 닫아요. 지우는 게 아니에요. 가격은 이미 기록돼 있고, 잘못 눌렀으면 그 딜에서 ‘다시 열기’를 누르면 돼요.</p>
-            <p><b className="text-ink">정보 고치기</b> — 브랜드·상품명·가격을 잘못 읽었을 때 바로잡아요.</p>
+            <p><b className="text-ink">✅ 올릴게요</b> — 링크 붙이고 문구 확인하는 단계로 넘어가요.</p>
+            <p><b className="text-ink">가격만 지켜보기</b> — 안 올리지만 다시 찍을 때마다 가격 비교가 쌓여요.</p>
+            <p><b className="text-ink">안 올릴게요</b> — 딜을 닫아요. 지우는 건 아니고 ‘다시 열기’로 되돌릴 수 있어요.</p>
+            <p><b className="text-ink">정보 고치기</b> — 브랜드·상품명·가격이 틀렸을 때 고쳐요.</p>
           </div>
         </details>
       )}

@@ -44,10 +44,10 @@ export function InAppBrowserNotice() {
         <b>{appName}</b> 안에서는 Face ID를 쓸 수 없어요.
       </p>
       <ol className="mt-1.5 flex list-decimal flex-col gap-1 pl-4">
-        <li>⋯ 또는 공유 버튼을 누르고 <b>“Safari로 열기”</b>를 골라주세요.</li>
+        <li>⋯ 또는 공유 버튼 → <b>”Safari로 열기”</b></li>
         {url && (
           <li>
-            메뉴가 없으면 아래 주소를 길게 눌러 <b>“Safari에서 열기”</b>를 골라주세요.
+            메뉴가 없으면 아래 주소를 길게 눌러주세요.
             <br />
             <a href={url} className="break-all font-semibold underline">
               {url}

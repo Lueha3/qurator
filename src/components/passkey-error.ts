@@ -22,10 +22,9 @@ export function passkeyErrorMessage(error: unknown, action: "등록" | "로그�
       return `${action}을 취소했어요. 다시 누르면 돼요.`;
 
     case "ERROR_INVALID_RP_ID":
-      // 첫 줄은 현표용, 둘째 줄은 관리자용 — 현표는 화면을 보내는 것으로 할 일이 끝난다.
       return (
-        `지금은 이 주소에서 Face ID를 쓸 수 없어요. 관리자에게 이 화면을 보내주세요.\n` +
-        `(관리자용) 앱 주소 설정이 지금 주소와 달라 기기가 거부했어요. Vercel 환경변수 PUBLIC_BASE_URL을 "${currentOrigin()}"로 맞춰주세요.`
+        `이 주소에서 Face ID를 쓸 수 없어요. 관리자에게 이 화면을 보내주세요.\n` +
+        `(관리자용) PUBLIC_BASE_URL을 "${currentOrigin()}"로 맞춰주세요.`
       );
 
     case "ERROR_INVALID_DOMAIN":
@@ -46,16 +45,15 @@ export function passkeyErrorMessage(error: unknown, action: "등록" | "로그�
   // 인앱 브라우저(카톡 등)가 Face ID 접근 자체를 거부한 경우도 똑같이 이 이름으로 온다 —
   // 화면에서 detectInAppBrowser()로 먼저 걸러지지 않았다면(모르는 앱이라서) 여기서 짚어준다.
   if (e.name === "NotAllowedError" && !e.code) {
-    // 로그인에서 가장 흔한 실제 상황은 "다른 기기는 등록됐는데 이 폰은 아직"이다 — 그걸 먼저 말한다.
     if (action === "로그인") {
       return (
-        `열리지 않았어요. 이 폰을 아직 등록하지 않았다면 관리자에게 등록 링크를 받아주세요. ` +
-        `카톡·인스타 안에서 열었다면 더보기(⋯)에서 "Safari로 열기"를 눌러주세요. 직접 취소했다면 무시해도 돼요.`
+        `열리지 않았어요. 이 폰이 미등록이면 관리자에게 링크를 받으세요.\n` +
+        `카톡·인스타 안이면 "Safari로 열기"를 눌러주세요.`
       );
     }
     return (
-      `등록이 안 됐어요. 카톡·인스타처럼 앱 안에서 뜨는 브라우저에서는 Face ID를 쓸 수 없어요 — ` +
-      `더보기(⋯)에서 "Safari로 열기"를 눌러 다시 해주세요. 직접 취소했다면 무시해도 돼요.`
+      `등록이 안 됐어요. 앱 안 브라우저에서는 안 돼요.\n` +
+      `"Safari로 열기"를 눌러 다시 해주세요.`
     );
   }
 
@@ -72,9 +70,8 @@ export function rpIdMismatch(options: unknown): string | null {
   if (!rpID || rpID === window.location.hostname) return null;
 
   return (
-    `지금은 이 주소에서 Face ID를 쓸 수 없어요. 관리자에게 이 화면을 보내주세요.\n` +
-    `(관리자용) 서버 설정(PUBLIC_BASE_URL)은 "${rpID}"인데 지금 주소는 "${window.location.hostname}"이에요. ` +
-    `Vercel 환경변수를 "${currentOrigin()}"로 맞춰주세요.`
+    `이 주소에서 Face ID를 쓸 수 없어요. 관리자에게 이 화면을 보내주세요.\n` +
+    `(관리자용) PUBLIC_BASE_URL이 "${rpID}"인데 지금은 "${window.location.hostname}"이에요. "${currentOrigin()}"로 맞춰주세요.`
   );
 }
 

@@ -175,21 +175,21 @@ function Note({ state, invite }: { state: State; invite?: boolean }) {
   if (state === "none")
     return (
       <p className="text-xs text-ink-soft">
-        아직 등록된 폰이 없어요. 관리자에게 <b>등록 링크</b>를 받아 그 링크로 열어주세요.
+        등록된 폰이 없어요. 관리자에게 등록 링크를 받으세요.
       </p>
     );
   if (state === "unsupported")
-    return <p className="text-xs text-ink-soft">이 브라우저에서는 Face ID를 쓸 수 없어요. Safari로 열어주세요.</p>;
+    return <p className="text-xs text-ink-soft">이 브라우저에서는 안 돼요. Safari로 열어주세요.</p>;
   if (state === "no-authenticator")
     return (
       <p className="text-xs text-ink-soft">
-        이 기기에는 Face ID가 없어서 쓸 수 없어요. 아이폰에서 열어주세요.
+        이 기기에는 Face ID가 없어요. 아이폰에서 열어주세요.
       </p>
     );
   if (state === "bad-invite")
     return (
       <p className="text-xs text-danger">
-        이 등록 링크는 만료되었거나 이미 사용됐어요. 관리자에게 새 링크를 받아주세요.
+        이 링크는 만료됐거나 이미 쓴 링크예요. 관리자에게 새로 받으세요.
       </p>
     );
   if (state === "failed")

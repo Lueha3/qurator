@@ -65,7 +65,7 @@ export function DealEditForm({ deal, onClose }: { deal: DealDTO; onClose: () => 
       <Field label="상품명">
         <input value={form.productName} onChange={(e) => set("productName", e.target.value)} placeholder="오버핏 맨투맨" className={inputCls} />
       </Field>
-      <Field label="상품 주소" hint="내 링크 말고, 상품 페이지 주소예요">
+      <Field label="상품 주소" hint="내 링크 말고 상품 주소예요">
         <input
           type="url"
           value={form.productUrl}

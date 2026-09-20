@@ -8,10 +8,10 @@ import type { ApprovalStageDTO } from "./api-types";
 // 코드 식별자(CANDIDATE 등)와 docs의 단계 이름은 그대로다 — 바뀐 것은 화면에 보이는 말뿐이다.
 
 export const STAGE_LABEL: Record<ApprovalStageDTO, string> = {
-  CANDIDATE: "올릴지 정하기",
+  CANDIDATE: "올릴지 고르기",
   AWAITING_LINK: "링크 붙이기",
-  READY_TO_PUBLISH: "문구 확정하기",
-  APPROVED: "확정됨",
+  READY_TO_PUBLISH: "문구 확인하기",
+  APPROVED: "올림 완료",
   SKIPPED: "안 올림",
 };
 

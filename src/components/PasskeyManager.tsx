@@ -44,12 +44,12 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
 
   async function register() {
     if (typeof window === "undefined" || !window.PublicKeyCredential) {
-      return setProblem("이 브라우저에서는 Face ID 로그인을 쓸 수 없어요.");
+      return setProblem("이 브라우저에서는 안 돼요. Safari로 열어주세요.");
     }
     // 없는 기기에서 시도하면 응답 없이 매달려 "등록 중…" 버튼이 영원히 굳어버린다
     // (2026-09-18, 테스트 중 재현) — 시도 전에 먼저 확인한다.
     if (!(await hasAuthenticator())) {
-      return setProblem("이 기기에는 Face ID·Touch ID 같은 잠금 해제 수단이 없어 쓸 수 없어요.");
+      return setProblem("이 기기에는 Face ID가 없어요.");
     }
     setBusy(true);
     setNote(null);
@@ -57,7 +57,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
     try {
       const res = await fetch("/api/auth/passkey/register");
       if (!res.ok) {
-        setProblem("서버 설정(PUBLIC_BASE_URL)이 아직 없어 등록할 수 없어요. 관리자에게 알려주세요.");
+        setProblem("서버 설정이 아직 없어요. 관리자에게 알려주세요.");
         return;
       }
 
@@ -81,7 +81,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
         return;
       }
       const { label } = await verified.json();
-      setNote(`${label} 등록 완료! 이제 주소만 열고 얼굴만 보면 돼요.`);
+      setNote(`${label} 등록했어요! 이제 얼굴만 보면 들어와져요.`);
       setName("");
       router.refresh();
     } catch (error) {
@@ -138,7 +138,7 @@ export function PasskeyManager({ passkeys }: { passkeys: PasskeyView[] }) {
       <button type="button" onClick={register} disabled={busy} className={primaryBtnCls}>
         {busy ? "등록 중…" : passkeys.length > 0 ? "🔐 이 폰도 등록하기" : "🔐 이 기기에 Face ID 등록"}
       </button>
-      {passkeys.length > 0 && <p className="text-xs text-ink-faint">이미 등록한 폰이면 누르지 않아도 돼요.</p>}
+      {passkeys.length > 0 && <p className="text-xs text-ink-faint">이미 등록한 폰이면 안 눌러도 돼요.</p>}
 
       {note && <p className="rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">{note}</p>}
       {problem && (

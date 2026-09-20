@@ -22,7 +22,7 @@ export function DedupeCard() {
       try {
         await work();
       } catch {
-        setError("잠깐 문제가 생겼어요. 다시 눌러주세요.");
+        setError("문제가 생겼어요. 다시 눌러주세요.");
       }
     });
   }
@@ -30,7 +30,7 @@ export function DedupeCard() {
   if (done !== null) {
     return (
       <p className="rounded-md bg-accent-soft px-3 py-2 text-sm text-accent">
-        ✅ {done}개를 “안 올림”으로 옮겼어요. 딜 탭의 “안 올림”에서 볼 수 있어요.
+        ✅ {done}개 정리했어요.
       </p>
     );
   }

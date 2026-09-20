@@ -97,7 +97,7 @@ export function CopyPane({
 
       {state === "manual" && (
         <p className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
-          자동 복사가 막혀 있어요. 아래 글을 길게 눌러 전체 선택한 뒤 복사해주세요.
+          자동 복사가 안 돼요. 아래 글을 길게 눌러 복사해주세요.
         </p>
       )}
 

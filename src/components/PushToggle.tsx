@@ -61,14 +61,14 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
       const ok = await pushSubscribeAction(sub.toJSON());
       if (!ok) {
         await sub.unsubscribe();
-        setNote("알림 설정을 저장하지 못했어요. 다시 눌러주세요.");
+        setNote("저장하지 못했어요. 다시 눌러주세요.");
         setState("off");
         return;
       }
       setState("on");
-      setNote("켰어요. 할 일이 있는 날 매일 아침 8시에 한 통 와요.");
+      setNote("켰어요! 할 일 있는 날 아침 8시에 와요.");
     } catch {
-      setNote("알림을 켜지 못했어요. 잠시 뒤 다시 눌러주세요.");
+      setNote("켜지 못했어요. 다시 눌러주세요.");
     } finally {
       setBusy(false);
     }
@@ -87,7 +87,7 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
       setState("off");
       setNote("껐어요.");
     } catch {
-      setNote("알림을 끄지 못했어요. 다시 눌러주세요.");
+      setNote("끄지 못했어요. 다시 눌러주세요.");
     } finally {
       setBusy(false);
     }
@@ -100,10 +100,10 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
       const run = await pushTestAction();
       setNote(
         run.status === "sent"
-          ? "보냈어요. 폰 알림을 확인해주세요."
+          ? "보냈어요! 폰 알림을 확인해주세요."
           : run.status === "no-subscription"
-            ? "켜진 기기가 없어요. 먼저 알림을 켜주세요."
-            : "서버에 알림 설정이 없어 못 보냈어요."
+            ? "켜진 기기가 없어요. 먼저 켜주세요."
+            : "서버 설정이 없어요. 관리자에게 알려주세요."
       );
     } catch {
       setNote("보내지 못했어요.");
@@ -117,14 +117,14 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
   if (state === "no-keys")
     return (
       <p className="text-xs text-ink-soft">
-        서버에 알림 설정이 아직 없어요. 관리자에게 알려주세요 (알림 키 등록).
+        서버에 알림 설정이 없어요. 관리자에게 알려주세요.
       </p>
     );
 
   if (state === "needs-install")
     return (
       <p className="text-xs text-ink-soft">
-        아이폰은 <b>홈 화면에 추가한 앱</b>에서만 알림을 켤 수 있어요. 홈 화면 아이콘으로 열고 다시 와주세요.
+        아이폰은 홈 화면에 추가해야 알림을 켤 수 있어요. 홈 화면 아이콘으로 열어주세요.
       </p>
     );
 
@@ -134,7 +134,7 @@ export function PushToggle({ publicKey }: { publicKey: string | null }) {
   if (state === "denied")
     return (
       <p className="text-xs text-danger">
-        알림이 꺼져 있어요. 아이폰 설정에서 이 앱의 알림을 허용한 뒤 다시 와주세요.
+        알림이 꺼져 있어요. 아이폰 설정에서 허용해주세요.
       </p>
     );
 

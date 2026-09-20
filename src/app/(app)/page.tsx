@@ -69,19 +69,19 @@ export default async function HomePage() {
 
   return (
     <>
-      <PageHeader title="qurator" subtitle={empty ? undefined : "오늘 할 일부터 보여드려요."} />
+      <PageHeader title="qurator" subtitle={empty ? undefined : "지금 할 일이에요."} />
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-7 px-4 pb-6 pt-2">
         {empty ? (
           <p className={emptyCls}>
             아직 올린 딜이 없어요.
             <br />
-            무신사 상품 화면을 찍어 올리면 가격이 기록돼요. 오른쪽 아래 📷 올리기를 눌러보세요.
+            오른쪽 아래 📷 올리기로 시작해보세요.
           </p>
         ) : (
           <>
             {todo.length > 0 && (
               <section className="flex flex-col gap-2">
-                <h2 className="text-[13px] font-medium text-ink-soft">오늘 할 일 <span className="text-ink-faint">· 거의 끝난 것부터</span></h2>
+                <h2 className="text-[13px] font-medium text-ink-soft">오늘 할 일 <span className="text-ink-faint">· 금방 끝나는 것부터</span></h2>
                 <div className="card divide-y divide-line">
                   {todo.map((item) => (
                     <Link
@@ -102,7 +102,7 @@ export default async function HomePage() {
             {drops.length > 0 && (
               <section id="drops" className="flex flex-col gap-2 scroll-mt-20">
                 <h2 className="text-[13px] font-medium text-ink-soft">
-                  📉 싸진 상품 <span className="text-ink-faint">· 지난번 기록보다 내려갔어요</span>
+                  📉 싸진 상품 <span className="text-ink-faint">· 지난번보다 내렸어요</span>
                 </h2>
                 <ul className="card divide-y divide-line">
                   {drops.slice(0, DROPS_SHOWN).map((drop) => (
@@ -138,7 +138,7 @@ export default async function HomePage() {
             {deadLinks.length > 0 && (
               <section id="soldout" className="flex flex-col gap-2 scroll-mt-20">
                 <h2 className="text-[13px] font-medium text-danger">
-                  {deadLinks.every((a) => a.health === "SOLDOUT") ? "품절됐어요" : "링크가 막혔어요"} — 카톡에 안내를 올려주세요
+                  {deadLinks.every((a) => a.health === "SOLDOUT") ? "품절됐어요" : "링크가 막혔어요"} — 카톡에 알려주세요
                 </h2>
                 {deadLinks.map((alert) => (
                   <div key={alert.dealId} className="card border-l-[3px] border-danger p-4">
@@ -148,7 +148,7 @@ export default async function HomePage() {
                       {alert.confirmedAt && ` · ${formatRelativeFromNow(alert.confirmedAt, now)}`} {HEALTH_LABEL[alert.health]}로 표시함
                     </p>
                     <p className="mb-3 mt-1 text-xs text-ink-soft">
-                      팔로워 페이지에서는 내렸어요. 이미 보낸 링크를 누르면 ‘지금은 살 수 없는 상품이에요’ 화면이 떠요.
+                      팔로워 페이지에서 내렸어요. 보낸 링크는 안내 화면으로 바뀌어요.
                     </p>
                     <CopyPane text={alert.correction} label={NOTICE_LABEL[alert.health]} />
                   </div>
@@ -159,7 +159,7 @@ export default async function HomePage() {
             <section className="flex flex-col gap-2">
               <div className="flex items-baseline justify-between">
                 <h2 className="text-[13px] font-medium text-ink-soft">
-                  지난 7일 성과 <span className="text-ink-faint">· ▲▼는 그 전 7일과 비교</span>
+                  7일 성과 <span className="text-ink-faint">· 지난주 대비</span>
                 </h2>
                 <Link href="/stats" className="text-xs font-medium text-accent">
                   더 보기

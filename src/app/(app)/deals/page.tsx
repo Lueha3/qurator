@@ -40,7 +40,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
 
   return (
     <>
-      <PageHeader title="딜" subtitle="올린 딜이 최근 순으로 모여요. 눌러서 다음 할 일을 하세요." />
+      <PageHeader title="딜" subtitle="최근 순이에요. 눌러서 다음 단계로." />
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-6 pt-2">
         <DealBrowser
           deals={deals}

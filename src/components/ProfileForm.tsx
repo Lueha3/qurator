@@ -26,7 +26,7 @@ export function ProfileForm({
       const result = await updateProfileAction(form);
       setMessage(
         result.ok
-          ? { tone: "ok", text: "저장했어요. 팔로워 페이지에 바로 반영돼요." }
+          ? { tone: "ok", text: "저장했어요! 바로 반영돼요." }
           : { tone: "error", text: result.reason }
       );
     });

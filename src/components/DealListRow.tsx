@@ -52,7 +52,7 @@ export function DealListRow({ deal, trailing, hideSavedTag, href, onOpen }: RowP
 
         <div className="mt-1 flex items-baseline gap-1.5 text-sm">
           {price.missing ? (
-            <span className="text-xs font-medium text-danger">⚠️ 가격을 못 읽었어요 — 눌러서 고치기</span>
+            <span className="text-xs font-medium text-danger">⚠️ 가격 오류 — 눌러서 고치기</span>
           ) : (
             <>
               <span className={`font-semibold ${done ? "text-ink-soft" : ""}`}>{formatKRW(price.effective!)}</span>

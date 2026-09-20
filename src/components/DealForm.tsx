@@ -73,7 +73,7 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json.error ?? "만들지 못했어요. 다시 시도해주세요.");
+        setError(json.error ?? "만들지 못했어요. 다시 해보세요.");
         return;
       }
       setForm(EMPTY_FORM);
@@ -81,7 +81,7 @@ export function DealForm({ onCreated }: { onCreated?: (deal: DealDTO) => void })
       router.refresh();
       onCreated?.(json.deal as DealDTO);
     } catch {
-      setError("인터넷 연결을 확인해주세요.");
+      setError("인터넷을 확인해주세요.");
     } finally {
       setSubmitting(false);
     }
