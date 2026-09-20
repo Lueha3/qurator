@@ -30,7 +30,7 @@ export function InviteCard({ invites }: { invites: InviteView[] }) {
           {invites.map((invite) => (
             <li key={invite.id} className="flex items-center justify-between gap-3 text-xs">
               <span className="min-w-0">
-                <b className="text-sm font-medium">{invite.note ?? "이름 없는 등록 링크"}</b>
+                <b className="text-sm font-medium">{invite.note ?? "이름 없는 링크"}</b>
                 <span className="block text-ink-soft">
                   {formatExpiry(invite.expiresAt)}까지 · 아직 사용 안 함
                 </span>
@@ -56,8 +56,8 @@ export function InviteCard({ invites }: { invites: InviteView[] }) {
       {fresh ? (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-ink-soft">
-            카톡으로 보내도 돼요. 받는 사람은 링크를 길게 눌러 <b>‘Safari에서 열기’</b>를 골라야 해요.
-            <b>30분 안에 한 번만</b> 쓸 수 있고, 지금 복사하지 않으면 다시 볼 수 없어요.
+            카톡으로 보내도 돼요. 받는 사람은 길게 눌러 <b>’Safari에서 열기’</b>를 골라야 해요.
+            <b>7일 안에 한 번만</b> 쓸 수 있어요. 지금 복사 안 하면 다시 못 봐요.
           </p>
           <code className="block break-all rounded-lg border border-line bg-paper p-3 font-mono text-xs">
             {fresh}

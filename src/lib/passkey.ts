@@ -286,8 +286,8 @@ export function deviceLabel(userAgent: string | null): string {
 // docs/03 §7.2. 실사용자(현표)에게 패스키를 등록시키려고 마스터 토큰을 통째로 넘기지 않기 위한 길.
 // 이 코드는 **게이트를 여는 열쇠**이므로 취급이 토큰과 같아야 한다: 높은 엔트로피, 짧은 수명, 1회용.
 
-/** 초대 수명. 카톡으로 보내고 그 자리에서 누르는 시간이면 충분하다. */
-const INVITE_TTL_MS = 30 * 60 * 1000;
+/** 초대 수명. 카톡으로 보내고 시간 여유를 두고 등록할 수 있게 7일. */
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface Invite {
   code: string;
