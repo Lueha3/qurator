@@ -435,6 +435,12 @@ model PriceSnapshot {
   listPrice   Int? // 정가
   salePrice   Int? // 행사가(판매가)
   couponPrice Int? // 공개 상품쿠폰가 — 파서 확장(W3) 전에는 항상 null
+  /**
+   * 화면에 찍힌 할인율(%) — 좋아요 목록 그리드 캡처에서만 채워진다(docs/06 §4.6).
+   * 기준가 대비 실할인율(price-analysis.ts가 계산)과는 다른 값이다. 2026-09-20 추가:
+   * 그 전에는 vision이 읽어와도 저장할 자리가 없어 캡처 직후 버려졌다 — 실사용자 제보로 발견.
+   */
+  discountRateShown Int?
   source      SnapshotSource
   eventTag    String? // "BF2025" 등. 이벤트 창(policy watch.event.*) 안이면 자동 스탬핑, MANUAL은 직접 지정
   note        String? // MANUAL 입력 근거 (예: "작년 스크린샷 기준")

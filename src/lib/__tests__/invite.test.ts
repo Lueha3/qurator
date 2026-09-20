@@ -32,11 +32,11 @@ describe("초대 발급", () => {
     expect(a.code).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
-  it("30분 뒤 만료된다", async () => {
+  it("7일 뒤 만료된다", async () => {
     const invite = await createInvite(null);
-    const minutes = (invite.expiresAt.getTime() - Date.now()) / 60_000;
-    expect(minutes).toBeGreaterThan(25);
-    expect(minutes).toBeLessThanOrEqual(30);
+    const days = (invite.expiresAt.getTime() - Date.now()) / 86_400_000;
+    expect(days).toBeGreaterThan(6.9);
+    expect(days).toBeLessThanOrEqual(7);
   });
 
   it("목록에 코드를 다시 내보내지 않는다 — 목록이 열쇠 보관함이 되면 안 된다", async () => {

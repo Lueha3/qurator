@@ -14,6 +14,7 @@ function snap(daysAgo: number, salePrice: number | null, source: SnapshotLike["s
     listPrice: 89000,
     salePrice,
     couponPrice: null,
+    discountRateShown: null,
     source,
     eventTag: null,
   };

@@ -29,6 +29,8 @@ export interface SnapshotLike {
   listPrice: number | null;
   salePrice: number | null;
   couponPrice: number | null;
+  /** 화면에 찍힌 할인율(%) — 그리드 캡처에서만 채워진다. 기준가 대비 실할인율과는 다른 값이다 */
+  discountRateShown: number | null;
   source: SnapshotSource;
   eventTag: string | null;
 }

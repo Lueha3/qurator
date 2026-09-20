@@ -40,6 +40,8 @@ export interface SnapshotInput {
   listPrice?: number | null;
   salePrice?: number | null;
   couponPrice?: number | null;
+  /** 화면에 찍힌 할인율(%) — 그리드 캡처에서만 넘어온다. 기준가 대비 실할인율과는 다른 값이다 */
+  discountRateShown?: number | null;
   source: SnapshotSource;
   /** 미지정이면 이벤트 창(policy)으로 자동 판정. MANUAL 경로는 항상 명시한다. */
   eventTag?: string | null;
@@ -74,6 +76,7 @@ export async function recordSnapshot(
         listPrice,
         salePrice,
         couponPrice,
+        discountRateShown: input.discountRateShown ?? null,
         source: input.source,
         eventTag,
         note: input.note ?? null,

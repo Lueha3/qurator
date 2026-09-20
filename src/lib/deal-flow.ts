@@ -174,6 +174,9 @@ async function captureGridItems(items: VisionGridItem[]): Promise<CaptureResult>
       listPrice: null,
       salePrice: item.salePrice,
       couponPrice: null,
+      // 화면에 찍힌 할인율 그대로 — 예전에는 vision이 읽어와도 저장할 자리가 없어 여기서 버려졌다
+      // (2026-09-20, 실사용자 제보로 발견). 기준가 대비 실할인율은 price-analysis.ts가 따로 계산한다.
+      discountRateShown: item.discountRateShown,
       source: "SCREENSHOT",
     });
     if (!recorded) {

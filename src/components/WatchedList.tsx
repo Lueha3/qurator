@@ -106,8 +106,15 @@ function WatchedRow({
           </div>
         </div>
 
-        {/* 배지와 화살표는 위쪽에 모은다 — 행 오른쪽 아래는 "그만 지켜보기"가 쓴다. */}
+        {/* 배지와 화살표는 위쪽에 모은다 — 행 오른쪽 아래는 "그만 지켜보기"가 쓴다.
+            화면 할인율(맨 앞, DealListRow와 같은 맨 배지)과 dropRate(📉, 지난 기록 대비 내림)는
+            다른 값이라 나란히 둬도 헷갈리지 않게 이모지로 구분한다. */}
         <div className="flex shrink-0 items-center gap-1.5">
+          {item.discountRateShown !== null && item.discountRateShown > 0 && (
+            <span className="rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-bold leading-4 text-accent-ink">
+              {item.discountRateShown}%
+            </span>
+          )}
           {item.dropRate !== null && (
             <span className="rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-bold leading-4 text-accent-ink">
               📉 {item.dropRate}%

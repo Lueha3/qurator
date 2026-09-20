@@ -28,6 +28,7 @@ function snap(
     salePrice,
     listPrice: extra.listPrice ?? null,
     couponPrice: extra.couponPrice ?? null,
+    discountRateShown: extra.discountRateShown ?? null,
     source: (extra.source ?? "HEALTH_CHECK") as SnapshotSource,
     eventTag: extra.eventTag ?? null,
   };

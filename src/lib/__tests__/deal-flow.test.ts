@@ -169,7 +169,10 @@ describe("스크린샷 캡처 (docs/06 §3-4)", () => {
 
   it("Vision 실패(null)면 Deal·스냅샷을 만들지 않는다 (docs/06 §3.3)", async () => {
     extractFromScreenshot.mockResolvedValueOnce(null);
-    expect(await captureFromScreenshots([IMAGE])).toEqual({ kind: "vision_failed" });
+    expect(await captureFromScreenshots([IMAGE])).toEqual({
+      kind: "vision_failed",
+      reason: "bad-response",
+    });
     expect(await db.deal.count()).toBe(0);
     expect(await db.priceSnapshot.count()).toBe(0);
   });

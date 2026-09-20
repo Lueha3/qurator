@@ -142,7 +142,7 @@ export default async function SettingsPage() {
         <section className="card p-4">
           <h3 className="mb-1 text-sm font-semibold">🧹 중복 딜 정리</h3>
           <p className="mb-3 text-xs text-ink-soft">
-            예전에 같은 상품으로 생긴 중복 딜을 '안 올림'으로 옮겨요. 링크가 붙은 딜은 안 건드려요.
+            예전에 같은 상품으로 생긴 중복 딜을 &apos;안 올림&apos;으로 옮겨요. 링크가 붙은 딜은 안 건드려요.
           </p>
           <DedupeCard />
         </section>

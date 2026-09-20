@@ -165,6 +165,27 @@ describe("지켜보는 상품 목록", () => {
     expect(rows[0].recordCount).toBe(1);
   });
 
+  // 회귀 테스트 — 실사용자 제보(2026-09-20): 화면에 할인율이 찍혀 있었는데 목록에 안 나왔다.
+  // 원인은 PriceSnapshot에 저장할 컬럼 자체가 없어 vision이 읽어온 값이 그 자리에서 버려진 것.
+  it("화면에 찍힌 할인율이 스냅샷에 저장돼 목록에 나온다", async () => {
+    await captureGrid([
+      gridItem({ brand: "쿠어", productName: "오버셔츠", salePrice: 53400, discountRateShown: 40 }),
+    ]);
+
+    const snapshot = await db.priceSnapshot.findFirstOrThrow();
+    expect(snapshot.discountRateShown).toBe(40);
+
+    const rows = await loadWatchedProducts();
+    expect(rows[0].discountRateShown).toBe(40);
+  });
+
+  it("할인율이 안 찍혀 있었으면 null로 남는다 — 0%를 지어내지 않는다", async () => {
+    await captureGrid([gridItem({ discountRateShown: null })]);
+
+    const rows = await loadWatchedProducts();
+    expect(rows[0].discountRateShown).toBeNull();
+  });
+
   it("싸진 상품이 맨 위로 온다", async () => {
     await captureGrid([
       gridItem({ productName: "그대로", salePrice: 50000 }),

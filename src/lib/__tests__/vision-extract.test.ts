@@ -81,8 +81,8 @@ describe("extractFromScreenshot", () => {
 
     // 이미지 블록이 텍스트 지시보다 먼저 온다 (Anthropic vision 컨벤션, docs/06 §4.1 요구사항 5)
     const call = create.mock.calls[0][0];
-    expect(call.model).toBe("claude-opus-5");
-    expect(call.output_config).toEqual({ effort: "low" });
+    expect(call.model).toBe("claude-sonnet-5");
+    expect(call.thinking).toEqual({ type: "disabled" });
     const content = call.messages[0].content;
     expect(content[0].type).toBe("image");
     expect(content[0].source).toEqual({

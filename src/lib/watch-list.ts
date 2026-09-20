@@ -23,6 +23,11 @@ export interface WatchedProductDTO {
   dropRate: number | null;
   /** 지금까지 기록한 횟수 */
   recordCount: number;
+  /**
+   * 화면에 찍힌 할인율(%) — 최신 기록 기준. dropRate(지난 기록 대비 내림폭)와는 다른 값이다:
+   * 이건 무신사가 그 순간 표시한 정가 대비 할인율을 그대로 옮긴 것뿐이다.
+   */
+  discountRateShown: number | null;
   /** 이 상품으로 이미 만든 딜. 있으면 그 카드로 바로 간다 */
   dealId: string | null;
   /** 마지막 기록 시각 */
@@ -75,6 +80,7 @@ export async function loadWatchedProducts(now: Date = new Date()): Promise<Watch
       priceBefore: dropped ? before : null,
       dropRate: dropped ? Math.round(((before - price) / before) * 100) : null,
       recordCount: analysis?.snapshotCount ?? 0,
+      discountRateShown: analysis?.current?.discountRateShown ?? null,
       dealId: dealByProduct.get(watch.productId) ?? null,
       lastRecordedAt: analysis?.current?.capturedAt.toISOString() ?? null,
     };
