@@ -78,3 +78,73 @@ export async function deleteDeals(dealIds: string[]): Promise<DeleteDealsResult>
 
   return { dealCount: realIds.length, orphanedProductCount: orphanedProductIds.length };
 }
+
+// ── 지켜보는 상품 선택 삭제 ─────────────────────────────────────────────
+
+export interface DeleteWatchedProductsResult {
+  /** 실제로 지운 상품 수 */
+  productCount: number;
+  /** 발행된(APPROVED) 딜이 있어 건드리지 않고 건너뛴 상품 수 */
+  blockedCount: number;
+}
+
+/**
+ * "지켜보는 중" 목록의 체크박스 삭제 — deleteDeals와 달리 여기는 **딜이 아니라 상품**을
+ * 지우는 입구다. 그리드 캡처로 만들어진 상품은 딜 없이 그냥 쌓이므로("딜 있음" 표시가 없는
+ * 대부분), 그 자체를 지울 방법이 필요하다.
+ *
+ * **발행된(APPROVED) 딜이 하나라도 있는 상품은 통째로 건너뛴다.** 그 딜의 ContentCard·
+ * CuratorLink·ShortLink·ClickEvent는 팔로워가 지금 이 순간에도 쓰고 있을 수 있는 실물
+ * 데이터다 — audit_log의 "삭제 경로를 만들지 않는다"(§11)와 같은 이유로, 발행된 것은
+ * 이 경로에서 지우지 않는다. CANDIDATE·AWAITING_LINK·READY_TO_PUBLISH·SKIPPED 딜은
+ * 아직 발행 전이거나 발행하지 않기로 한 것이라 함께 지운다.
+ */
+export async function deleteWatchedProducts(
+  productIds: string[]
+): Promise<DeleteWatchedProductsResult> {
+  const ids = [...new Set(productIds)].filter(Boolean);
+  if (ids.length === 0) return { productCount: 0, blockedCount: 0 };
+
+  const approvedDeals = await db.deal.findMany({
+    where: { productId: { in: ids }, approvalStage: "APPROVED" },
+    select: { productId: true },
+  });
+  const blocked = new Set(approvedDeals.map((d) => d.productId));
+  const targetIds = ids.filter((id) => !blocked.has(id));
+
+  if (targetIds.length === 0) return { productCount: 0, blockedCount: blocked.size };
+
+  const deals = await db.deal.findMany({
+    where: { productId: { in: targetIds } },
+    select: { id: true },
+  });
+  const dealIds = deals.map((d) => d.id);
+  const shortLinks = await db.shortLink.findMany({
+    where: { dealId: { in: dealIds } },
+    select: { id: true },
+  });
+  const shortLinkIds = shortLinks.map((s) => s.id);
+
+  await db.$transaction([
+    db.clickEvent.deleteMany({ where: { shortLinkId: { in: shortLinkIds } } }),
+    db.shortLink.deleteMany({ where: { dealId: { in: dealIds } } }),
+    db.post.deleteMany({ where: { dealId: { in: dealIds } } }),
+    db.contentCard.deleteMany({ where: { dealId: { in: dealIds } } }),
+    db.curatorLink.deleteMany({ where: { dealId: { in: dealIds } } }),
+    db.deal.deleteMany({ where: { id: { in: dealIds } } }),
+    db.priceSnapshot.deleteMany({ where: { productId: { in: targetIds } } }),
+    db.watchItem.deleteMany({ where: { productId: { in: targetIds } } }),
+    db.productVariant.deleteMany({ where: { productId: { in: targetIds } } }),
+    db.product.deleteMany({ where: { id: { in: targetIds } } }),
+  ]);
+
+  await audit({
+    actor: "HUMAN",
+    action: "product.deleted",
+    detail:
+      `지켜보는 상품 ${targetIds.length}개 선택 삭제` +
+      (blocked.size > 0 ? ` · 발행된 딜이 있어 ${blocked.size}개는 건너뜀` : ""),
+  });
+
+  return { productCount: targetIds.length, blockedCount: blocked.size };
+}

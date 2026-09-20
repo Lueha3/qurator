@@ -3,7 +3,7 @@
 import { emptyCls, inputCls, segmentCls, segmentItemCls } from "./form";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { deleteDealsAction, unwatchAction } from "@/app/actions";
+import { deleteDealsAction, deleteWatchedProductsAction, unwatchAction } from "@/app/actions";
 import type { DealDTO } from "@/lib/api-types";
 import { kstDayKey, kstDayLabel, kstTime } from "@/lib/format";
 import { DealListRow } from "./DealListRow";
@@ -131,15 +131,24 @@ export function DealBrowser({
 
   // 체크박스 다중 선택 삭제 — 2026-09-20. dedupe(안 올림으로 옮기기)로는 못 잡는
   // 깨진 인코딩·개별 오탐 같은 것을 사람이 직접 골라 지우는 경로다.
+  //
+  // "지켜보는 중" 탭은 딜이 아니라 상품을 보여주는 다른 목록(WatchedList)이라, 선택 대상도
+  // 다른 종류의 id다 — 그래서 선택 집합을 딜용/상품용으로 나눠 둔다. selectMode 토글과
+  // 확인 단계는 공유한다(화면에 하나만 보이므로 헷갈릴 일이 없다).
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [deleteConfirming, setDeleteConfirming] = useState(false);
   const [deletePending, startDeleteTransition] = useTransition();
+  /** 발행된 딜이 있어 일부를 건너뛰었을 때만 채운다 — 조용히 "N개만" 지워지면 안 된다 */
+  const [productDeleteNote, setProductDeleteNote] = useState<string | null>(null);
 
   function toggleSelectMode() {
     setSelectMode((v) => !v);
     setSelected(new Set());
+    setSelectedProducts(new Set());
     setDeleteConfirming(false);
+    setProductDeleteNote(null);
   }
 
   function toggleSelected(dealId: string) {
@@ -151,6 +160,15 @@ export function DealBrowser({
     });
   }
 
+  function toggleSelectedProduct(productId: string) {
+    setSelectedProducts((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
+  }
+
   function runDelete() {
     const ids = [...selected];
     startDeleteTransition(async () => {
@@ -158,6 +176,22 @@ export function DealBrowser({
       setSelectMode(false);
       setSelected(new Set());
       setDeleteConfirming(false);
+      router.refresh();
+    });
+  }
+
+  function runDeleteProducts() {
+    const ids = [...selectedProducts];
+    startDeleteTransition(async () => {
+      const result = await deleteWatchedProductsAction(ids);
+      setSelectMode(false);
+      setSelectedProducts(new Set());
+      setDeleteConfirming(false);
+      if (result.blockedCount > 0) {
+        setProductDeleteNote(
+          `${result.productCount}개 지웠어요. 발행된 딜이 있어 ${result.blockedCount}개는 그대로 뒀어요.`
+        );
+      }
       router.refresh();
     });
   }
@@ -296,8 +330,17 @@ export function DealBrowser({
         )}
       </div>
 
+      {productDeleteNote && (
+        <p className="rounded-xl bg-accent-soft px-3 py-2 text-sm text-accent">{productDeleteNote}</p>
+      )}
+
       {filter === "saved" ? (
-        <WatchedList items={visibleWatched} />
+        <WatchedList
+          items={visibleWatched}
+          selectMode={selectMode}
+          selected={selectedProducts}
+          onToggleSelect={toggleSelectedProduct}
+        />
       ) : visible.length === 0 ? (
         <p className={emptyCls}>
           {query.trim() ? `“${query.trim()}”에 맞는 딜이 없어요.` : EMPTY_TEXT[filter]}
@@ -359,46 +402,55 @@ export function DealBrowser({
         </div>
       </dialog>
 
-      {selectMode && selected.size > 0 && (
-        <div
-          className="fixed inset-x-0 z-30 mx-auto max-w-3xl px-4"
-          style={{ bottom: "calc(8rem + env(safe-area-inset-bottom, 0px))" }}
-        >
-          {deleteConfirming ? (
-            <div className="elevated flex flex-col gap-2 rounded-2xl border border-danger bg-paper p-3">
-              <p className="text-sm font-semibold text-danger">
-                {selected.size}개를 지울까요? 되돌릴 수 없어요.
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={deletePending}
-                  onClick={() => setDeleteConfirming(false)}
-                  className="flex-1 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-ink-soft disabled:opacity-40"
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  disabled={deletePending}
-                  onClick={runDelete}
-                  className="flex-1 rounded-xl bg-danger px-3 py-2.5 text-sm font-semibold text-accent-ink disabled:opacity-40"
-                >
-                  {deletePending ? "지우는 중…" : "네, 지워요"}
-                </button>
+      {(() => {
+        // "지켜보는 중" 탭은 딜이 아니라 상품을 선택하므로 어느 집합·어느 삭제 함수를 쓸지
+        // 지금 보이는 탭으로 정한다 — 다른 탭에 남아 있을 수 있는 선택은 무시한다.
+        const onSaved = filter === "saved";
+        const count = onSaved ? selectedProducts.size : selected.size;
+        if (!selectMode || count === 0) return null;
+        const run = onSaved ? runDeleteProducts : runDelete;
+
+        return (
+          <div
+            className="fixed inset-x-0 z-30 mx-auto max-w-3xl px-4"
+            style={{ bottom: "calc(8rem + env(safe-area-inset-bottom, 0px))" }}
+          >
+            {deleteConfirming ? (
+              <div className="elevated flex flex-col gap-2 rounded-2xl border border-danger bg-paper p-3">
+                <p className="text-sm font-semibold text-danger">
+                  {count}개를 지울까요? 되돌릴 수 없어요.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={deletePending}
+                    onClick={() => setDeleteConfirming(false)}
+                    className="flex-1 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-ink-soft disabled:opacity-40"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deletePending}
+                    onClick={run}
+                    className="flex-1 rounded-xl bg-danger px-3 py-2.5 text-sm font-semibold text-accent-ink disabled:opacity-40"
+                  >
+                    {deletePending ? "지우는 중…" : "네, 지워요"}
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setDeleteConfirming(true)}
-              className="elevated w-full rounded-2xl bg-danger px-4 py-3 text-base font-semibold text-accent-ink transition-opacity active:opacity-90"
-            >
-              🗑️ {selected.size}개 삭제
-            </button>
-          )}
-        </div>
-      )}
+            ) : (
+              <button
+                type="button"
+                onClick={() => setDeleteConfirming(true)}
+                className="elevated w-full rounded-2xl bg-danger px-4 py-3 text-base font-semibold text-accent-ink transition-opacity active:opacity-90"
+              >
+                🗑️ {count}개 삭제
+              </button>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -29,7 +29,12 @@ import { parseTagInput } from "@/lib/deal-tags";
 import { updateProfile, type ProfileResult } from "@/lib/profile";
 import { markSoldOut, restoreDeal, type LinkHealthResult } from "@/lib/link-health";
 import { applyDedupe, planDedupe, type DedupePlan } from "@/lib/dedupe";
-import { deleteDeals, type DeleteDealsResult } from "@/lib/deal-delete";
+import {
+  deleteDeals,
+  deleteWatchedProducts,
+  type DeleteDealsResult,
+  type DeleteWatchedProductsResult,
+} from "@/lib/deal-delete";
 import { createInvite, deletePasskey, revokeInvite } from "@/lib/passkey";
 import {
   removeSubscription,
@@ -194,6 +199,15 @@ export async function dedupeApplyAction(): Promise<{ closed: number }> {
 /** 딜 탭 체크박스 다중 선택 삭제 — src/lib/deal-delete.ts 참고. */
 export async function deleteDealsAction(dealIds: string[]): Promise<DeleteDealsResult> {
   const result = await deleteDeals(dealIds);
+  revalidateApp();
+  return result;
+}
+
+/** "지켜보는 중" 탭 체크박스 다중 선택 삭제 — src/lib/deal-delete.ts 참고. */
+export async function deleteWatchedProductsAction(
+  productIds: string[]
+): Promise<DeleteWatchedProductsResult> {
+  const result = await deleteWatchedProducts(productIds);
   revalidateApp();
   return result;
 }

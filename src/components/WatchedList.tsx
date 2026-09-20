@@ -16,7 +16,18 @@ import { emptyCls } from "./form";
 //
 // 딜이 이미 있는 상품은 그 카드로 바로 간다 — 같은 상품의 판단이 두 장으로 갈라지지 않게.
 
-export function WatchedList({ items }: { items: WatchedProductDTO[] }) {
+export function WatchedList({
+  items,
+  selectMode,
+  selected,
+  onToggleSelect,
+}: {
+  items: WatchedProductDTO[];
+  /** 체크박스 선택 모드 — DealBrowser의 "☑️ 선택" 토글을 공유한다 (2026-09-20) */
+  selectMode?: boolean;
+  selected?: Set<string>;
+  onToggleSelect?: (productId: string) => void;
+}) {
   const [error, setError] = useState<string | null>(null);
 
   if (items.length === 0) {
@@ -34,7 +45,14 @@ export function WatchedList({ items }: { items: WatchedProductDTO[] }) {
       {error && <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
       <ul className="card divide-y divide-line">
         {items.map((item) => (
-          <WatchedRow key={item.productId} item={item} onError={setError} />
+          <WatchedRow
+            key={item.productId}
+            item={item}
+            onError={setError}
+            selectMode={selectMode}
+            selected={selected?.has(item.productId)}
+            onToggleSelect={onToggleSelect}
+          />
         ))}
       </ul>
     </div>
@@ -44,14 +62,24 @@ export function WatchedList({ items }: { items: WatchedProductDTO[] }) {
 function WatchedRow({
   item,
   onError,
+  selectMode,
+  selected,
+  onToggleSelect,
 }: {
   item: WatchedProductDTO;
   onError: (message: string | null) => void;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (productId: string) => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   function open() {
+    if (selectMode) {
+      onToggleSelect?.(item.productId);
+      return;
+    }
     onError(null);
     startTransition(async () => {
       try {
@@ -70,6 +98,7 @@ function WatchedRow({
 
   // 목록이 300줄이 될 수 있으므로 "그만 지켜보기"에 한 줄을 더 내주지 않는다 — 행 오른쪽
   // 아래의 빈 자리에 겹쳐 놓고, 그 자리만 본문 탭에서 떼어낸다(pr-20으로 겹침 방지).
+  // 선택 모드에서는 숨긴다 — 탭 전체가 선택 토글이라 겹친 버튼이 오조작을 부른다.
   return (
     <li className="relative">
       <button
@@ -78,6 +107,16 @@ function WatchedRow({
         disabled={pending}
         className="flex w-full items-start gap-3 px-3.5 py-3 pb-3.5 text-left disabled:opacity-50"
       >
+        {selectMode && (
+          <span
+            aria-hidden
+            className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
+              selected ? "border-accent bg-accent text-accent-ink" : "border-line-strong text-transparent"
+            }`}
+          >
+            ✓
+          </span>
+        )}
         <BrandMark brand={item.brandName} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-[11px] leading-4 text-ink-soft">
@@ -126,9 +165,11 @@ function WatchedRow({
         </div>
       </button>
 
-      <div className="absolute bottom-2.5 right-3.5">
-        <ReleaseButton productId={item.productId} onError={onError} />
-      </div>
+      {!selectMode && (
+        <div className="absolute bottom-2.5 right-3.5">
+          <ReleaseButton productId={item.productId} onError={onError} />
+        </div>
+      )}
     </li>
   );
 }
