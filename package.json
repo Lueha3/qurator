@@ -13,6 +13,7 @@
     "db:import": "tsx --env-file=.env scripts/import-data.ts",
     "db:copy": "tsx --env-file=.env scripts/copy-postgres-data.ts",
     "db:dedupe": "tsx --env-file=.env scripts/dedupe-deals.ts",
+    "db:purge-screenshots": "tsx --env-file=.env scripts/purge-screenshot-data.ts",
     "gateway": "tsx --env-file=.env scripts/gateway.ts",
     "push:keys": "tsx scripts/vapid-keys.ts",
     "test": "vitest run",

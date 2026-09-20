@@ -29,6 +29,7 @@ import { parseTagInput } from "@/lib/deal-tags";
 import { updateProfile, type ProfileResult } from "@/lib/profile";
 import { markSoldOut, restoreDeal, type LinkHealthResult } from "@/lib/link-health";
 import { applyDedupe, planDedupe, type DedupePlan } from "@/lib/dedupe";
+import { applyPurge, type PurgePlan } from "@/lib/purge-screenshot-data";
 import { createInvite, deletePasskey, revokeInvite } from "@/lib/passkey";
 import {
   removeSubscription,
@@ -188,6 +189,14 @@ export async function dedupeApplyAction(): Promise<{ closed: number }> {
   const result = await applyDedupe();
   revalidateApp();
   return result;
+}
+
+/**
+ * 1회용 정리 — /purge-test-data 페이지 전용. 링크가 없는 화면이라 실수로 눌릴 일이 없고,
+ * 사용 후 라우트 자체를 지울 예정이다(docs/06 §4.1.1 참고 — 여긴 새 비유가 아니라 정리다).
+ */
+export async function purgeTestDataAction(): Promise<PurgePlan> {
+  return applyPurge();
 }
 
 export async function updateProfileAction(input: {
