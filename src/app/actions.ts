@@ -14,6 +14,7 @@ import {
   markInterested,
   replaceHook,
   reopenDeal,
+  startDealFromProduct,
   skipDeal,
   updateDealFacts,
   type ApproveResult,
@@ -54,6 +55,14 @@ export async function interestAction(dealId: string): Promise<void> {
 export async function skipAction(dealId: string): Promise<void> {
   await skipDeal(dealId);
   revalidateApp();
+}
+
+export async function startDealAction(
+  productId: string
+): Promise<{ ok: true; dealId: string; reused: boolean } | { ok: false; reason: string }> {
+  const result = await startDealFromProduct(productId);
+  revalidateApp();
+  return result;
 }
 
 export async function reopenAction(dealId: string): Promise<{ ok: boolean; reason?: string }> {

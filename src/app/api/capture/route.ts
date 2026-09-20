@@ -53,5 +53,14 @@ export async function POST(req: NextRequest) {
       reused: result.reused,
     });
   }
+  if (result.kind === "grid") {
+    return reply({
+      kind: "grid",
+      added: result.added,
+      updated: result.updated,
+      cheaper: result.cheaper,
+      skipped: result.skipped,
+    });
+  }
   return reply({ kind: result.kind });
 }

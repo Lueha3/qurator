@@ -58,6 +58,8 @@ describe("extractFromScreenshot", () => {
 
     expect(result).toEqual({
       isProductPage: true,
+      // 상세 페이지 응답에는 그리드가 없다 — null과 []는 뜻이 다르다(docs/06 §4.6)
+      gridItems: null,
       brand: "쿠어",
       productName: "스탠다드 오버셔츠",
       styleCode: "COAT-001",

@@ -111,6 +111,23 @@ export function CaptureFab() {
           router.push(`/deals?d=${body.dealId}`);
           router.refresh();
           break;
+        case "grid": {
+          // 목록 한 장 = 상품 여러 개. 몇 개를 담았는지, 그중 싸진 것이 있는지가 알고 싶은 전부다.
+          const total = body.added + body.updated;
+          const parts = [body.added > 0 ? `새 상품 ${body.added}개` : null, body.updated > 0 ? `가격 갱신 ${body.updated}개` : null]
+            .filter(Boolean)
+            .join(" · ");
+          setToast({
+            tone: total > 0 ? "ok" : "error",
+            message: total > 0 ? `목록에서 ${total}개를 담았어요.` : "목록에서 읽은 상품이 없어요. 화면을 더 가까이 찍어주세요.",
+            detail: total > 0 ? [parts, body.cheaper > 0 ? `📉 ${body.cheaper}개는 지난번보다 싸졌어요` : null].filter(Boolean).join("\n") : null,
+          });
+          if (total > 0) {
+            router.push("/deals?f=saved");
+            router.refresh();
+          }
+          break;
+        }
         case "not_product_page":
           setToast({
             tone: "error",

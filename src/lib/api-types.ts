@@ -127,6 +127,8 @@ export interface CreateDealResponse {
 /** POST /api/capture 응답 — 스크린샷 캡처 결과 (docs/06 §3.3의 세 갈래 + 요청 오류) */
 export type CaptureResponse =
   | { kind: "created"; dealId: string; priceChangeNote: string | null; reused: boolean }
+  /** 좋아요 목록을 통째로 담은 결과 (docs/06 §4.6) — 딜이 아니라 지켜보는 상품이 된다 */
+  | { kind: "grid"; added: number; updated: number; cheaper: number; skipped: number }
   | { kind: "not_product_page" }
   | { kind: "vision_failed" }
   | { kind: "error"; error: string };

@@ -38,6 +38,7 @@ const IMAGE = { data: "ZmFrZSBqcGVn", mediaType: "image/jpeg" }; // "fake jpeg"
 
 const VISION_FULL: VisionExtractResult = {
   isProductPage: true,
+  gridItems: null,
   brand: "쿠어",
   productName: "스탠다드 오버셔츠",
   styleCode: "CO-999",

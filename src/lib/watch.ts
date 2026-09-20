@@ -47,18 +47,30 @@ export type AddWatchResult =
 /**
  * 워치에 상품을 등록한다. 상한을 넘으면 거부한다 —
  * "조금 더 담아도 되겠지"가 반복되면 소수 추적이라는 전제 자체가 무너진다.
+ *
+ * `bulk`는 좋아요 목록을 통째로 담는 경로(docs/06 §4.6) 전용이다. **크롤리스 모드에서만** 상한을
+ * 건너뛴다. 상한(기본 30개)이 존재하는 이유는 "무신사로 나가는 자동 요청을 소수로 묶는 것"인데,
+ * 크롤리스 모드에서는 자동 요청이 0건이고 가격은 현표가 올린 스크린샷으로만 쌓인다 — 그 상태의
+ * 워치는 트래픽이 아니라 **장부**라서 30개로 묶을 이유가 없다. 300개를 담아두고 좋아요 목록
+ * 13장으로 한 번에 갱신하는 것이 이 기능의 전부다.
+ *
+ * 크롤링을 다시 켜면 이 장부가 그대로 조회 대상이 되므로, runWatchCycle이 시작 전에 상한을
+ * 다시 확인하고 초과 상태면 사이클을 아예 돌리지 않는다(아래 CYCLE 가드).
  */
 export async function addWatch(
   productId: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  opts: { bulk?: boolean } = {}
 ): Promise<AddWatchResult> {
   const limits = await getWatchLimits();
   const existing = await db.watchItem.findUnique({ where: { productId } });
   const activeCount = await countActiveWatches(now);
 
+  const capApplies = !(opts.bulk && (await isCrawlessMode()));
+
   // 이미 활성인 항목의 갱신은 상한과 무관하다(총량이 늘지 않는다).
   const isActiveNow = !!existing && existing.active && existing.expiresAt > now;
-  if (!isActiveNow && activeCount >= limits.itemsMax) {
+  if (capApplies && !isActiveNow && activeCount >= limits.itemsMax) {
     return {
       ok: false,
       reason: `지켜보기는 ${limits.itemsMax}개까지예요. 하나를 그만 지켜본 뒤 다시 눌러주세요.`,
@@ -181,6 +193,21 @@ export async function runWatchCycle(now: Date = new Date()): Promise<WatchCycleR
   // 뚫지 않는다는 원칙은 시도조차 하지 않는 것까지 포함한다.
   if (await isCrawlessMode()) {
     result.crawless = true;
+    return result;
+  }
+
+  // 상한 재확인 (docs/06 §4.6). 크롤리스 모드에서 좋아요 목록을 통째로 담으면 워치가 수백 건이
+  // 될 수 있는데, 그 상태로 크롤링을 다시 켜면 "소수만 조회한다"는 §3.2 전제가 조용히 무너진다.
+  // perRunMax가 한 사이클의 건수는 막아주지만 날짜가 지나면 결국 전부 돌게 된다.
+  // 사람이 줄이기 전에는 아예 돌지 않는다 — 자동으로 골라내면 무엇이 빠졌는지 아무도 모른다.
+  const activeNow = await countActiveWatches(now);
+  if (activeNow > limits.itemsMax) {
+    result.stoppedEarly = `지켜보는 상품이 ${activeNow}개로 상한(${limits.itemsMax})을 넘어 사이클을 돌리지 않았습니다 — 줄이거나 상한을 올려주세요.`;
+    await audit({
+      actor: "SYSTEM",
+      action: "watch.cycle_refused",
+      detail: result.stoppedEarly,
+    });
     return result;
   }
 

@@ -15,11 +15,12 @@ import { parseCuratorLink } from "./curator-link";
 import { recordSnapshot } from "./price-snapshot";
 import { buildPriceAnalyses, buildPriceChangeNote } from "./price-analysis";
 import { draftHookLine } from "./ai-hook";
-import { extractFromScreenshot, type ScreenshotImage } from "./vision-extract";
+import { extractFromScreenshot, type ScreenshotImage, type VisionGridItem } from "./vision-extract";
 import { matchOrCreateProduct, type MatchedBy } from "./product-match";
 import { renderAllChannels, type DealFacts, type DealLink } from "./renderer";
 import { audit } from "./audit";
 import { ensureShortLink } from "./shortlink";
+import { addWatch } from "./watch";
 import { serializeTags } from "./deal-tags";
 import { firstCheckAt } from "./health-check";
 import type { ApprovalStage, Channel } from "@prisma/client";
@@ -92,6 +93,22 @@ export type CaptureResult =
       /** 새 카드가 아니라 이미 열려 있던 카드를 갱신했는가 — 사람에게 다르게 말해야 한다 */
       reused: boolean;
     }
+  /**
+   * 좋아요 목록 같은 그리드 화면 — 딜을 만들지 않고 **지켜보는 상품**으로 담는다 (docs/06 §4.6).
+   * 한 장에 24개가 들어오는데 그걸 전부 딜로 만들면 "오늘 할 일"이 300줄이 된다. 목록에 담은
+   * 상품은 아직 올릴지 정한 것이 아니라 "값을 지켜볼 것"이라, 딜은 사람이 고를 때 만들어진다.
+   */
+  | {
+      kind: "grid";
+      /** 처음 담긴 상품 */
+      added: number;
+      /** 이미 담겨 있어 가격만 갱신된 상품 */
+      updated: number;
+      /** 그중 지난번보다 싸진 상품 */
+      cheaper: number;
+      /** 이름이나 가격을 못 읽어 건너뛴 칸 */
+      skipped: number;
+    }
   /** 상품 페이지가 아닌 화면(장바구니·옵션 시트·홈) — 기록할 것이 없어 딜·스냅샷을 만들지 않는다 */
   | { kind: "not_product_page" }
   /** Vision 실패(API 장애·타임아웃·키 없음) — 빈 딜을 만들지 않고 안내만 한다 */
@@ -102,9 +119,148 @@ export type CaptureResult =
  * 여러 장이면 같은 상품 페이지를 위/아래로 나눠 찍은 것으로 보고 Vision에 한 번에 보낸다.
  * 무신사에 요청을 전혀 보내지 않는다: Vision이 화면에서 직접 읽으므로 게이트웨이를 거치지 않는다(§7).
  */
+/**
+ * 그리드 화면에서 읽은 상품들을 **지켜보는 상품**으로 담는다 (docs/06 §4.6).
+ *
+ * 딜을 만들지 않는 것이 핵심이다. 좋아요 목록 300개를 담는 목적은 지금 올릴 것을 고르는 게 아니라
+ * **가격이 내려가는 순간을 잡는 것**이고, 그 판단의 재료는 스냅샷이다. 목록을 다시 찍을 때마다
+ * 300개 가격이 한 번에 갱신되고, 싸진 상품은 홈이 따로 띄운다.
+ *
+ * 한 칸에서 읽히는 것은 브랜드·상품명·지금 가격·할인율뿐이다. 품번이 없으므로 매칭은
+ * (브랜드, 상품명) 정규화 일치에만 기댄다 — 같은 이름의 다른 색상은 한 상품으로 합쳐질 수 있는데,
+ * 가격을 지켜보는 목적에서는 그게 틀린 합치기가 아니다(색상별 가격이 다르면 딜을 만들 때 갈라진다).
+ */
+async function captureGridItems(items: VisionGridItem[]): Promise<CaptureResult> {
+  const creator = await getDefaultCreator();
+  let added = 0;
+  let updated = 0;
+  let cheaper = 0;
+  let skipped = 0;
+  const touched: string[] = [];
+
+  for (const item of items) {
+    // 이름도 가격도 없는 칸은 기록할 사실이 없다. Vision 파서가 이미 한 번 거르지만, DB에 쓰는
+    // 쪽에서 다시 막는다 — 걸러졌겠거니 하고 쓰면 "(브랜드 미입력) 0원" 상품이 목록에 쌓인다.
+    if ((item.brand === null && item.productName === null) || item.salePrice === null) {
+      skipped++;
+      continue;
+    }
+
+    const { product, matchedBy } = await matchOrCreateProduct({
+      creatorId: creator.id,
+      brand: item.brand,
+      productName: item.productName,
+      styleCode: null,
+    });
+
+    // 그리드에는 정가가 없다. 정가를 아직 모르는(0) 상품은 카드에 "0원"이 찍히지 않도록
+    // 지금 가격을 정가 자리에 둔다 — 상세 경로와 같은 규칙이다.
+    if (product.listPrice === 0 && item.salePrice !== null) {
+      await db.product.update({ where: { id: product.id }, data: { listPrice: item.salePrice } });
+    }
+
+    const before = await db.priceSnapshot.findFirst({
+      where: { productId: product.id, source: { not: "MANUAL" }, salePrice: { not: null } },
+      orderBy: { capturedAt: "desc" },
+    });
+
+    const { recorded } = await recordSnapshot({
+      productId: product.id,
+      listPrice: null,
+      salePrice: item.salePrice,
+      couponPrice: null,
+      source: "SCREENSHOT",
+    });
+    if (!recorded) {
+      skipped++;
+      continue;
+    }
+
+    if (before?.salePrice != null && item.salePrice !== null && item.salePrice < before.salePrice) {
+      cheaper++;
+    }
+    if (matchedBy === "created") added++;
+    else updated++;
+    touched.push(product.id);
+  }
+
+  // 담기는 기록이 끝난 뒤에 한다 — 상한에 걸려 거부돼도 가격은 이미 남는다.
+  let newlyWatched = 0;
+  for (const productId of touched) {
+    const r = await addWatch(productId, new Date(), { bulk: true });
+    if (r.ok && !r.alreadyActive) newlyWatched++;
+  }
+
+  await audit({
+    actor: "HUMAN",
+    action: "capture.grid",
+    detail: `목록에서 ${items.length}칸 읽음 — 새 상품 ${added} · 갱신 ${updated} · 싸짐 ${cheaper} · 지켜보기 추가 ${newlyWatched}`,
+  });
+
+  return { kind: "grid", added, updated, cheaper, skipped };
+}
+
+/**
+ * 지켜보는 상품에서 딜을 시작한다 (docs/06 §4.6). 좋아요 목록으로 담긴 상품은 딜이 없으므로,
+ * "이건 올려야겠다"고 정한 순간 여기서 카드가 생긴다.
+ *
+ * 이미 끝나지 않은 딜이 있으면 새로 만들지 않고 그것을 돌려준다 — 같은 상품의 판단이 두 장으로
+ * 갈라지면 어느 쪽이 진짜인지 알 수 없다(캡처 경로가 열린 딜을 재사용하는 것과 같은 이유).
+ *
+ * 가격은 마지막 스냅샷에서 가져온다. 그리드에서 읽은 값이라 정가는 모를 수 있고, 그건 카드가
+ * "정보 고치기"로 채우라고 말한다.
+ */
+export async function startDealFromProduct(
+  productId: string
+): Promise<{ ok: true; dealId: string; reused: boolean } | { ok: false; reason: string }> {
+  const product = await db.product.findUnique({ where: { id: productId } });
+  if (!product) return { ok: false, reason: "이 상품을 찾을 수 없어요. 화면을 새로고침해 주세요." };
+
+  const open = await db.deal.findFirst({
+    where: {
+      productId,
+      approvalStage: { in: ["CANDIDATE", "AWAITING_LINK", "READY_TO_PUBLISH"] },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  if (open) return { ok: true, dealId: open.id, reused: true };
+
+  const latest = await db.priceSnapshot.findFirst({
+    where: { productId, source: { not: "MANUAL" } },
+    orderBy: { capturedAt: "desc" },
+  });
+
+  const deal = await db.deal.create({
+    data: {
+      productId,
+      creatorId: product.creatorId,
+      status: "DRAFT",
+      approvalStage: "CANDIDATE",
+      salePrice: latest?.salePrice ?? null,
+      // 그리드에는 정가가 없어 할인율을 믿을 수 없다 — 화면에서 읽은 값만 쓴다는 규칙대로 비워 둔다.
+      parseSource: "vision",
+      parseFieldCount: [product.brandName, product.productName, latest?.salePrice ?? null].filter(
+        (v) => v !== null && v !== undefined
+      ).length,
+    },
+  });
+
+  await audit({
+    actor: "HUMAN",
+    action: "deal.started_from_watch",
+    approvalRef: deal.id,
+    detail: `지켜보는 상품에서 딜 시작 — ${product.brandName} ${product.productName}`,
+  });
+
+  return { ok: true, dealId: deal.id, reused: false };
+}
+
 export async function captureFromScreenshots(images: ScreenshotImage[]): Promise<CaptureResult> {
   const result = await extractFromScreenshot(images.slice(0, MAX_CAPTURE_IMAGES));
   if (!result) return { kind: "vision_failed" };
+  // 그리드가 먼저다 — 목록 화면은 isProductPage가 false로 오므로 아래 분기에 걸리면
+  // "상품 페이지를 찍어주세요"라는 엉뚱한 안내가 나간다.
+  if (result.gridItems !== null) return captureGridItems(result.gridItems);
   if (!result.isProductPage) return { kind: "not_product_page" };
 
   const creator = await getDefaultCreator();

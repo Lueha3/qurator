@@ -2,8 +2,9 @@ import Link from "next/link";
 import { loadDeals } from "@/lib/deal-list";
 import { loadDeadLinkAlerts } from "@/lib/dashboard";
 import { dueForReminder } from "@/lib/watch-remind";
+import { cheaperWatchedProducts } from "@/lib/price-drop";
 import { isCrawlessMode } from "@/lib/policy";
-import { formatRelativeFromNow } from "@/lib/format";
+import { formatKRW, formatRelativeFromNow } from "@/lib/format";
 import { loadStats } from "@/lib/stats";
 import { STAGE_DOT, STAGE_FILTER, TODO_LABEL, TODO_STAGES } from "@/lib/deal-stage";
 import { PageHeader } from "@/components/PageHeader";
@@ -24,6 +25,9 @@ export const dynamic = "force-dynamic";
 
 const HEALTH_LABEL = { SOLDOUT: "품절", DEAD: "상품 페이지 없음", COUPON_EXPIRED: "쿠폰 종료" } as const;
 /** 안내문이 사유별로 다르므로 복사 버튼 이름도 그 사유를 말한다 (docs/08 §4.0.7) */
+/** 홈은 "지금 할 일"만 보여주는 화면이다 — 싸진 상품이 40개여도 40줄을 깔지 않는다 */
+const DROPS_SHOWN = 5;
+
 const NOTICE_LABEL = {
   SOLDOUT: "📋 품절 안내 복사",
   DEAD: "📋 판매 종료 안내 복사",
@@ -32,11 +36,12 @@ const NOTICE_LABEL = {
 
 export default async function HomePage() {
   const now = new Date();
-  const [deals, crawless, deadLinks, stats] = await Promise.all([
+  const [deals, crawless, deadLinks, stats, drops] = await Promise.all([
     loadDeals(now),
     isCrawlessMode(),
     loadDeadLinkAlerts(),
     loadStats(7, now),
+    cheaperWatchedProducts(now),
   ]);
   const reminders = crawless ? await dueForReminder(now) : [];
 
@@ -49,6 +54,9 @@ export default async function HomePage() {
       count: deals.filter((d) => d.approvalStage === stage).length,
     })
   ).filter((item) => item.count > 0);
+  if (drops.length > 0) {
+    todo.push({ key: "drops", href: "#drops", dot: "bg-stage-approved", label: "싸진 상품 보기", count: drops.length });
+  }
   if (reminders.length > 0) {
     todo.push({ key: "reshoot", href: "/deals?f=saved", dot: "bg-stage-awaiting", label: "다시 찍어 올릴 상품", count: reminders.length });
   }
@@ -88,6 +96,42 @@ export default async function HomePage() {
                     </Link>
                   ))}
                 </div>
+              </section>
+            )}
+
+            {drops.length > 0 && (
+              <section id="drops" className="flex flex-col gap-2 scroll-mt-20">
+                <h2 className="text-[13px] font-medium text-ink-soft">
+                  📉 싸진 상품 <span className="text-ink-faint">· 지난번 기록보다 내려갔어요</span>
+                </h2>
+                <ul className="card divide-y divide-line">
+                  {drops.slice(0, DROPS_SHOWN).map((drop) => (
+                    <li key={drop.productId}>
+                      <Link
+                        href="/deals?f=saved"
+                        className="flex items-center gap-3 px-4 py-3 transition-colors active:bg-paper"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[11px] leading-4 text-ink-soft">{drop.brandName}</span>
+                          <span className="block truncate text-[15px] font-semibold leading-snug">{drop.productName}</span>
+                          <span className="block text-sm">
+                            <span className="text-xs text-ink-soft line-through">{formatKRW(drop.from)}</span>{" "}
+                            <span className="font-semibold">{formatKRW(drop.to)}</span>
+                          </span>
+                        </span>
+                        <span className="shrink-0 rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-bold leading-4 text-accent-ink">
+                          {drop.rate}%
+                        </span>
+                        <span aria-hidden className="text-ink-faint">›</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                {drops.length > DROPS_SHOWN && (
+                  <Link href="/deals?f=saved" className="px-1 text-xs font-medium text-accent">
+                    {drops.length - DROPS_SHOWN}개 더 보기
+                  </Link>
+                )}
               </section>
             )}
 

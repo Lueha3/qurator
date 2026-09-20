@@ -1,0 +1,88 @@
+// 지켜보는 상품 목록 — docs/06 §4.6.
+//
+// 딜 목록(deal-list.ts)과 **다른 축**이다. 딜은 "올릴지 판단하는 카드"이고, 이쪽은 "값을 지켜보는
+// 상품"이다. 좋아요 목록을 통째로 담으면 딜 없이 상품만 300개가 생기므로, 딜 목록으로는 그 300개가
+// 화면에 아예 보이지 않는다 — 이 함수가 그 목록을 만든다.
+//
+// 딜이 이미 있는 상품은 그 딜로 이어준다(dealId). 없으면 [올릴게요]를 누르는 순간 만들어진다.
+//
+// DB만 읽는다. 이 계산이 무신사 요청을 만들지 않는 것이 불변식이다.
+
+import { db } from "./db";
+import { buildPriceAnalyses } from "./price-analysis";
+
+export interface WatchedProductDTO {
+  productId: string;
+  brandName: string;
+  productName: string;
+  /** 마지막으로 기록된 가격. 한 번도 못 읽었으면 null */
+  price: number | null;
+  /** 지난번 기록 가격 — 이번에 내렸을 때만 채워진다(오른 경우는 배지를 띄우지 않는다) */
+  priceBefore: number | null;
+  /** 내린 폭(%) — priceBefore가 있을 때만 */
+  dropRate: number | null;
+  /** 지금까지 기록한 횟수 */
+  recordCount: number;
+  /** 이 상품으로 이미 만든 딜. 있으면 그 카드로 바로 간다 */
+  dealId: string | null;
+  /** 마지막 기록 시각 */
+  lastRecordedAt: string | null;
+}
+
+/**
+ * 지켜보는 상품 전부. 싸진 것이 맨 위, 그다음은 최근 기록순.
+ *
+ * 딜 연결은 **끝나지 않은 딜**만 본다 — 이미 올렸거나 안 올리기로 한 딜로 보내면, 같은 상품을
+ * 다시 판단하려는 사람을 끝난 카드에 떨어뜨리게 된다. 그 경우는 딜 없는 것과 같이 취급해
+ * [올릴게요]가 새 판단을 시작하게 한다.
+ */
+export async function loadWatchedProducts(now: Date = new Date()): Promise<WatchedProductDTO[]> {
+  const watches = await db.watchItem.findMany({
+    where: { active: true, expiresAt: { gt: now } },
+    include: { product: true },
+  });
+  if (watches.length === 0) return [];
+
+  const productIds = watches.map((w) => w.productId);
+  const [analyses, openDeals] = await Promise.all([
+    buildPriceAnalyses(productIds, now),
+    db.deal.findMany({
+      where: {
+        productId: { in: productIds },
+        approvalStage: { in: ["CANDIDATE", "AWAITING_LINK", "READY_TO_PUBLISH"] },
+      },
+      select: { id: true, productId: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+
+  const dealByProduct = new Map<string, string>();
+  for (const deal of openDeals) {
+    if (!dealByProduct.has(deal.productId)) dealByProduct.set(deal.productId, deal.id);
+  }
+
+  const rows = watches.map((watch): WatchedProductDTO => {
+    const analysis = analyses.get(watch.productId);
+    const price = analysis?.current?.salePrice ?? null;
+    const before = analysis?.previous?.salePrice ?? null;
+    const dropped = price !== null && before !== null && price < before;
+
+    return {
+      productId: watch.productId,
+      brandName: watch.product.brandName,
+      productName: watch.product.productName,
+      price,
+      priceBefore: dropped ? before : null,
+      dropRate: dropped ? Math.round(((before - price) / before) * 100) : null,
+      recordCount: analysis?.snapshotCount ?? 0,
+      dealId: dealByProduct.get(watch.productId) ?? null,
+      lastRecordedAt: analysis?.current?.capturedAt.toISOString() ?? null,
+    };
+  });
+
+  return rows.sort((a, b) => {
+    // 싸진 것이 먼저 — 이 목록을 여는 이유가 그것이다.
+    if ((b.dropRate ?? -1) !== (a.dropRate ?? -1)) return (b.dropRate ?? -1) - (a.dropRate ?? -1);
+    return (b.lastRecordedAt ?? "").localeCompare(a.lastRecordedAt ?? "");
+  });
+}

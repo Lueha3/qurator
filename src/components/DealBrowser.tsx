@@ -8,6 +8,8 @@ import { kstDayKey, kstDayLabel, kstTime } from "@/lib/format";
 import { DealListRow } from "./DealListRow";
 import { DealStageCard } from "./DealStageCard";
 import { DealForm } from "./DealForm";
+import { WatchedList } from "./WatchedList";
+import type { WatchedProductDTO } from "@/lib/watch-list";
 
 // 딜 탭 — docs/08 §3.3.
 //
@@ -103,12 +105,15 @@ export function DealBrowser({
   curatorShopUrl,
   initialFilter,
   initialDealId,
+  watched,
   nowIso,
 }: {
   deals: DealDTO[];
   curatorShopUrl: string | null;
   initialFilter: DealFilter;
   initialDealId: string | null;
+  /** 지켜보는 상품 — 딜이 없을 수 있어 딜 목록과 따로 온다 (docs/06 §4.6) */
+  watched: WatchedProductDTO[];
   /**
    * 서버가 정한 기준 시각. 클라이언트가 Date.now()를 따로 부르면 "오늘/어제" 경계와 보관 판정이
    * 서버 렌더와 달라져 하이드레이션이 깨질 수 있다 — 같은 순간을 그대로 넘겨받는다.
@@ -128,8 +133,10 @@ export function DealBrowser({
   const counts = useMemo(() => {
     const map = {} as Record<DealFilter, number>;
     for (const f of FILTERS) map[f.key] = deals.filter((d) => matches(d, f.key, now)).length;
+    // "지켜보는 중"은 딜이 아니라 상품을 센다 — 좋아요 목록으로 담은 상품은 딜이 없다.
+    map.saved = watched.length;
     return map;
-  }, [deals, now]);
+  }, [deals, now, watched.length]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -185,6 +192,14 @@ export function DealBrowser({
 
   const showRelease = filter === "saved";
 
+  // 지켜보는 상품은 딜 목록과 다른 배열이라 검색을 따로 건다 — 같은 검색칸이 둘 다에 걸려야
+  // "쿠어"를 쳤을 때 탭을 옮겨도 같은 것을 찾는다.
+  const visibleWatched = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return watched;
+    return watched.filter((w) => `${w.brandName} ${w.productName}`.toLowerCase().includes(q));
+  }, [watched, query]);
+
   return (
     <div className="flex flex-col gap-4">
       {/* 필터: GrowthPilot의 세그먼트 스위치 — 흰 상자 안 연한 초록 알약 */}
@@ -227,7 +242,9 @@ export function DealBrowser({
         </button>
       </div>
 
-      {visible.length === 0 ? (
+      {filter === "saved" ? (
+        <WatchedList items={visibleWatched} />
+      ) : visible.length === 0 ? (
         <p className={emptyCls}>
           {query.trim() ? `“${query.trim()}”에 맞는 딜이 없어요.` : EMPTY_TEXT[filter]}
         </p>

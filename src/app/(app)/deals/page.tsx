@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { loadDeals } from "@/lib/deal-list";
 import { PageHeader } from "@/components/PageHeader";
 import { DealBrowser, type DealFilter } from "@/components/DealBrowser";
+import { loadWatchedProducts } from "@/lib/watch-list";
 
 // 딜 탭 — docs/08 §3.3. 찾기(행)와 하기(시트)를 분리한 목록.
 // DB만 읽는다 — 페이지뷰가 무신사 요청을 만들지 않는다.
@@ -25,10 +26,12 @@ function parseFilter(raw: string | string[] | undefined): DealFilter {
 
 export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
   const now = new Date();
-  const [params, deals, creator] = await Promise.all([
+  const [params, deals, creator, watched] = await Promise.all([
     searchParams,
     loadDeals(now),
     db.creator.findFirst(),
+    // 좋아요 목록으로 담은 상품은 딜이 없다 — "지켜보는 중" 탭은 딜이 아니라 이 목록을 그린다.
+    loadWatchedProducts(now),
   ]);
 
   const rawDealId = Array.isArray(params.d) ? params.d[0] : params.d;
@@ -44,6 +47,7 @@ export default async function DealsPage({ searchParams }: PageProps<"/deals">) {
           curatorShopUrl={creator?.curatorShopUrl ?? null}
           initialFilter={parseFilter(params.f)}
           initialDealId={initialDealId}
+          watched={watched}
           nowIso={now.toISOString()}
         />
       </main>
