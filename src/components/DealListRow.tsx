@@ -22,15 +22,27 @@ interface RowProps {
   hideSavedTag?: boolean;
   href?: string;
   onOpen?: () => void;
+  /** 선택 삭제 모드일 때만 켠다 — 브랜드 마크 앞에 체크박스를 그린다. 홈 화면은 쓰지 않는다 */
+  selected?: boolean;
 }
 
-export function DealListRow({ deal, trailing, hideSavedTag, href, onOpen }: RowProps) {
+export function DealListRow({ deal, trailing, hideSavedTag, href, onOpen, selected }: RowProps) {
   const price = dealPriceParts(deal);
   const dot = STAGE_DOT[deal.approvalStage];
   const done = deal.approvalStage === "SKIPPED";
 
   const body = (
     <>
+      {selected !== undefined && (
+        <span
+          aria-hidden
+          className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
+            selected ? "border-accent bg-accent text-accent-ink" : "border-line-strong text-transparent"
+          }`}
+        >
+          ✓
+        </span>
+      )}
       <BrandMark brand={deal.brand} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 text-[11px] leading-4 text-ink-soft">

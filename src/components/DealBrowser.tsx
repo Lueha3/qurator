@@ -2,7 +2,8 @@
 
 import { emptyCls, inputCls, segmentCls, segmentItemCls } from "./form";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { unwatchAction } from "@/app/actions";
+import { useRouter } from "next/navigation";
+import { deleteDealsAction, unwatchAction } from "@/app/actions";
 import type { DealDTO } from "@/lib/api-types";
 import { kstDayKey, kstDayLabel, kstTime } from "@/lib/format";
 import { DealListRow } from "./DealListRow";
@@ -120,12 +121,46 @@ export function DealBrowser({
    */
   nowIso: string;
 }) {
+  const router = useRouter();
   const [filter, setFilter] = useState<DealFilter>(initialFilter);
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(initialDealId);
   const [manualOpen, setManualOpen] = useState(false);
   const sheetRef = useRef<HTMLDialogElement>(null);
   const manualRef = useRef<HTMLDialogElement>(null);
+
+  // 체크박스 다중 선택 삭제 — 2026-09-20. dedupe(안 올림으로 옮기기)로는 못 잡는
+  // 깨진 인코딩·개별 오탐 같은 것을 사람이 직접 골라 지우는 경로다.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
+  const [deletePending, startDeleteTransition] = useTransition();
+
+  function toggleSelectMode() {
+    setSelectMode((v) => !v);
+    setSelected(new Set());
+    setDeleteConfirming(false);
+  }
+
+  function toggleSelected(dealId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(dealId)) next.delete(dealId);
+      else next.add(dealId);
+      return next;
+    });
+  }
+
+  function runDelete() {
+    const ids = [...selected];
+    startDeleteTransition(async () => {
+      await deleteDealsAction(ids);
+      setSelectMode(false);
+      setSelected(new Set());
+      setDeleteConfirming(false);
+      router.refresh();
+    });
+  }
 
   const nowDate = useMemo(() => new Date(nowIso), [nowIso]);
   const now = nowDate.getTime();
@@ -233,13 +268,32 @@ export function DealBrowser({
           aria-label="딜 검색"
           className={inputCls}
         />
-        <button
-          type="button"
-          onClick={() => setManualOpen(true)}
-          className="shrink-0 rounded-xl border border-line bg-surface px-3.5 py-3 text-sm font-semibold text-ink-soft"
-        >
-          ✏️ 직접 만들기
-        </button>
+        {selectMode ? (
+          <button
+            type="button"
+            onClick={toggleSelectMode}
+            className="shrink-0 rounded-xl border border-line bg-surface px-3.5 py-3 text-sm font-semibold text-ink-soft"
+          >
+            취소
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={toggleSelectMode}
+              className="shrink-0 rounded-xl border border-line bg-surface px-3.5 py-3 text-sm font-semibold text-ink-soft"
+            >
+              ☑️ 선택
+            </button>
+            <button
+              type="button"
+              onClick={() => setManualOpen(true)}
+              className="shrink-0 rounded-xl border border-line bg-surface px-3.5 py-3 text-sm font-semibold text-ink-soft"
+            >
+              ✏️ 직접 만들기
+            </button>
+          </>
+        )}
       </div>
 
       {filter === "saved" ? (
@@ -259,7 +313,8 @@ export function DealBrowser({
                   deal={deal}
                   time={kstTime(new Date(deal.createdAt))}
                   showRelease={showRelease}
-                  onOpen={() => openSheet(deal.id)}
+                  onOpen={selectMode ? () => toggleSelected(deal.id) : () => openSheet(deal.id)}
+                  selected={selectMode ? selected.has(deal.id) : undefined}
                 />
               ))}
             </ul>
@@ -303,6 +358,47 @@ export function DealBrowser({
           <DealForm onCreated={() => setManualOpen(false)} />
         </div>
       </dialog>
+
+      {selectMode && selected.size > 0 && (
+        <div
+          className="fixed inset-x-0 z-30 mx-auto max-w-3xl px-4"
+          style={{ bottom: "calc(8rem + env(safe-area-inset-bottom, 0px))" }}
+        >
+          {deleteConfirming ? (
+            <div className="elevated flex flex-col gap-2 rounded-2xl border border-danger bg-paper p-3">
+              <p className="text-sm font-semibold text-danger">
+                {selected.size}개를 지울까요? 되돌릴 수 없어요.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={deletePending}
+                  onClick={() => setDeleteConfirming(false)}
+                  className="flex-1 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-ink-soft disabled:opacity-40"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  disabled={deletePending}
+                  onClick={runDelete}
+                  className="flex-1 rounded-xl bg-danger px-3 py-2.5 text-sm font-semibold text-accent-ink disabled:opacity-40"
+                >
+                  {deletePending ? "지우는 중…" : "네, 지워요"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setDeleteConfirming(true)}
+              className="elevated w-full rounded-2xl bg-danger px-4 py-3 text-base font-semibold text-accent-ink transition-opacity active:opacity-90"
+            >
+              🗑️ {selected.size}개 삭제
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -312,17 +408,19 @@ function DealRow({
   time,
   showRelease,
   onOpen,
+  selected,
 }: {
   deal: DealDTO;
   time: string;
   showRelease: boolean;
   onOpen: () => void;
+  selected?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
 
   return (
     <li>
-      <DealListRow deal={deal} trailing={time} hideSavedTag={showRelease} onOpen={onOpen} />
+      <DealListRow deal={deal} trailing={time} hideSavedTag={showRelease} onOpen={onOpen} selected={selected} />
       {showRelease && (
         <div className="flex items-center justify-between gap-3 px-3.5 pb-3 pl-[66px] text-xs text-ink-soft">
           <span>
