@@ -144,6 +144,15 @@ model Deal {
   aiScore           Float?
   priority          Int      @default(0)
 
+  /**
+   * Vision이 스스로 매긴 확신도·애매한 점(vision-extract.ts). 2026-09-21 추가 —
+   * 그 전에는 매 호출 비용을 내고 받아놓고 캡처 직후 버려졌다. "low"거나 notes가 있으면
+   * 후보 카드가 사람에게 재확인을 청한다(docs/06 §3 "확신의 정도가 숫자와 함께 보여야 한다").
+   * 그리드 캡처(gridItems)는 칸별 확신도가 없어 채워지지 않는다 — 상세 페이지 캡처 전용.
+   */
+  visionConfidence  String? // "high" | "medium" | "low"
+  visionNotes       String?
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -461,8 +470,16 @@ enum SnapshotSource {
   USER_URL // 봇에 링크를 던진 시점의 파싱 결과 (피기백)
   HEALTH_CHECK // 헬스체커가 내려받은 페이지의 파싱 결과 (피기백)
   WATCH // VPS 워치 러너의 정기 스냅샷 (W2)
-  MANUAL // 사람이 직접 입력 (작년 BF가 등)
+  MANUAL // 사람이 직접 입력 (작년 BF가 등) — computeBaseline·analyzeSnapshots가 표본·현재가에서 제외한다
   SCREENSHOT // docs/06 — 스크린샷 Vision 추출 결과 (실질적인 1차 입력 경로)
+  /**
+   * 사람이 오늘 화면을 보고 Vision의 오독을 바로잡은 값 (2026-09-21 추가, updateDealFacts).
+   * MANUAL과 다르다 — MANUAL은 "기억나는 작년 가격" 같은 과거 시점 추정값이라 표본에서
+   * 빠지는 게 맞지만, 이건 "오늘 화면에 실제로 찍힌 값을 사람이 대신 옮겨 적은 것"이라
+   * SCREENSHOT과 동급으로 최신가·기준가 계산에 들어가야 한다. 그래야 한 번 고친 값이
+   * 다음 기준가·최저가 계산에도 반영된다(그 전엔 고쳐도 스냅샷에 안 남아 계속 무시됐다).
+   */
+  CORRECTED
 }
 
 // ── watch_items ─────────────────────────────────────────────────────────

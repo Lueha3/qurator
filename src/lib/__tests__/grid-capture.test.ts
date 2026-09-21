@@ -151,6 +151,23 @@ describe("싸진 상품", () => {
     await captureGrid([gridItem()]);
     expect(await cheaperWatchedProducts()).toEqual([]);
   });
+
+  it("한 번에 80% 넘게 내린 값은 의심 표시가 붙고 맨 위 자리를 내준다 — OCR 자릿수 오독일 수 있다 (2026-09-21)", async () => {
+    await captureGrid([
+      gridItem({ productName: "오버셔츠", salePrice: 53400 }),
+      gridItem({ productName: "코트", salePrice: 100000 }),
+    ]);
+    await captureGrid([
+      gridItem({ productName: "오버셔츠", salePrice: 48000 }), // 정상 하락(10%)
+      gridItem({ productName: "코트", salePrice: 9000 }), // 자릿수 오독처럼 보이는 91% 하락
+    ]);
+
+    const drops = await cheaperWatchedProducts();
+    // 의심스러운 쪽(코트, 91%)이 하락률로는 훨씬 크지만 맨 위로 오지 않는다.
+    expect(drops.map((d) => d.productName)).toEqual(["오버셔츠", "코트"]);
+    expect(drops[0].suspicious).toBe(false);
+    expect(drops[1].suspicious).toBe(true);
+  });
 });
 
 describe("지켜보는 상품 목록", () => {

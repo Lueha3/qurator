@@ -158,11 +158,11 @@ async function captureGridItems(items: VisionGridItem[]): Promise<CaptureResult>
       styleCode: null,
     });
 
-    // 그리드에는 정가가 없다. 정가를 아직 모르는(0) 상품은 카드에 "0원"이 찍히지 않도록
-    // 지금 가격을 정가 자리에 둔다 — 상세 경로와 같은 규칙이다.
-    if (product.listPrice === 0 && item.salePrice !== null) {
-      await db.product.update({ where: { id: product.id }, data: { listPrice: item.salePrice } });
-    }
+    // 그리드에는 정가가 없다. 0("미확인" sentinel — product-match.ts와 동일한 관례)을
+    // 그대로 둔다: 판매가를 정가 자리에 채우면 나중에 진짜 가격이 그 아래로 떨어졌을 때
+    // 검증된 적 없는 그 값이 취소선 "정가"로 나간다(표시광고법 오인표시 위험, 2026-09-21
+    // 발견). "0원" 노출은 렌더러가 listPrice=0을 "정가 모름"으로 처리하는 쪽에서 막는다
+    // (renderer.ts priceLine).
 
     const before = await db.priceSnapshot.findFirst({
       where: { productId: product.id, source: { not: "MANUAL" }, salePrice: { not: null } },
@@ -281,13 +281,13 @@ export async function captureFromScreenshots(images: ScreenshotImage[]): Promise
     styleCode: result.styleCode,
   });
 
-  // 정가는 Product의 사실이다 — 화면에서 읽힌 정가로 갱신한다. 정가 없이 판매가만 읽혔고 아직
-  // 정가를 모르는(0) 상품이면 판매가를 정가 자리에 둔다: 0을 그대로 두면 카드에 "0원"이
-  // 고지문과 함께 찍혀 나간다 (수동 폼 경로의 listPrice ?? salePrice ?? 0과 같은 규칙).
-  const listPriceReading =
-    result.listPrice ?? (product.listPrice === 0 ? result.salePrice : null);
-  if (listPriceReading !== null && listPriceReading !== product.listPrice) {
-    await db.product.update({ where: { id: product.id }, data: { listPrice: listPriceReading } });
+  // 정가는 Product의 사실이다 — 화면에서 **실제로 읽힌** 정가로만 갱신한다. 정가를 못
+  // 읽었으면 listPrice는 "미확인"(0) 그대로 둔다. 판매가를 정가 자리에 채웠다가 나중에
+  // 진짜 가격이 그 아래로 떨어지면, 검증된 적 없는 그 값이 취소선 "정가"로 나간다
+  // (표시광고법 오인표시 위험 — 틀린 판매가보다 무겁다, 2026-09-21 발견). "0원" 노출은
+  // 렌더러가 listPrice=0을 "정가 모름"으로 처리하는 쪽에서 막는다 (renderer.ts priceLine).
+  if (result.listPrice !== null && result.listPrice !== product.listPrice) {
+    await db.product.update({ where: { id: product.id }, data: { listPrice: result.listPrice } });
   }
 
   // 피기백 스냅샷 — 가격을 하나도 못 읽었으면 recordSnapshot이 조용히 건너뛴다.
@@ -330,14 +330,28 @@ export async function captureFromScreenshots(images: ScreenshotImage[]): Promise
   });
 
   if (open) {
+    // 사람이 이미 고친 딜(parseSource='manual')은 재캡처의 새 OCR 값으로 덮지 않는다 — 안
+    // 그러면 힘들게 고친 값이 다음 캡처 한 번에 흔적도 없이 사라진다(2026-09-21 발견).
+    // 새 OCR 값은 위에서 이미 스냅샷으로 기록됐으니, 가격이 실제로 바뀌었다면 priceChangeNote로
+    // 사람 눈에 띈다 — 다시 고칠지는 사람이 판단한다.
+    const preserveManualCorrection = open.parseSource === "manual";
+
     await db.deal.update({
       where: { id: open.id },
       data: {
-        // 화면이 현재 가격의 근거다. 다만 이번에 못 읽은 값으로 이미 있는 값을 지우지는 않는다.
-        salePrice: result.salePrice ?? open.salePrice,
-        discountRate: result.discountRateShown ?? open.discountRate,
-        parseSource: parseFieldCount > 0 ? "vision" : open.parseSource,
+        // 화면이 현재 가격의 근거다. 다만 이번에 못 읽은 값이나, 사람이 이미 고친 값은 지우지 않는다.
+        salePrice: preserveManualCorrection ? open.salePrice : (result.salePrice ?? open.salePrice),
+        discountRate: preserveManualCorrection
+          ? open.discountRate
+          : (result.discountRateShown ?? open.discountRate),
+        parseSource: preserveManualCorrection
+          ? open.parseSource
+          : (parseFieldCount > 0 ? "vision" : open.parseSource),
         parseFieldCount: Math.max(parseFieldCount, open.parseFieldCount),
+        // 확신도·애매한 점도 최신 캡처 것으로 — 사람이 이미 고친 딜은 부정확했을 옛 읽기
+        // 흔적을 새로 덮지 않는다(위 preserveManualCorrection과 같은 판단).
+        visionConfidence: preserveManualCorrection ? open.visionConfidence : result.confidence,
+        visionNotes: preserveManualCorrection ? open.visionNotes : result.notes,
       },
     });
 
@@ -366,6 +380,8 @@ export async function captureFromScreenshots(images: ScreenshotImage[]): Promise
       discountRate: result.discountRateShown,
       parseSource: "vision",
       parseFieldCount,
+      visionConfidence: result.confidence,
+      visionNotes: result.notes,
     },
   });
 
@@ -652,6 +668,41 @@ function nonNegativeInt(v: number | null | undefined): boolean {
   return v == null || (Number.isInteger(v) && v >= 0);
 }
 
+function fmtAuditVal(v: string | number | Date | null | undefined): string {
+  if (v === null || v === undefined || v === "") return "(없음)";
+  if (v instanceof Date) return v.toISOString();
+  return String(v);
+}
+
+/**
+ * "정보 고치기: brand, listPrice"처럼 **필드 이름만** 남기던 예전 로그로는 무엇이 어떻게
+ * 바뀌었는지 되짚을 수 없었다(2026-09-21 발견) — 특히 가격 오독을 사람이 고친 흔적이 가장
+ * 가치 있는 기록인데 그게 지워지고 있었다. 바뀐 필드만, 전/후 값과 함께 남긴다.
+ */
+function describePatch(patch: DealFactsPatch, before: DealRecord): string {
+  const parts: string[] = [];
+  function check(label: string, beforeVal: string | number | Date | null, afterVal: string | number | Date | null | undefined) {
+    if (afterVal === undefined) return;
+    if (String(beforeVal ?? "") === String(afterVal ?? "")) return;
+    parts.push(`${label} ${fmtAuditVal(beforeVal)}→${fmtAuditVal(afterVal)}`);
+  }
+  check("브랜드", before.product.brandName, patch.brand);
+  check("상품명", before.product.productName, patch.productName);
+  check("품번", before.product.styleCode, patch.styleCode);
+  check("정가", before.product.listPrice, patch.listPrice);
+  check("할인가", before.salePrice, patch.salePrice);
+  check("할인율", before.discountRate, patch.discountRate);
+  check("쿠폰코드", before.couponCode, patch.couponCode);
+  check("쿠폰설명", before.couponDesc, patch.couponDesc);
+  check("쿠폰가", before.finalPrice, patch.finalPrice);
+  check("마감", before.endsAt, patch.endsAt);
+  check("메모", before.curatorNote, patch.curatorNote);
+  check("훅", before.hookLine, patch.hookLine);
+  if (patch.productUrl !== undefined) parts.push(`URL ${fmtAuditVal(patch.productUrl)}`);
+  if (patch.tags !== undefined) parts.push(`태그 [${patch.tags.join(", ")}]`);
+  return parts.length > 0 ? parts.join(" · ") : Object.keys(patch).join(", ");
+}
+
 /**
  * Vision·파서가 잘못 읽은 값을 사람이 바로잡는다. 이미 카드가 렌더된 딜이면 새 버전으로 다시 렌더한다 —
  * 승인 화면이 보여주는 것은 언제나 현재 사실이어야 한다.
@@ -732,7 +783,17 @@ export async function updateDealFacts(
         hookLine: patch.hookLine === undefined ? undefined : patch.hookLine?.trim() || null,
         tags: patch.tags === undefined ? undefined : serializeTags(patch.tags),
         // 사람이 손본 딜은 "읽지 못함" 상태가 아니다 — 후보 카드가 진행 버튼을 다시 내준다.
-        parseSource: deal.parseSource === "none" ? "manual" : undefined,
+        // 가격 필드를 고쳤을 때도 'manual'로 바꾼다(parseSource가 이미 'vision'이어도) — 안
+        // 그러면 재캡처가 "이 딜은 사람이 고쳤다"를 알 방법이 없어 다음 OCR로 고친 값을
+        // 덮어써버린다(captureFromScreenshots의 preserveManualCorrection, 2026-09-21 발견).
+        // 낮은 확신도 경고도 이제 무의미해지므로(parseSource==='vision' 조건에 걸려) 같이 사라진다.
+        parseSource:
+          deal.parseSource === "none" ||
+          patch.listPrice !== undefined ||
+          patch.salePrice !== undefined ||
+          patch.discountRate !== undefined
+            ? "manual"
+            : undefined,
       },
     });
   });
@@ -741,8 +802,27 @@ export async function updateDealFacts(
     actor: "HUMAN",
     action: "deal.edited",
     approvalRef: deal.id,
-    detail: `정보 고치기: ${Object.keys(patch).join(", ")}`,
+    detail: `정보 고치기: ${describePatch(patch, deal)}`,
   });
+
+  // 사람이 고친 가격이 다음 캡처·기준가 계산의 근거가 되게 한다 — 안 그러면 고친 값이
+  // price_snapshots에 전혀 남지 않아 computeBaseline·price-drop·최저가 배지가 계속
+  // 틀린 OCR 값을 근거로 삼는다(2026-09-21 발견). CORRECTED는 MANUAL과 달리 "오늘 화면의
+  // 진짜 값"이라 SCREENSHOT과 동급으로 최신가 계산에 들어간다(스키마 주석 참고).
+  if (patch.listPrice !== undefined || patch.salePrice !== undefined) {
+    const corrected = await loadDeal(dealId);
+    if (corrected) {
+      await recordSnapshot({
+        productId: corrected.productId,
+        listPrice: corrected.product.listPrice > 0 ? corrected.product.listPrice : null,
+        salePrice: corrected.salePrice,
+        couponPrice: null,
+        discountRateShown: corrected.discountRate,
+        source: "CORRECTED",
+        note: "사람이 정보 고치기로 바로잡은 값",
+      });
+    }
+  }
 
   // 카드가 이미 있으면(발행 승인 단계 이상) 현재 사실로 새 버전을 렌더한다.
   const hasCards = (await db.contentCard.count({ where: { dealId: deal.id } })) > 0;

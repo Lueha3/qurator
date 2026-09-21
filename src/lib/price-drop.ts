@@ -13,6 +13,14 @@
 import { db } from "./db";
 import { buildPriceAnalyses } from "./price-analysis";
 
+/**
+ * 한 번에 이 이상 내렸으면 실제 세일보다 OCR 자릿수 오독일 가능성이 크다고 본다(2026-09-21,
+ * 실사용 오독 재현 — 자릿수 하나가 빠지면 하락률이 ~90%로 보인다). 완전히 숨기지는 않는다 —
+ * 무신사 블랙아웃 세일처럼 실제로 80%를 넘는 경우가 드물게 있어서다. 다만 "많이 내린 순"
+ * 정렬에서 맨 위 자리는 내주지 않는다: 확인 안 된 값이 "가장 좋은 딜"로 보이면 안 된다.
+ */
+const SUSPICIOUS_DROP_RATE = 80;
+
 export interface PriceDropItem {
   productId: string;
   brandName: string;
@@ -23,6 +31,8 @@ export interface PriceDropItem {
   to: number;
   /** 내린 폭(%) — 반올림 */
   rate: number;
+  /** 한 번에 너무 많이 내려 OCR 오독 가능성이 있다 — 목록에서 빼지는 않고 표시만 한다 */
+  suspicious: boolean;
 }
 
 /**
@@ -47,15 +57,21 @@ export async function cheaperWatchedProducts(now: Date = new Date()): Promise<Pr
     const from = analysis?.previous?.salePrice ?? null;
     if (to === null || from === null || to >= from) continue;
 
+    const rate = Math.round(((from - to) / from) * 100);
     drops.push({
       productId: watch.productId,
       brandName: watch.product.brandName,
       productName: watch.product.productName,
       from,
       to,
-      rate: Math.round(((from - to) / from) * 100),
+      rate,
+      suspicious: rate >= SUSPICIOUS_DROP_RATE,
     });
   }
 
-  return drops.sort((a, b) => b.rate - a.rate);
+  // 의심스러운 값은 뒤로 — 확인되지 않은 오독이 "가장 많이 내렸다"는 자리를 차지하지 않는다.
+  return drops.sort((a, b) => {
+    if (a.suspicious !== b.suspicious) return a.suspicious ? 1 : -1;
+    return b.rate - a.rate;
+  });
 }

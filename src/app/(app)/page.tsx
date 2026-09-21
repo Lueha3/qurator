@@ -118,8 +118,16 @@ export default async function HomePage() {
                             <span className="text-xs text-ink-soft line-through">{formatKRW(drop.from)}</span>{" "}
                             <span className="font-semibold">{formatKRW(drop.to)}</span>
                           </span>
+                          {/* 한 번에 너무 많이 내렸으면 OCR 오독일 수 있다 — 확인 없이 믿지 말라고 알려준다 */}
+                          {drop.suspicious && (
+                            <span className="block text-xs text-danger">⚠️ 많이 내렸어요 — 화면 다시 확인해 주세요</span>
+                          )}
                         </span>
-                        <span className="shrink-0 rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-bold leading-4 text-accent-ink">
+                        <span
+                          className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-bold leading-4 ${
+                            drop.suspicious ? "bg-danger text-accent-ink" : "bg-accent text-accent-ink"
+                          }`}
+                        >
                           {drop.rate}%
                         </span>
                         <span aria-hidden className="text-ink-faint">›</span>

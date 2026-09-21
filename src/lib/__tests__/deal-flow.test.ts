@@ -521,4 +521,83 @@ describe("정보 고치기", () => {
     expect((await updateDealFacts(dealId, { discountRate: 140 })).ok).toBe(false);
     expect((await updateDealFacts(dealId, { productUrl: "https://evil.example.com/x" })).ok).toBe(false);
   });
+
+  it("고친 가격이 CORRECTED 스냅샷으로 남는다 — 안 그러면 기준가 계산이 오독을 계속 근거로 삼는다", async () => {
+    const { dealId, matchedBy } = await capture(); // salePrice: 53400
+    expect(matchedBy).toBe("created");
+    const before = await db.priceSnapshot.count();
+
+    await updateDealFacts(dealId, { salePrice: 49900 });
+
+    const snapshots = await db.priceSnapshot.findMany({ orderBy: { capturedAt: "asc" } });
+    expect(snapshots.length).toBe(before + 1);
+    const corrected = snapshots[snapshots.length - 1];
+    expect(corrected.source).toBe("CORRECTED");
+    expect(corrected.salePrice).toBe(49900);
+  });
+
+  it("가격을 건드리지 않은 수정은 새 스냅샷을 만들지 않는다 — 편집할 때마다 늘어나면 노이즈다", async () => {
+    const { dealId } = await capture();
+    const before = await db.priceSnapshot.count();
+
+    await updateDealFacts(dealId, { curatorNote: "168/62 M 정사이즈" });
+
+    expect(await db.priceSnapshot.count()).toBe(before);
+  });
+
+  it("감사 로그에 전/후 값이 남는다 — 필드 이름만으로는 무엇이 바뀌었는지 알 수 없다", async () => {
+    const { dealId } = await capture(); // salePrice: 53400
+    await updateDealFacts(dealId, { salePrice: 49900 });
+
+    const entry = await db.auditLog.findFirst({
+      where: { action: "deal.edited", approvalRef: dealId },
+      orderBy: { ts: "desc" },
+    });
+    expect(entry?.detail).toContain("53400→49900");
+  });
+});
+
+describe("재캡처가 사람이 고친 값을 덮지 않는다 (2026-09-21)", () => {
+  it("정보 고치기로 고친 딜을 다시 찍어도 고친 값이 유지된다", async () => {
+    const { dealId } = await capture(); // salePrice: 53400
+    await updateDealFacts(dealId, { salePrice: 49900 });
+
+    // 같은 상품을 다시 찍었는데 이번엔 OCR이 다른(틀린) 값을 읽었다고 가정
+    await capture({ ...VISION_FULL, salePrice: 39900, discountRateShown: 55 });
+
+    const deal = await db.deal.findUniqueOrThrow({ where: { id: dealId } });
+    expect(deal.salePrice).toBe(49900); // 고친 값 그대로
+    expect(deal.parseSource).toBe("manual"); // vision으로 되돌아가지 않는다
+
+    // 새 OCR 읽기는 스냅샷으로는 남는다 — 가격이 바뀌었다면 눈에 띄어야 하니까
+    const latestSnapshot = await db.priceSnapshot.findFirst({ orderBy: { capturedAt: "desc" } });
+    expect(latestSnapshot?.salePrice).toBe(39900);
+  });
+
+  it("아직 안 고친 딜은 재캡처의 새 OCR 값으로 정상 갱신된다", async () => {
+    const { dealId } = await capture(); // salePrice: 53400
+
+    await capture({ ...VISION_FULL, salePrice: 49900, discountRateShown: 44 });
+
+    const deal = await db.deal.findUniqueOrThrow({ where: { id: dealId } });
+    expect(deal.salePrice).toBe(49900);
+    expect(deal.parseSource).toBe("vision");
+  });
+});
+
+describe("정가를 지어내지 않는다 — 표시광고법 (2026-09-21)", () => {
+  it("정가를 못 읽었으면 판매가로 채우지 않고 미확인(0)으로 둔다", async () => {
+    const { dealId } = await capture({ ...VISION_FULL, listPrice: null });
+
+    const deal = await db.deal.findUniqueOrThrow({ where: { id: dealId }, include: { product: true } });
+    expect(deal.product.listPrice).toBe(0);
+  });
+
+  it("확신도가 낮으면 딜에 남는다", async () => {
+    const { dealId } = await capture({ ...VISION_FULL, confidence: "low", notes: "가격이 두 개 보임" });
+
+    const deal = await db.deal.findUniqueOrThrow({ where: { id: dealId } });
+    expect(deal.visionConfidence).toBe("low");
+    expect(deal.visionNotes).toBe("가격이 두 개 보임");
+  });
 });

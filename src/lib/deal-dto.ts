@@ -16,6 +16,8 @@ type DealWithRelations = {
   status: string;
   approvalStage: ApprovalStage;
   parseSource: string | null;
+  visionConfidence: string | null;
+  visionNotes: string | null;
   salePrice: number | null;
   discountRate: number | null;
   couponCode: string | null;
@@ -140,6 +142,8 @@ export function toDealDTO(
     status: deal.status,
     approvalStage: deal.approvalStage,
     parseSource: deal.parseSource,
+    visionConfidence: deal.visionConfidence,
+    visionNotes: deal.visionNotes,
     linkCount: deal.curatorLinks.length,
     watchActive: !!watch && watch.active && watch.expiresAt > now,
     soldOut: deal.curatorLinks.some((l) => l.health !== "OK" && l.health !== "UNCHECKED"),

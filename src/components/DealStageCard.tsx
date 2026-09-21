@@ -97,6 +97,13 @@ export function DealStageCard({ deal, curatorShopUrl }: { deal: DealDTO; curator
           {deal.parseSource === "opengraph" && (
             <p className="text-sm text-ink-soft">일부만 읽었어요. 올리기 전에 확인해주세요.</p>
           )}
+          {/* AI 스스로 확신이 낮다고 한 캡처 — 사람이 고치면 parseSource가 'manual'로 바뀌어 사라진다 */}
+          {deal.parseSource === "vision" && deal.visionConfidence === "low" && (
+            <p className="text-sm text-danger">⚠️ AI가 확신하지 못했어요. 화면과 비교해 다시 확인해주세요.</p>
+          )}
+          {deal.parseSource === "vision" && deal.visionNotes && (
+            <p className="text-sm text-ink-soft">💭 AI 메모: {deal.visionNotes}</p>
+          )}
           {canProceed && (
             <button
               type="button"

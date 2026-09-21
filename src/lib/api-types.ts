@@ -108,6 +108,10 @@ export interface DealDTO {
   approvalStage: ApprovalStageDTO;
   /** 'vision' | 'manual' | 'json-ld' | 'opengraph' | 'none' — "읽지 못함"이면 진행 버튼을 내주지 않는다 */
   parseSource: string | null;
+  /** Vision이 스스로 매긴 확신도 — "low"면 후보 카드가 재확인을 청한다. parseSource가 'vision'일 때만 의미 있다 */
+  visionConfidence: string | null;
+  /** Vision이 남긴 애매한 점(예: "가격이 두 개 보임") */
+  visionNotes: string | null;
   /** 붙어 있는 큐레이터 링크 수 */
   linkCount: number;
   /** 이 상품이 가격 추적(워치) 중인가 */

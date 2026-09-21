@@ -56,13 +56,18 @@ const CHAR_LIMIT: Partial<Record<Channel, number>> = {
   INSTAGRAM_COMMENT: 2200,
 };
 
+// listPrice=0은 "미확인" sentinel이다(product-match.ts와 동일한 관례) — deal-format.ts의
+// dealPriceLine·dealPriceParts와 같은 규칙을 쓴다. 0을 정가로 취급하면 "0원"이 고지문과
+// 함께 나가거나(그 자체로 문제), 정가가 실제로는 검증된 적 없는데 취소선 비교가 나갈 수
+// 있다(표시광고법 오인표시 위험 — deal-flow.ts가 예전엔 이걸 판매가로 정가를 채워
+// 회피했었다, 2026-09-21 제거).
 function priceLine(f: DealFacts): string {
   const effective = f.finalPrice ?? f.salePrice ?? f.listPrice;
-  if (f.salePrice != null && f.salePrice < f.listPrice) {
+  if (f.salePrice != null && f.listPrice > 0 && f.salePrice < f.listPrice) {
     const pct = f.discountRate != null ? ` (${f.discountRate}%)` : "";
     return `${formatKRW(f.listPrice)} → ${formatKRW(effective)}${pct}`;
   }
-  return formatKRW(f.listPrice);
+  return formatKRW(effective || f.listPrice);
 }
 
 function couponLine(f: DealFacts): string | null {

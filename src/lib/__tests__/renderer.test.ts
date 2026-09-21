@@ -106,6 +106,17 @@ describe("renderCard — 채널별 글자수 하드 제약 (docs/02 §4.3)", () 
   });
 });
 
+describe("renderCard — 정가 미확인(listPrice=0)은 지어내지 않는다 (2026-09-21)", () => {
+  it("정가를 모르면(0) 취소선 비교 없이 판매가만 보여준다 — '0원'을 찍지 않는다", () => {
+    const result = renderCard("KAKAO_OPEN", { ...baseFacts, listPrice: 0, finalPrice: null });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.card.bodyText.split("\n")).not.toContain("0원"); // 가격 줄 자체가 "0원"이면 안 된다
+    expect(result.card.bodyText).toContain("53,400원");
+    expect(result.card.bodyText).not.toMatch(/원 → /); // 검증되지 않은 정가와 비교하지 않는다
+  });
+});
+
 describe("renderCard — 조건부 섹션", () => {
   it("쿠폰이 없으면 쿠폰 블록 전체가 생략된다", () => {
     const result = renderCard("KAKAO_OPEN", {
